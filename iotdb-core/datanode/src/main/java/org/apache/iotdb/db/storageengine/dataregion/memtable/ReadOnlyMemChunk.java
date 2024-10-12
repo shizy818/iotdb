@@ -31,13 +31,14 @@ import org.apache.tsfile.file.metadata.ChunkMetadata;
 import org.apache.tsfile.file.metadata.IChunkMetadata;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
+import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
-import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.reader.IPointReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
@@ -57,7 +58,8 @@ public class ReadOnlyMemChunk {
 
   protected IChunkMetadata cachedMetaData;
 
-  protected TsBlock tsBlock;
+  private List<TVList> sortedLists;
+  List<TimeRange> deletionList;
 
   protected ReadOnlyMemChunk(QueryContext context) {
     this.context = context;
@@ -68,7 +70,7 @@ public class ReadOnlyMemChunk {
       String measurementUid,
       TSDataType dataType,
       TSEncoding encoding,
-      TVList tvList,
+      List<TVList> sortedLists,
       Map<String, String> props,
       List<TimeRange> deletionList)
       throws IOException, QueryProcessException {
@@ -92,49 +94,41 @@ public class ReadOnlyMemChunk {
         floatPrecision = TSFileDescriptor.getInstance().getConfig().getFloatPrecision();
       }
     }
-    this.tsBlock = tvList.buildTsBlock(floatPrecision, encoding, deletionList);
-    initChunkMetaFromTsBlock();
+    this.sortedLists = sortedLists;
+    this.deletionList = deletionList;
+    initChunkMetaFromTvLists();
   }
 
-  private void initChunkMetaFromTsBlock() throws QueryProcessException {
-    Statistics statsByType = Statistics.getStatsByType(dataType);
+  private void initChunkMetaFromTvLists() throws QueryProcessException, IOException {
+    Statistics<? extends Serializable> statsByType = Statistics.getStatsByType(dataType);
     IChunkMetadata metaData =
         new ChunkMetadata(measurementUid, dataType, null, null, 0, statsByType);
-    if (!isEmpty()) {
+
+    ReadOnlyMemChunkIterator iterator = new ReadOnlyMemChunkIterator(sortedLists, deletionList);
+    while (iterator.hasNextTimeValuePair()) {
+      TimeValuePair tvPair = iterator.nextTimeValuePair();
       switch (dataType) {
         case BOOLEAN:
-          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
-            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getBoolean(i));
-          }
+          statsByType.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
+          break;
+        case INT32:
+        case DATE:
+          statsByType.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
+          break;
+        case INT64:
+        case TIMESTAMP:
+          statsByType.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
           break;
         case TEXT:
         case BLOB:
         case STRING:
-          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
-            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getBinary(i));
-          }
+          statsByType.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
           break;
         case FLOAT:
-          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
-            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getFloat(i));
-          }
-          break;
-        case INT32:
-        case DATE:
-          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
-            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getInt(i));
-          }
-          break;
-        case INT64:
-        case TIMESTAMP:
-          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
-            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getLong(i));
-          }
+          statsByType.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
           break;
         case DOUBLE:
-          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
-            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getDouble(i));
-          }
+          statsByType.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
           break;
         default:
           throw new QueryProcessException("Unsupported data type:" + dataType);
@@ -146,12 +140,16 @@ public class ReadOnlyMemChunk {
     cachedMetaData = metaData;
   }
 
-  public TSDataType getDataType() {
-    return dataType;
+  public long rowCount() {
+    long rowCount = 0;
+    for (TVList sortedList : sortedLists) {
+      rowCount += sortedList.rowCount();
+    }
+    return rowCount;
   }
 
   public boolean isEmpty() {
-    return tsBlock.isEmpty();
+    return rowCount() == 0;
   }
 
   public IChunkMetadata getChunkMetaData() {
@@ -159,10 +157,6 @@ public class ReadOnlyMemChunk {
   }
 
   public IPointReader getPointReader() {
-    return tsBlock.getTsBlockSingleColumnIterator();
-  }
-
-  public TsBlock getTsBlock() {
-    return tsBlock;
+    return new ReadOnlyMemChunkIterator(sortedLists, deletionList);
   }
 }

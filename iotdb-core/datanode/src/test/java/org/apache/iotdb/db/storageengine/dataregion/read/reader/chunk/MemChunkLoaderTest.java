@@ -21,6 +21,8 @@ package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunk;
+import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunkIterator;
+import org.apache.iotdb.db.utils.datastructure.*;
 
 import org.apache.tsfile.common.conf.TSFileConfig;
 import org.apache.tsfile.enums.TSDataType;
@@ -28,13 +30,14 @@ import org.apache.tsfile.file.metadata.ChunkMetadata;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
 import org.apache.tsfile.read.common.BatchData;
 import org.apache.tsfile.read.common.block.TsBlock;
-import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPageReader;
+import org.apache.tsfile.read.reader.IPointReader;
 import org.apache.tsfile.utils.Binary;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -63,9 +66,8 @@ public class MemChunkLoaderTest {
 
     ChunkMetadata chunkMetadata1 = Mockito.mock(ChunkMetadata.class);
 
-    Mockito.when(chunk.getTsBlock()).thenReturn(buildBooleanTsBlock());
     Mockito.when(chunk.getChunkMetaData()).thenReturn(chunkMetadata1);
-    Mockito.when(chunk.getPointReader()).thenReturn(null);
+    Mockito.when(chunk.getPointReader()).thenReturn(buildBooleanPointReader());
     Statistics statistics = Mockito.mock(Statistics.class);
     Mockito.when(statistics.getCount()).thenReturn(2L);
 
@@ -105,15 +107,14 @@ public class MemChunkLoaderTest {
     memChunkLoader.close();
   }
 
-  private TsBlock buildBooleanTsBlock() {
-    TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(TSDataType.BOOLEAN));
-    builder.getTimeColumnBuilder().writeLong(1L);
-    builder.getColumnBuilder(0).writeBoolean(true);
-    builder.declarePosition();
-    builder.getTimeColumnBuilder().writeLong(2L);
-    builder.getColumnBuilder(0).writeBoolean(false);
-    builder.declarePosition();
-    return builder.build();
+  private IPointReader buildBooleanPointReader() {
+    List<TVList> sortedTVLists = new ArrayList<>();
+    BooleanTVList tvList = BooleanTVList.newList();
+    tvList.putBoolean(1L, true);
+    tvList.putBoolean(2L, false);
+    sortedTVLists.add(tvList);
+
+    return new ReadOnlyMemChunkIterator(sortedTVLists, null);
   }
 
   @Test
@@ -131,9 +132,8 @@ public class MemChunkLoaderTest {
 
     ChunkMetadata chunkMetadata1 = Mockito.mock(ChunkMetadata.class);
 
-    Mockito.when(chunk.getTsBlock()).thenReturn(buildInt32TsBlock());
     Mockito.when(chunk.getChunkMetaData()).thenReturn(chunkMetadata1);
-    Mockito.when(chunk.getPointReader()).thenReturn(null);
+    Mockito.when(chunk.getPointReader()).thenReturn(buildIntPointReader());
     Statistics statistics = Mockito.mock(Statistics.class);
     Mockito.when(statistics.getCount()).thenReturn(2L);
 
@@ -173,15 +173,14 @@ public class MemChunkLoaderTest {
     memChunkLoader.close();
   }
 
-  private TsBlock buildInt32TsBlock() {
-    TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(TSDataType.INT32));
-    builder.getTimeColumnBuilder().writeLong(1L);
-    builder.getColumnBuilder(0).writeInt(1);
-    builder.declarePosition();
-    builder.getTimeColumnBuilder().writeLong(2L);
-    builder.getColumnBuilder(0).writeInt(2);
-    builder.declarePosition();
-    return builder.build();
+  private IPointReader buildIntPointReader() {
+    List<TVList> sortedTVLists = new ArrayList<>();
+    IntTVList tvList = IntTVList.newList();
+    tvList.putInt(1L, 1);
+    tvList.putInt(2L, 2);
+    sortedTVLists.add(tvList);
+
+    return new ReadOnlyMemChunkIterator(sortedTVLists, null);
   }
 
   @Test
@@ -199,9 +198,8 @@ public class MemChunkLoaderTest {
 
     ChunkMetadata chunkMetadata1 = Mockito.mock(ChunkMetadata.class);
 
-    Mockito.when(chunk.getTsBlock()).thenReturn(buildInt64TsBlock());
     Mockito.when(chunk.getChunkMetaData()).thenReturn(chunkMetadata1);
-    Mockito.when(chunk.getPointReader()).thenReturn(null);
+    Mockito.when(chunk.getPointReader()).thenReturn(buildLongPointReader());
     Statistics statistics = Mockito.mock(Statistics.class);
     Mockito.when(statistics.getCount()).thenReturn(2L);
 
@@ -241,15 +239,14 @@ public class MemChunkLoaderTest {
     memChunkLoader.close();
   }
 
-  private TsBlock buildInt64TsBlock() {
-    TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(TSDataType.INT64));
-    builder.getTimeColumnBuilder().writeLong(1L);
-    builder.getColumnBuilder(0).writeLong(1L);
-    builder.declarePosition();
-    builder.getTimeColumnBuilder().writeLong(2L);
-    builder.getColumnBuilder(0).writeLong(2L);
-    builder.declarePosition();
-    return builder.build();
+  private IPointReader buildLongPointReader() {
+    List<TVList> sortedTVLists = new ArrayList<>();
+    LongTVList tvList = LongTVList.newList();
+    tvList.putLong(1L, 1L);
+    tvList.putLong(2L, 2L);
+    sortedTVLists.add(tvList);
+
+    return new ReadOnlyMemChunkIterator(sortedTVLists, null);
   }
 
   @Test
@@ -267,9 +264,8 @@ public class MemChunkLoaderTest {
 
     ChunkMetadata chunkMetadata1 = Mockito.mock(ChunkMetadata.class);
 
-    Mockito.when(chunk.getTsBlock()).thenReturn(buildFloatTsBlock());
     Mockito.when(chunk.getChunkMetaData()).thenReturn(chunkMetadata1);
-    Mockito.when(chunk.getPointReader()).thenReturn(null);
+    Mockito.when(chunk.getPointReader()).thenReturn(buildFloatPointReader());
     Statistics statistics = Mockito.mock(Statistics.class);
     Mockito.when(statistics.getCount()).thenReturn(2L);
 
@@ -309,15 +305,14 @@ public class MemChunkLoaderTest {
     memChunkLoader.close();
   }
 
-  private TsBlock buildFloatTsBlock() {
-    TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(TSDataType.FLOAT));
-    builder.getTimeColumnBuilder().writeLong(1L);
-    builder.getColumnBuilder(0).writeFloat(1.1f);
-    builder.declarePosition();
-    builder.getTimeColumnBuilder().writeLong(2L);
-    builder.getColumnBuilder(0).writeFloat(2.1f);
-    builder.declarePosition();
-    return builder.build();
+  private IPointReader buildFloatPointReader() {
+    List<TVList> sortedTVLists = new ArrayList<>();
+    FloatTVList tvList = FloatTVList.newList();
+    tvList.putFloat(1L, 1.1f);
+    tvList.putFloat(2L, 2.1f);
+    sortedTVLists.add(tvList);
+
+    return new ReadOnlyMemChunkIterator(sortedTVLists, null);
   }
 
   @Test
@@ -335,9 +330,8 @@ public class MemChunkLoaderTest {
 
     ChunkMetadata chunkMetadata1 = Mockito.mock(ChunkMetadata.class);
 
-    Mockito.when(chunk.getTsBlock()).thenReturn(buildDoubleTsBlock());
     Mockito.when(chunk.getChunkMetaData()).thenReturn(chunkMetadata1);
-    Mockito.when(chunk.getPointReader()).thenReturn(null);
+    Mockito.when(chunk.getPointReader()).thenReturn(buildDoublePointReader());
     Statistics statistics = Mockito.mock(Statistics.class);
     Mockito.when(statistics.getCount()).thenReturn(2L);
 
@@ -377,15 +371,14 @@ public class MemChunkLoaderTest {
     memChunkLoader.close();
   }
 
-  private TsBlock buildDoubleTsBlock() {
-    TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(TSDataType.DOUBLE));
-    builder.getTimeColumnBuilder().writeLong(1L);
-    builder.getColumnBuilder(0).writeDouble(1.1d);
-    builder.declarePosition();
-    builder.getTimeColumnBuilder().writeLong(2L);
-    builder.getColumnBuilder(0).writeDouble(2.1d);
-    builder.declarePosition();
-    return builder.build();
+  private IPointReader buildDoublePointReader() {
+    List<TVList> sortedTVLists = new ArrayList<>();
+    DoubleTVList tvList = DoubleTVList.newList();
+    tvList.putDouble(1L, 1.1d);
+    tvList.putDouble(2L, 2.1d);
+    sortedTVLists.add(tvList);
+
+    return new ReadOnlyMemChunkIterator(sortedTVLists, null);
   }
 
   @Test
@@ -403,9 +396,8 @@ public class MemChunkLoaderTest {
 
     ChunkMetadata chunkMetadata1 = Mockito.mock(ChunkMetadata.class);
 
-    Mockito.when(chunk.getTsBlock()).thenReturn(buildTextTsBlock());
     Mockito.when(chunk.getChunkMetaData()).thenReturn(chunkMetadata1);
-    Mockito.when(chunk.getPointReader()).thenReturn(null);
+    Mockito.when(chunk.getPointReader()).thenReturn(buildTextPointReader());
     Statistics statistics = Mockito.mock(Statistics.class);
     Mockito.when(statistics.getCount()).thenReturn(2L);
 
@@ -445,14 +437,13 @@ public class MemChunkLoaderTest {
     memChunkLoader.close();
   }
 
-  private TsBlock buildTextTsBlock() {
-    TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(TSDataType.TEXT));
-    builder.getTimeColumnBuilder().writeLong(1L);
-    builder.getColumnBuilder(0).writeBinary(new Binary(BINARY_STR, TSFileConfig.STRING_CHARSET));
-    builder.declarePosition();
-    builder.getTimeColumnBuilder().writeLong(2L);
-    builder.getColumnBuilder(0).writeBinary(new Binary(BINARY_STR, TSFileConfig.STRING_CHARSET));
-    builder.declarePosition();
-    return builder.build();
+  private IPointReader buildTextPointReader() {
+    List<TVList> sortedTVLists = new ArrayList<>();
+    BinaryTVList tvList = BinaryTVList.newList();
+    tvList.putBinary(1L, new Binary(BINARY_STR, TSFileConfig.STRING_CHARSET));
+    tvList.putBinary(2L, new Binary(BINARY_STR, TSFileConfig.STRING_CHARSET));
+    sortedTVLists.add(tvList);
+
+    return new ReadOnlyMemChunkIterator(sortedTVLists, null);
   }
 }

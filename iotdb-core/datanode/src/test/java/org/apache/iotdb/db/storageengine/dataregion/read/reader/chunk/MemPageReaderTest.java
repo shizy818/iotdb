@@ -19,11 +19,17 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
+import org.apache.iotdb.db.exception.query.QueryProcessException;
+import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
+import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunk;
+import org.apache.iotdb.db.utils.datastructure.IntTVList;
+import org.apache.iotdb.db.utils.datastructure.TVList;
+
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.ChunkMetadata;
+import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
 import org.apache.tsfile.read.common.block.TsBlock;
-import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.filter.factory.TimeFilterApi;
 import org.apache.tsfile.read.filter.factory.ValueFilterApi;
 import org.apache.tsfile.read.reader.IPageReader;
@@ -33,35 +39,52 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.apache.tsfile.read.filter.factory.ValueFilterApi.DEFAULT_MEASUREMENT_INDEX;
 
 public class MemPageReaderTest {
 
-  private static final TsBlock tsBlock;
+  private static final ReadOnlyMemChunk readOnlyMemChunk;
   private static final ChunkMetadata chunkMetadata = Mockito.mock(ChunkMetadata.class);
 
   static {
-    TsBlockBuilder tsBlockBuilder = new TsBlockBuilder(Collections.singletonList(TSDataType.INT32));
     Statistics statistics = Statistics.getStatsByType(TSDataType.INT32);
 
-    for (int i = 0; i < 100; i++) {
-      tsBlockBuilder.getTimeColumnBuilder().writeLong(i);
-      tsBlockBuilder.getValueColumnBuilders()[0].writeInt(i);
-      tsBlockBuilder.declarePosition();
+    TSDataType dataType = TSDataType.INT32;
+    String measurementId = "s1";
+    IntTVList tvList = IntTVList.newList();
+    for (int i = 0; i < 1000; i++) {
+      tvList.putInt(i, i);
       statistics.update(i, i);
     }
+    tvList.sort();
 
-    tsBlock = tsBlockBuilder.build();
+    try {
+      List<TVList> sortedLists = new ArrayList<>();
+      sortedLists.add(tvList);
+      readOnlyMemChunk =
+          new ReadOnlyMemChunk(
+              new QueryContext(),
+              measurementId,
+              dataType,
+              TSEncoding.PLAIN,
+              sortedLists,
+              null,
+              null);
+    } catch (IOException | QueryProcessException e) {
+      throw new RuntimeException(e);
+    }
+
     Mockito.when(chunkMetadata.getTimeStatistics()).thenReturn(statistics);
     Mockito.when(chunkMetadata.getMeasurementStatistics(0)).thenReturn(Optional.of(statistics));
     Mockito.when(chunkMetadata.getDataType()).thenReturn(TSDataType.INT32);
   }
 
   private MemPageReader generatePageReader() {
-    return new MemPageReader(tsBlock, chunkMetadata, null);
+    return new MemPageReader(readOnlyMemChunk.getPointReader(), chunkMetadata, null);
   }
 
   @Test

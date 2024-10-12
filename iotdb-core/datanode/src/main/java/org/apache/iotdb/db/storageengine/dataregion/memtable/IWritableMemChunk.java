@@ -31,6 +31,7 @@ import org.apache.tsfile.write.schema.IMeasurementSchema;
 import java.util.List;
 
 public interface IWritableMemChunk extends WALEntryValue {
+  int SORT_THRESHOLD = 5000;
 
   boolean putLongWithFlushCheck(long t, long v);
 

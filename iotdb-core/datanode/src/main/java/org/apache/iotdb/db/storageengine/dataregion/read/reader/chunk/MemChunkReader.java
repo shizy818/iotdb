@@ -49,7 +49,7 @@ public class MemChunkReader implements IChunkReader, IPointReader {
     this.pageReaderList =
         Collections.singletonList(
             new MemPageReader(
-                readableChunk.getTsBlock(), readableChunk.getChunkMetaData(), globalTimeFilter));
+                timeValuePairIterator, readableChunk.getChunkMetaData(), globalTimeFilter));
   }
 
   @Override

@@ -416,4 +416,43 @@ public abstract class TVList implements WALEntryValue {
   public List<long[]> getTimestamps() {
     return timestamps;
   }
+
+  public TVListIterator iterator() {
+    return new TVListIterator();
+  }
+
+  /** TVList Iterator */
+  public class TVListIterator {
+    private int index;
+
+    public TVListIterator() {
+      seekToFirst();
+    }
+
+    public void seekToFirst() {
+      index = 0;
+    }
+
+    public boolean hasNext() {
+      return index < rowCount;
+    }
+
+    public TimeValuePair next() {
+      return getTimeValuePair(index++);
+    }
+
+    public TimeValuePair current() {
+      if (index >= rowCount) {
+        return null;
+      }
+      return getTimeValuePair(index);
+    }
+
+    public TimeValuePair peekNext() {
+      if (index + 1 >= rowCount) {
+        return null;
+      }
+      return getTimeValuePair(index + 1);
+    }
+  }
 }

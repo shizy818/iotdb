@@ -23,13 +23,7 @@ import org.apache.iotdb.commons.path.IFullPath;
 import org.apache.iotdb.commons.path.NonAlignedFullPath;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedWritableMemChunk;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedWritableMemChunkGroup;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.IMemTable;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMemChunk;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMemChunkGroup;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunk;
+import org.apache.iotdb.db.storageengine.dataregion.memtable.*;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.utils.ModificationUtils;
@@ -373,10 +367,15 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
         || !memTableMap.get(deviceID).contains(fullPath.getMeasurement())) {
       return null;
     }
-    IWritableMemChunk memChunk =
-        memTableMap.get(deviceID).getMemChunkMap().get(fullPath.getMeasurement());
-    // get sorted tv list is synchronized so different query can get right sorted list reference
-    TVList chunkCopy = memChunk.getSortedTvListForQuery();
+    WritableMemChunk memChunk =
+        (WritableMemChunk)
+            memTableMap.get(deviceID).getMemChunkMap().get(fullPath.getMeasurement());
+
+    List<TVList> sortedLists = new ArrayList<>(memChunk.getSortedLists());
+    // clone and sort list is synchronized so different query can get right sorted list reference
+    TVList clonedList = memChunk.cloneAndSortList();
+    sortedLists.add(clonedList);
+
     List<TimeRange> deletionList = null;
     if (modsToMemtable != null) {
       deletionList =
@@ -392,7 +391,7 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
         fullPath.getMeasurement(),
         fullPath.getMeasurementSchema().getType(),
         fullPath.getMeasurementSchema().getEncodingType(),
-        chunkCopy,
+        sortedLists,
         fullPath.getMeasurementSchema().getProps(),
         deletionList);
   }
