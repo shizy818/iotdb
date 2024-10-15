@@ -115,7 +115,6 @@ public class MemPageReader implements IPageReader {
       if (recordFilter != null && !recordFilter.satisfy(tvPair.getTimestamp(), tvPair.getValue())) {
         continue;
       }
-
       // skip offset rows
       if (paginationController.hasCurOffset()) {
         paginationController.consumeOffset();

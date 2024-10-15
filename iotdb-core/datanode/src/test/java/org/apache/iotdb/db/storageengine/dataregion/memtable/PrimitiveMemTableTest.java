@@ -33,6 +33,7 @@ import org.apache.iotdb.db.storageengine.dataregion.modification.Deletion;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
 import org.apache.iotdb.db.storageengine.dataregion.wal.utils.WALByteBufferForTest;
 import org.apache.iotdb.db.utils.MathUtils;
+import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileConfig;
 import org.apache.tsfile.common.conf.TSFileDescriptor;
@@ -96,7 +97,7 @@ public class PrimitiveMemTableTest {
   }
 
   @Test
-  public void memSeriesSortIteratorTest() throws IOException {
+  public void memSeriesSortIteratorTest() throws IOException, QueryProcessException {
     TSDataType dataType = TSDataType.INT32;
     WritableMemChunk series =
         new WritableMemChunk(new MeasurementSchema("s1", dataType, TSEncoding.PLAIN));
@@ -104,8 +105,13 @@ public class PrimitiveMemTableTest {
     for (int i = 0; i < count; i++) {
       series.writeWithFlushCheck(i, i);
     }
-    IPointReader it =
-        series.getSortedTvListForQuery().buildTsBlock().getTsBlockSingleColumnIterator();
+
+    List<TVList> sortedLists = new ArrayList<>(series.getSortedLists());
+    sortedLists.add(series.cloneAndSortList());
+    ReadOnlyMemChunk chunk =
+        new ReadOnlyMemChunk(
+            new QueryContext(), "s1", dataType, TSEncoding.PLAIN, sortedLists, null, null);
+    IPointReader it = chunk.getPointReader();
     int i = 0;
     while (it.hasNextTimeValuePair()) {
       Assert.assertEquals(i, it.nextTimeValuePair().getTimestamp());

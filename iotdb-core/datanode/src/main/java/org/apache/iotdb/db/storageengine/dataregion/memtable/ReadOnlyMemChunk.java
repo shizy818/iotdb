@@ -60,6 +60,8 @@ public class ReadOnlyMemChunk {
 
   private List<TVList> sortedLists;
   List<TimeRange> deletionList;
+  TSEncoding encoding;
+  int floatPrecision;
 
   protected ReadOnlyMemChunk(QueryContext context) {
     this.context = context;
@@ -96,6 +98,8 @@ public class ReadOnlyMemChunk {
     }
     this.sortedLists = sortedLists;
     this.deletionList = deletionList;
+    this.encoding = encoding;
+    this.floatPrecision = floatPrecision;
     initChunkMetaFromTvLists();
   }
 
@@ -140,8 +144,8 @@ public class ReadOnlyMemChunk {
     cachedMetaData = metaData;
   }
 
-  public long rowCount() {
-    long rowCount = 0;
+  public int rowCount() {
+    int rowCount = 0;
     for (TVList sortedList : sortedLists) {
       rowCount += sortedList.rowCount();
     }
@@ -157,6 +161,6 @@ public class ReadOnlyMemChunk {
   }
 
   public IPointReader getPointReader() {
-    return new ReadOnlyMemChunkIterator(sortedLists, deletionList);
+    return new ReadOnlyMemChunkIterator(sortedLists, deletionList, encoding, floatPrecision);
   }
 }

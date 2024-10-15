@@ -43,7 +43,7 @@ public class MemChunkReader implements IChunkReader, IPointReader {
   private TimeValuePair cachedTimeValuePair;
 
   public MemChunkReader(ReadOnlyMemChunk readableChunk, Filter globalTimeFilter) {
-    timeValuePairIterator = readableChunk.getPointReader();
+    this.timeValuePairIterator = readableChunk.getPointReader();
     this.globalTimeFilter = globalTimeFilter;
     // we treat one ReadOnlyMemChunk as one Page
     this.pageReaderList =

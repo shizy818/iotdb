@@ -252,20 +252,6 @@ public class WritableMemChunk implements IWritableMemChunk {
     throw new UnSupportedDataTypeException(UNSUPPORTED_TYPE + schema.getType());
   }
 
-  @Override
-  public synchronized TVList getSortedTvListForQuery() {
-    sortTVList();
-    // increase reference count
-    list.increaseReferenceCount();
-    return list;
-  }
-
-  @Override
-  public synchronized TVList getSortedTvListForQuery(
-      List<IMeasurementSchema> measurementSchema, boolean ignoreAllNullRows) {
-    throw new UnSupportedDataTypeException(UNSUPPORTED_TYPE + list.getDataType());
-  }
-
   private void sortTVList() {
     if (!list.isSorted()) {
       list.sort();
@@ -289,6 +275,16 @@ public class WritableMemChunk implements IWritableMemChunk {
   @Override
   public IMeasurementSchema getSchema() {
     return schema;
+  }
+
+  @Override
+  public TVList getSortedTvListForQuery() {
+    return null;
+  }
+
+  @Override
+  public TVList getSortedTvListForQuery(List<IMeasurementSchema> schemaList, boolean ignoreAllNullRows) {
+    return null;
   }
 
   @Override
@@ -482,10 +478,10 @@ public class WritableMemChunk implements IWritableMemChunk {
     schema.serializeTo(ByteBuffer.wrap(bytes));
     buffer.put(bytes);
 
-    list.serializeToWAL(buffer);
     for (TVList sortedList : sortedLists) {
       sortedList.serializeToWAL(buffer);
     }
+    list.serializeToWAL(buffer);
   }
 
   public static WritableMemChunk deserialize(DataInputStream stream) throws IOException {

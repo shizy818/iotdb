@@ -1,28 +1,46 @@
 package org.apache.iotdb.db.storageengine.dataregion.memtable;
 
+import org.apache.iotdb.db.utils.MathUtils;
 import org.apache.iotdb.db.utils.ModificationUtils;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
+import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.TsPrimitiveType;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ReadOnlyMemChunkIterator implements IPointReader {
-  private final List<TVList.TVListIterator> listIterators;
-  List<TimeRange> deletionList;
+  private List<TVList.TVListIterator> listIterators;
+  private List<TimeRange> deletionList;
   private boolean hasNextRow;
   private TimeValuePair currentTvPair;
+  private TSEncoding encoding;
+  private Integer floatPrecision;
+  int[] deleteCursor;
 
   public ReadOnlyMemChunkIterator(List<TVList> sortedLists, List<TimeRange> deletionList) {
+    new ReadOnlyMemChunkIterator(sortedLists, deletionList, null, null);
+  }
+
+  public ReadOnlyMemChunkIterator(
+      List<TVList> sortedLists,
+      List<TimeRange> deletionList,
+      TSEncoding encoding,
+      Integer floatPrecision) {
     this.listIterators = new ArrayList<>();
     for (TVList sortedList : sortedLists) {
       listIterators.add(sortedList.iterator());
     }
     this.deletionList = deletionList;
+    this.encoding = encoding;
+    this.floatPrecision = floatPrecision;
+    this.deleteCursor = new int[] {0};
     prepareNextRow();
   }
 
@@ -36,7 +54,8 @@ public class ReadOnlyMemChunkIterator implements IPointReader {
       // skip deleted point
       if (deletionList != null) {
         while (currTvPair != null
-            && ModificationUtils.isPointDeleted(currTvPair.getTimestamp(), deletionList)) {
+            && ModificationUtils.isPointDeleted(
+                currTvPair.getTimestamp(), deletionList, deleteCursor)) {
           iterator.next();
           currTvPair = iterator.current();
         }
@@ -63,8 +82,8 @@ public class ReadOnlyMemChunkIterator implements IPointReader {
 
       // call next if current timestamp in other list iterator is identical
       for (TVList.TVListIterator iterator : listIterators) {
-        TimeValuePair curr = iterator.current();
-        if (curr != null && curr.getTimestamp() == currentTvPair.getTimestamp()) {
+        TimeValuePair tvPair = iterator.current();
+        if (tvPair != null && tvPair.getTimestamp() == currentTvPair.getTimestamp()) {
           iterator.next();
         }
       }
@@ -78,13 +97,33 @@ public class ReadOnlyMemChunkIterator implements IPointReader {
 
   @Override
   public TimeValuePair nextTimeValuePair() throws IOException {
-    TimeValuePair ret = currentTvPair;
+    TimeValuePair ret = currentTimeValuePair();
     prepareNextRow();
     return ret;
   }
 
   @Override
-  public TimeValuePair currentTimeValuePair() throws IOException {
+  public TimeValuePair currentTimeValuePair() {
+    TSDataType dataType = currentTvPair.getValue().getDataType();
+    if (encoding != null && floatPrecision != null) {
+      if (dataType == TSDataType.FLOAT) {
+        float value = currentTvPair.getValue().getFloat();
+        if (!Float.isNaN(value)
+            && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+          currentTvPair.setValue(
+              new TsPrimitiveType.TsFloat(
+                  MathUtils.roundWithGivenPrecision(value, floatPrecision)));
+        }
+      } else if (dataType == TSDataType.DOUBLE) {
+        double value = currentTvPair.getValue().getDouble();
+        if (!Double.isNaN(value)
+            && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+          currentTvPair.setValue(
+              new TsPrimitiveType.TsDouble(
+                  MathUtils.roundWithGivenPrecision(value, floatPrecision)));
+        }
+      }
+    }
     return currentTvPair;
   }
 
