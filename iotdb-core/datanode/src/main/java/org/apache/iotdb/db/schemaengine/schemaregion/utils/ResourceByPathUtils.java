@@ -27,6 +27,7 @@ import org.apache.iotdb.db.storageengine.dataregion.memtable.*;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.utils.ModificationUtils;
+import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.enums.TSDataType;
@@ -176,7 +177,7 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
       IMemTable memTable,
       List<Pair<Modification, IMemTable>> modsToMemtable,
       long timeLowerBound)
-      throws QueryProcessException {
+      throws QueryProcessException, IOException {
     Map<IDeviceID, IWritableMemChunkGroup> memTableMap = memTable.getMemTableMap();
     IDeviceID deviceID = alignedFullPath.getDeviceId();
 
@@ -200,10 +201,11 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
       }
     }
 
-    // get sorted tv list is synchronized so different query can get right sorted list reference
-    TVList alignedTvListCopy =
-        alignedMemChunk.getSortedTvListForQuery(
-            alignedFullPath.getSchemaList(), context.isIgnoreAllNullRows());
+    // clone and sort list is synchronized so different query can get right sorted list reference
+    List<AlignedTVList> sortedLists = new ArrayList<>(alignedMemChunk.getSortedLists());
+    AlignedTVList clonedList = alignedMemChunk.cloneAndSortList();
+    sortedLists.add(clonedList);
+
     List<TimeRange> timeColumnDeletion = null;
     List<List<TimeRange>> valueColumnsDeletionList = null;
     if (modsToMemtable != null) {
@@ -223,10 +225,17 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
               modsToMemtable,
               timeLowerBound);
     }
+
+    List<Integer> columnIndexList = new ArrayList<>();
+    for (IMeasurementSchema measurementSchema : alignedFullPath.getSchemaList()) {
+      columnIndexList.add(
+          alignedMemChunk.getMeasurementIndex(measurementSchema.getMeasurementId()));
+    }
     return new AlignedReadOnlyMemChunk(
         context,
         getMeasurementSchema(),
-        alignedTvListCopy,
+        columnIndexList,
+        sortedLists,
         timeColumnDeletion,
         valueColumnsDeletionList);
   }

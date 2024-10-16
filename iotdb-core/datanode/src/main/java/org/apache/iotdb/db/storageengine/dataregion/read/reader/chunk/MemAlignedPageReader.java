@@ -19,11 +19,13 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
-import org.apache.tsfile.block.column.Column;
+import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunkIterator;
+
 import org.apache.tsfile.block.column.ColumnBuilder;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.AlignedChunkMetadata;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
+import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.BatchData;
 import org.apache.tsfile.read.common.BatchDataFactory;
 import org.apache.tsfile.read.common.block.TsBlock;
@@ -31,12 +33,12 @@ import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.filter.basic.Filter;
 import org.apache.tsfile.read.filter.factory.FilterFactory;
 import org.apache.tsfile.read.reader.IPageReader;
+import org.apache.tsfile.read.reader.IPointReader;
 import org.apache.tsfile.read.reader.series.PaginationController;
 import org.apache.tsfile.utils.TsPrimitiveType;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,7 +46,7 @@ import static org.apache.tsfile.read.reader.series.PaginationController.UNLIMITE
 
 public class MemAlignedPageReader implements IPageReader {
 
-  private final TsBlock tsBlock;
+  private final IPointReader timeValuePairIterator;
   private final AlignedChunkMetadata chunkMetadata;
 
   private Filter recordFilter;
@@ -53,8 +55,8 @@ public class MemAlignedPageReader implements IPageReader {
   private TsBlockBuilder builder;
 
   public MemAlignedPageReader(
-      TsBlock tsBlock, AlignedChunkMetadata chunkMetadata, Filter recordFilter) {
-    this.tsBlock = tsBlock;
+      IPointReader timeValuePairIterator, AlignedChunkMetadata chunkMetadata, Filter recordFilter) {
+    this.timeValuePairIterator = timeValuePairIterator;
     this.chunkMetadata = chunkMetadata;
     this.recordFilter = recordFilter;
   }
@@ -67,91 +69,61 @@ public class MemAlignedPageReader implements IPageReader {
   @Override
   public BatchData getAllSatisfiedPageData(boolean ascending) throws IOException {
     BatchData batchData = BatchDataFactory.createBatchData(TSDataType.VECTOR, ascending, false);
-
-    boolean[] satisfyInfo = buildSatisfyInfoArray();
-
-    for (int rowIndex = 0; rowIndex < tsBlock.getPositionCount(); rowIndex++) {
-      if (satisfyInfo[rowIndex]) {
-        long time = tsBlock.getTimeByIndex(rowIndex);
-        TsPrimitiveType[] values = new TsPrimitiveType[tsBlock.getValueColumnCount()];
-        for (int column = 0; column < tsBlock.getValueColumnCount(); column++) {
-          if (tsBlock.getColumn(column) != null && !tsBlock.getColumn(column).isNull(rowIndex)) {
-            values[column] = tsBlock.getColumn(column).getTsPrimitiveType(rowIndex);
-          }
-        }
-        batchData.putVector(time, values);
+    while (timeValuePairIterator.hasNextTimeValuePair()) {
+      TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
+      if (recordFilter != null
+          && !recordFilter.satisfyRow(tvPair.getTimestamp(), tvPair.getValues())) {
+        continue;
       }
+      batchData.putVector(tvPair.getTimestamp(), tvPair.getValue().getVector());
     }
+    ((AlignedReadOnlyMemChunkIterator) timeValuePairIterator).reset();
     return batchData.flip();
   }
 
   @Override
-  public TsBlock getAllSatisfiedData() {
+  public TsBlock getAllSatisfiedData() throws IOException {
     builder.reset();
+    while (timeValuePairIterator.hasNextTimeValuePair()) {
+      TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
 
-    boolean[] satisfyInfo = buildSatisfyInfoArray();
-
-    // build time column
-    int readEndIndex = buildTimeColumn(satisfyInfo);
-
-    // build value column
-    buildValueColumns(satisfyInfo, readEndIndex);
-
-    return builder.build();
-  }
-
-  private boolean[] buildSatisfyInfoArray() {
-    if (recordFilter == null || recordFilter.allSatisfy(this)) {
-      boolean[] satisfyInfo = new boolean[tsBlock.getPositionCount()];
-      Arrays.fill(satisfyInfo, true);
-      return satisfyInfo;
-    }
-    return recordFilter.satisfyTsBlock(tsBlock);
-  }
-
-  private int buildTimeColumn(boolean[] satisfyInfo) {
-    int readEndIndex = tsBlock.getPositionCount();
-    for (int row = 0; row < readEndIndex; row++) {
-
-      if (needSkipCurrentRow(satisfyInfo, row)) {
+      // skip unsatisfied row
+      if (recordFilter != null
+          && !recordFilter.satisfyRow(tvPair.getTimestamp(), tvPair.getValues())) {
+        continue;
+      }
+      // skip offset rows
+      if (paginationController.hasCurOffset()) {
+        paginationController.consumeOffset();
         continue;
       }
 
       if (paginationController.hasCurLimit()) {
-        builder.getTimeColumnBuilder().writeLong(tsBlock.getTimeByIndex(row));
-        builder.declarePosition();
+        // write time column
+        writeTimeColumn(builder, tvPair.getTimestamp());
+        // write value column
+        writeValueColumns(builder, tvPair.getValue().getVector());
         paginationController.consumeLimit();
       } else {
-        readEndIndex = row;
+        break;
       }
     }
-    return readEndIndex;
+    ((AlignedReadOnlyMemChunkIterator) timeValuePairIterator).reset();
+    return builder.build();
   }
 
-  private boolean needSkipCurrentRow(boolean[] satisfyInfo, int rowIndex) {
-    if (!satisfyInfo[rowIndex]) {
-      return true;
-    }
-    if (paginationController.hasCurOffset()) {
-      paginationController.consumeOffset();
-      satisfyInfo[rowIndex] = false;
-      return true;
-    }
-    return false;
+  private void writeTimeColumn(TsBlockBuilder builder, long time) {
+    builder.getTimeColumnBuilder().writeLong(time);
+    builder.declarePosition();
   }
 
-  private void buildValueColumns(boolean[] satisfyInfo, int readEndIndex) {
-    for (int column = 0; column < tsBlock.getValueColumnCount(); column++) {
-      Column valueColumn = tsBlock.getColumn(column);
+  private void writeValueColumns(TsBlockBuilder builder, TsPrimitiveType[] values) {
+    for (int column = 0; column < values.length; column++) {
       ColumnBuilder valueBuilder = builder.getColumnBuilder(column);
-      for (int row = 0; row < readEndIndex; row++) {
-        if (satisfyInfo[row]) {
-          if (!valueColumn.isNull(row)) {
-            valueBuilder.write(valueColumn, row);
-          } else {
-            valueBuilder.appendNull();
-          }
-        }
+      if (values[column] != null) {
+        valueBuilder.writeObject(values[column].getValue());
+      } else {
+        valueBuilder.appendNull();
       }
     }
   }

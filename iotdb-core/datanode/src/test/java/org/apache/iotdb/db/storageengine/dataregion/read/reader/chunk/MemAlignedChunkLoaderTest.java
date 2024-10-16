@@ -21,6 +21,8 @@ package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
+import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunkIterator;
+import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
 
 import org.apache.tsfile.common.conf.TSFileConfig;
 import org.apache.tsfile.enums.TSDataType;
@@ -29,13 +31,13 @@ import org.apache.tsfile.file.metadata.ChunkMetadata;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
 import org.apache.tsfile.read.common.BatchData;
 import org.apache.tsfile.read.common.block.TsBlock;
-import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPageReader;
 import org.apache.tsfile.utils.Binary;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +55,9 @@ public class MemAlignedChunkLoaderTest {
   @Test
   public void testMemAlignedChunkLoader() throws IOException {
     AlignedReadOnlyMemChunk chunk = Mockito.mock(AlignedReadOnlyMemChunk.class);
+    AlignedReadOnlyMemChunkIterator chunkIterator = buildChunkIterator();
+    Mockito.when(chunk.getPointReader()).thenReturn(chunkIterator);
+
     ChunkMetadata chunkMetadata = Mockito.mock(ChunkMetadata.class);
 
     MemAlignedChunkLoader memAlignedChunkLoader =
@@ -66,7 +71,6 @@ public class MemAlignedChunkLoaderTest {
 
     AlignedChunkMetadata chunkMetadata1 = Mockito.mock(AlignedChunkMetadata.class);
 
-    Mockito.when(chunk.getTsBlock()).thenReturn(buildTsBlock());
     Mockito.when(chunk.getChunkMetaData()).thenReturn(chunkMetadata1);
     Statistics statistics1 = Mockito.mock(Statistics.class);
     Mockito.when(statistics1.hasNullValue(2)).thenReturn(true);
@@ -145,32 +149,29 @@ public class MemAlignedChunkLoaderTest {
     memAlignedChunkLoader.close();
   }
 
-  private TsBlock buildTsBlock() {
-    TsBlockBuilder builder =
-        new TsBlockBuilder(
-            Arrays.asList(
-                TSDataType.BOOLEAN,
-                TSDataType.INT32,
-                TSDataType.INT64,
-                TSDataType.FLOAT,
-                TSDataType.DOUBLE,
-                TSDataType.TEXT));
-    builder.getTimeColumnBuilder().writeLong(1L);
-    builder.getColumnBuilder(0).writeBoolean(true);
-    builder.getColumnBuilder(1).writeInt(1);
-    builder.getColumnBuilder(2).writeLong(1L);
-    builder.getColumnBuilder(3).writeFloat(1.1f);
-    builder.getColumnBuilder(4).appendNull();
-    builder.getColumnBuilder(5).writeBinary(new Binary(BINARY_STR, TSFileConfig.STRING_CHARSET));
-    builder.declarePosition();
-    builder.getTimeColumnBuilder().writeLong(2L);
-    builder.getColumnBuilder(0).appendNull();
-    builder.getColumnBuilder(1).appendNull();
-    builder.getColumnBuilder(2).appendNull();
-    builder.getColumnBuilder(3).appendNull();
-    builder.getColumnBuilder(4).writeDouble(3.14d);
-    builder.getColumnBuilder(5).appendNull();
-    builder.declarePosition();
-    return builder.build();
+  private AlignedReadOnlyMemChunkIterator buildChunkIterator() {
+    List<TSDataType> dataTypes =
+        Arrays.asList(
+            TSDataType.BOOLEAN,
+            TSDataType.INT32,
+            TSDataType.INT64,
+            TSDataType.FLOAT,
+            TSDataType.DOUBLE,
+            TSDataType.TEXT);
+    List<AlignedTVList> sortedLists = new ArrayList<>();
+    AlignedTVList list = AlignedTVList.newAlignedList(dataTypes);
+    Object[] values1 = new Object[dataTypes.size()];
+    values1[0] = true;
+    values1[1] = 1;
+    values1[2] = 1L;
+    values1[3] = 1.1f;
+    values1[5] = new Binary(BINARY_STR, TSFileConfig.STRING_CHARSET);
+    list.putAlignedValue(1L, values1);
+    Object[] values2 = new Object[dataTypes.size()];
+    values1[4] = 3.14d;
+    list.putAlignedValue(2L, values2);
+    sortedLists.add(list);
+
+    return new AlignedReadOnlyMemChunkIterator(sortedLists, dataTypes, null, null, null, false);
   }
 }

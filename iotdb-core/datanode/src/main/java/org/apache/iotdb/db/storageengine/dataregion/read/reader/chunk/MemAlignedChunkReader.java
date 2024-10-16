@@ -26,6 +26,7 @@ import org.apache.tsfile.read.common.BatchData;
 import org.apache.tsfile.read.filter.basic.Filter;
 import org.apache.tsfile.read.reader.IChunkReader;
 import org.apache.tsfile.read.reader.IPageReader;
+import org.apache.tsfile.read.reader.IPointReader;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -37,11 +38,12 @@ public class MemAlignedChunkReader implements IChunkReader {
   private final List<IPageReader> pageReaderList;
 
   public MemAlignedChunkReader(AlignedReadOnlyMemChunk readableChunk, Filter globalTimeFilter) {
+    IPointReader timeValuePairIterator = readableChunk.getPointReader();
     // we treat one ReadOnlyMemChunk as one Page
     this.pageReaderList =
         Collections.singletonList(
             new MemAlignedPageReader(
-                readableChunk.getTsBlock(),
+                timeValuePairIterator,
                 (AlignedChunkMetadata) readableChunk.getChunkMetaData(),
                 globalTimeFilter));
   }

@@ -278,16 +278,6 @@ public class WritableMemChunk implements IWritableMemChunk {
   }
 
   @Override
-  public TVList getSortedTvListForQuery() {
-    return null;
-  }
-
-  @Override
-  public TVList getSortedTvListForQuery(List<IMeasurementSchema> schemaList, boolean ignoreAllNullRows) {
-    return null;
-  }
-
-  @Override
   public long getMaxTime() {
     long maxTime = list.getMaxTime();
     for (TVList sortedList : sortedLists) {

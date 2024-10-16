@@ -108,39 +108,6 @@ public abstract class AlignedTVList extends TVList {
   }
 
   @Override
-  public TVList getTvListByColumnIndex(
-      List<Integer> columnIndex, List<TSDataType> dataTypeList, boolean ignoreAllNullRows) {
-    List<List<Object>> values = new ArrayList<>();
-    List<List<BitMap>> bitMaps = null;
-    for (int i = 0; i < columnIndex.size(); i++) {
-      // columnIndex == -1 means querying a non-exist column, add null column here
-      if (columnIndex.get(i) == -1) {
-        values.add(null);
-      } else {
-        values.add(this.values.get(columnIndex.get(i)));
-        if (this.bitMaps != null && this.bitMaps.get(columnIndex.get(i)) != null) {
-          if (bitMaps == null) {
-            bitMaps = new ArrayList<>(columnIndex.size());
-            for (int j = 0; j < columnIndex.size(); j++) {
-              bitMaps.add(null);
-            }
-          }
-          bitMaps.set(i, this.bitMaps.get(columnIndex.get(i)));
-        }
-      }
-    }
-    AlignedTVList alignedTvList = AlignedTVList.newAlignedList(dataTypeList);
-    alignedTvList.timestamps = this.timestamps;
-    alignedTvList.indices = this.indices;
-    alignedTvList.values = values;
-    alignedTvList.bitMaps = bitMaps;
-    alignedTvList.rowCount = this.rowCount;
-    // for table model, we won't discard any row even if all value columns are null
-    alignedTvList.rowBitMap = ignoreAllNullRows ? getRowBitMap() : null;
-    return alignedTvList;
-  }
-
-  @Override
   public AlignedTVList clone() {
     AlignedTVList cloneList = AlignedTVList.newAlignedList(dataTypes);
     cloneAs(cloneList);
@@ -1382,5 +1349,85 @@ public abstract class AlignedTVList extends TVList {
 
   public List<List<BitMap>> getBitMaps() {
     return bitMaps;
+  }
+
+  public int validRowCount() {
+    BitMap rowBitMap = getRowBitMap();
+    int count = 0;
+    for (int row = 0; row < rowCount; row++) {
+      if (!rowBitMap.isMarked(row)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  public AlignedTVListIterator iterator(boolean isIgnoreAllNullRows) {
+    return new AlignedTVListIterator(isIgnoreAllNullRows);
+  }
+
+  /** AlignedTVList Iterator */
+  public class AlignedTVListIterator extends TVListIterator {
+    BitMap rowBitMap;
+    private int index;
+
+    public AlignedTVListIterator(boolean isIgnoreAllNullRows) {
+      rowBitMap = isIgnoreAllNullRows ? getRowBitMap() : null;
+      seekToFirst();
+    }
+
+    public void seekToFirst() {
+      index = 0;
+    }
+
+    public boolean hasNext() {
+      if (rowBitMap != null) {
+        while (index < rowCount && rowBitMap.isMarked(getValueIndex(index))) {
+          index++;
+        }
+      }
+      return index < rowCount;
+    }
+
+    public TimeValuePair next() {
+      return getTimeValuePair(index++);
+    }
+
+    public void seekToLast() {
+      index = rowCount - 1;
+    }
+
+    public boolean hasPrevious() {
+      if (rowBitMap != null) {
+        while (index >= 0 && rowBitMap.isMarked(getValueIndex(index))) {
+          index--;
+        }
+      }
+      return index >= 0;
+    }
+
+    public TimeValuePair previous() {
+      return getTimeValuePair(index--);
+    }
+
+    public TimeValuePair current() {
+      if (hasNext()) {
+        return getTimeValuePair(index);
+      }
+      return null;
+    }
+
+    public TimeValuePair peekNext() {
+      int nextIndex = index + 1;
+      if (rowBitMap != null) {
+        while (nextIndex < rowCount && rowBitMap.isMarked(getValueIndex(nextIndex))) {
+          nextIndex++;
+        }
+      }
+      if (nextIndex >= rowCount) {
+        return null;
+      }
+      return getTimeValuePair(nextIndex);
+    }
   }
 }

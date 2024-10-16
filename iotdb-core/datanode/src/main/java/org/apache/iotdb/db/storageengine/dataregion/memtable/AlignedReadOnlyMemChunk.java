@@ -23,7 +23,6 @@ import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.MemAlignedChunkLoader;
 import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
-import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileDescriptor;
 import org.apache.tsfile.enums.TSDataType;
@@ -32,11 +31,13 @@ import org.apache.tsfile.file.metadata.ChunkMetadata;
 import org.apache.tsfile.file.metadata.IChunkMetadata;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
+import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
-import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,7 +48,13 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
   private final List<TSDataType> dataTypes;
 
-  private TsBlock tsBlock;
+  private final List<Integer> columnIndexList;
+
+  private final List<AlignedTVList> sortedLists;
+  private final List<TimeRange> timeColumnDeletion;
+  private final List<List<TimeRange>> valueColumnsDeletionList;
+  private final List<TSEncoding> encodingList;
+  private final int floatPrecision;
 
   /**
    * The constructor for Aligned type.
@@ -60,98 +67,90 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
   public AlignedReadOnlyMemChunk(
       QueryContext context,
       IMeasurementSchema schema,
-      TVList tvList,
+      List<Integer> columnIndexList,
+      List<AlignedTVList> sortedLists,
       List<TimeRange> timeColumnDeletion,
       List<List<TimeRange>> valueColumnsDeletionList)
-      throws QueryProcessException {
+      throws QueryProcessException, IOException {
     super(context);
     this.timeChunkName = schema.getMeasurementId();
     this.valueChunkNames = schema.getSubMeasurementsList();
     this.dataTypes = schema.getSubMeasurementsTSDataTypeList();
-    int floatPrecision = TSFileDescriptor.getInstance().getConfig().getFloatPrecision();
-    List<TSEncoding> encodingList = schema.getSubMeasurementsTSEncodingList();
-    this.tsBlock =
-        ((AlignedTVList) tvList)
-            .buildTsBlock(
-                floatPrecision,
-                encodingList,
-                timeColumnDeletion,
-                valueColumnsDeletionList,
-                context.isIgnoreAllNullRows());
-    initAlignedChunkMetaFromTsBlock();
+    this.floatPrecision = TSFileDescriptor.getInstance().getConfig().getFloatPrecision();
+    this.encodingList = schema.getSubMeasurementsTSEncodingList();
+    this.sortedLists = sortedLists;
+    this.timeColumnDeletion = timeColumnDeletion;
+    this.valueColumnsDeletionList = valueColumnsDeletionList;
+    this.columnIndexList = columnIndexList;
+    initAlignedChunkMetaFromAlignedTvList();
   }
 
-  private void initAlignedChunkMetaFromTsBlock() throws QueryProcessException {
-    // Time chunk
+  private void initAlignedChunkMetaFromAlignedTvList() throws IOException, QueryProcessException {
+    // Time statistics
     Statistics timeStatistics = Statistics.getStatsByType(TSDataType.VECTOR);
     IChunkMetadata timeChunkMetadata =
         new ChunkMetadata(timeChunkName, TSDataType.VECTOR, null, null, 0, timeStatistics);
     List<IChunkMetadata> valueChunkMetadataList = new ArrayList<>();
-    // Update time chunk
-    for (int row = 0; row < tsBlock.getPositionCount(); row++) {
-      timeStatistics.update(tsBlock.getTimeColumn().getLong(row));
-    }
-    timeStatistics.setEmpty(false);
-    // Update value chunk
-    for (int column = 0; column < tsBlock.getValueColumnCount(); column++) {
+    // values statistics
+    Statistics[] valuesStatistics = new Statistics[dataTypes.size()];
+    for (int column = 0; column < dataTypes.size(); column++) {
       Statistics valueStatistics = Statistics.getStatsByType(dataTypes.get(column));
       valueStatistics.setEmpty(true);
-      switch (dataTypes.get(column)) {
-        case BOOLEAN:
-          for (int row = 0; row < tsBlock.getPositionCount(); row++) {
-            if (!tsBlock.getColumn(column).isNull(row)) {
-              long time = tsBlock.getTimeColumn().getLong(row);
-              valueStatistics.update(time, tsBlock.getColumn(column).getBoolean(row));
-            }
-          }
-          break;
-        case TEXT:
-        case BLOB:
-        case STRING:
-          for (int row = 0; row < tsBlock.getPositionCount(); row++) {
-            if (!tsBlock.getColumn(column).isNull(row)) {
-              long time = tsBlock.getTimeColumn().getLong(row);
-              valueStatistics.update(time, tsBlock.getColumn(column).getBinary(row));
-            }
-          }
-          break;
-        case FLOAT:
-          for (int row = 0; row < tsBlock.getPositionCount(); row++) {
-            if (!tsBlock.getColumn(column).isNull(row)) {
-              long time = tsBlock.getTimeColumn().getLong(row);
-              valueStatistics.update(time, tsBlock.getColumn(column).getFloat(row));
-            }
-          }
-          break;
-        case INT32:
-        case DATE:
-          for (int row = 0; row < tsBlock.getPositionCount(); row++) {
-            if (!tsBlock.getColumn(column).isNull(row)) {
-              long time = tsBlock.getTimeColumn().getLong(row);
-              valueStatistics.update(time, tsBlock.getColumn(column).getInt(row));
-            }
-          }
-          break;
-        case INT64:
-        case TIMESTAMP:
-          for (int row = 0; row < tsBlock.getPositionCount(); row++) {
-            if (!tsBlock.getColumn(column).isNull(row)) {
-              long time = tsBlock.getTimeColumn().getLong(row);
-              valueStatistics.update(time, tsBlock.getColumn(column).getLong(row));
-            }
-          }
-          break;
-        case DOUBLE:
-          for (int row = 0; row < tsBlock.getPositionCount(); row++) {
-            if (!tsBlock.getColumn(column).isNull(row)) {
-              long time = tsBlock.getTimeColumn().getLong(row);
-              valueStatistics.update(time, tsBlock.getColumn(column).getDouble(row));
-            }
-          }
-          break;
-        default:
-          throw new QueryProcessException("Unsupported data type:" + dataTypes.get(column));
+      valuesStatistics[column] = valueStatistics;
+    }
+
+    AlignedReadOnlyMemChunkIterator iterator =
+        new AlignedReadOnlyMemChunkIterator(
+            sortedLists,
+            dataTypes,
+            columnIndexList,
+            timeColumnDeletion,
+            valueColumnsDeletionList,
+            context.isIgnoreAllNullRows());
+
+    while (iterator.hasNextTimeValuePair()) {
+      TimeValuePair tvPair = iterator.nextTimeValuePair();
+      long time = tvPair.getTimestamp();
+      TsPrimitiveType[] vector = tvPair.getValue().getVector();
+      // Update time chunk
+      timeStatistics.update(time);
+      // Update value chunk
+      for (int column = 0; column < dataTypes.size(); column++) {
+        if (vector[column] == null) {
+          continue;
+        }
+        Statistics valueStatistics = valuesStatistics[column];
+        switch (dataTypes.get(column)) {
+          case BOOLEAN:
+            valueStatistics.update(time, vector[column].getBoolean());
+            break;
+          case TEXT:
+          case BLOB:
+          case STRING:
+            valueStatistics.update(time, vector[column].getBinary());
+            break;
+          case FLOAT:
+            valueStatistics.update(time, vector[column].getFloat());
+            break;
+          case INT32:
+          case DATE:
+            valueStatistics.update(time, vector[column].getInt());
+            break;
+          case INT64:
+          case TIMESTAMP:
+            valueStatistics.update(time, vector[column].getLong());
+            break;
+          case DOUBLE:
+            valueStatistics.update(time, vector[column].getDouble());
+            break;
+          default:
+            throw new QueryProcessException("Unsupported data type:" + dataTypes.get(column));
+        }
       }
+    }
+    timeStatistics.setEmpty(false);
+    for (int column = 0; column < dataTypes.size(); column++) {
+      Statistics valueStatistics = valuesStatistics[column];
       if (valueStatistics.getCount() > 0) {
         IChunkMetadata valueChunkMetadata =
             new ChunkMetadata(
@@ -169,17 +168,29 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
     cachedMetaData = alignedChunkMetadata;
   }
 
+  public int rowCount() {
+    int rowCount = 0;
+    for (AlignedTVList sortedList : sortedLists) {
+      rowCount += sortedList.validRowCount();
+    }
+    return rowCount;
+  }
+
   @Override
   public boolean isEmpty() {
-    return tsBlock.isEmpty();
+    return rowCount() == 0;
   }
 
   @Override
   public IPointReader getPointReader() {
-    return tsBlock.getTsBlockAlignedRowIterator();
-  }
-
-  public TsBlock getTsBlock() {
-    return tsBlock;
+    return new AlignedReadOnlyMemChunkIterator(
+        sortedLists,
+        dataTypes,
+        columnIndexList,
+        timeColumnDeletion,
+        valueColumnsDeletionList,
+        encodingList,
+        floatPrecision,
+        context.isIgnoreAllNullRows());
   }
 }
