@@ -22,7 +22,13 @@ package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunkIterator;
-import org.apache.iotdb.db.utils.datastructure.*;
+import org.apache.iotdb.db.utils.datastructure.BinaryTVList;
+import org.apache.iotdb.db.utils.datastructure.BooleanTVList;
+import org.apache.iotdb.db.utils.datastructure.DoubleTVList;
+import org.apache.iotdb.db.utils.datastructure.FloatTVList;
+import org.apache.iotdb.db.utils.datastructure.IntTVList;
+import org.apache.iotdb.db.utils.datastructure.LongTVList;
+import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileConfig;
 import org.apache.tsfile.enums.TSDataType;

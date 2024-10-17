@@ -65,8 +65,18 @@ public abstract class TVList implements WALEntryValue {
   protected AtomicInteger referenceCount;
   private long version;
 
+  // List of index array, add 1 when expanded -> data point index array
+  // Index relation: arrayIndex -> elementIndex
+  // Used in sort method, sort only changes indices
+  protected List<int[]> indices;
+
+  // used by non-aligned TVList
+  // Index relation: arrayIndex -> elementIndex
+  protected List<BitMap> bitMap;
+
   protected TVList() {
     timestamps = new ArrayList<>();
+    indices = new ArrayList<>();
     rowCount = 0;
     maxTime = Long.MIN_VALUE;
     referenceCount = new AtomicInteger();
@@ -225,8 +235,18 @@ public abstract class TVList implements WALEntryValue {
     throw new UnsupportedOperationException(ERR_DATATYPE_NOT_CONSISTENT);
   }
 
+  /**
+   * Get the row index value in index column.
+   *
+   * @param index row index
+   */
   public int getValueIndex(int index) {
-    throw new UnsupportedOperationException(ERR_DATATYPE_NOT_CONSISTENT);
+    if (index >= rowCount) {
+      throw new ArrayIndexOutOfBoundsException(index);
+    }
+    int arrayIndex = index / ARRAY_SIZE;
+    int elementIndex = index % ARRAY_SIZE;
+    return indices.get(arrayIndex)[elementIndex];
   }
 
   public long getMaxTime() {
@@ -249,33 +269,38 @@ public abstract class TVList implements WALEntryValue {
     return clone();
   }
 
-  protected abstract void releaseLastValueArray();
+  protected void markNullValue(int arrayIndex, int elementIndex) {
+    // init bitMap if doesn't have
+    if (bitMap == null) {
+      bitMap = new ArrayList<>();
+      for (int i = 0; i < timestamps.size(); i++) {
+        bitMap.add(new BitMap(ARRAY_SIZE));
+      }
+    }
 
-  protected void releaseLastTimeArray() {
-    PrimitiveArrayManager.release(timestamps.remove(timestamps.size() - 1));
+    // if the bitmap in arrayIndex is null, init the bitmap
+    if (bitMap.get(arrayIndex) == null) {
+      bitMap.set(arrayIndex, new BitMap(ARRAY_SIZE));
+    }
+
+    // mark the null value in the current bitmap
+    bitMap.get(arrayIndex).mark(elementIndex);
   }
 
   public int delete(long lowerBound, long upperBound) {
-    int newSize = 0;
-    maxTime = Long.MIN_VALUE;
+    int deletedNumber = 0;
+    long maxTime = Long.MIN_VALUE;
     for (int i = 0; i < rowCount; i++) {
       long time = getTime(i);
-      if (time < lowerBound || time > upperBound) {
-        set(i, newSize++);
+      if (time >= lowerBound && time <= upperBound) {
+        int originRowIndex = getValueIndex(i);
+        int arrayIndex = originRowIndex / ARRAY_SIZE;
+        int elementIndex = originRowIndex % ARRAY_SIZE;
+        markNullValue(arrayIndex, elementIndex);
+        deletedNumber++;
+      } else {
         maxTime = Math.max(time, maxTime);
       }
-    }
-    int deletedNumber = rowCount - newSize;
-    rowCount = newSize;
-    // release primitive arrays that are empty
-    int newArrayNum = newSize / ARRAY_SIZE;
-    if (newSize % ARRAY_SIZE != 0) {
-      newArrayNum++;
-    }
-    int oldArrayNum = timestamps.size();
-    for (int releaseIdx = newArrayNum; releaseIdx < oldArrayNum; releaseIdx++) {
-      releaseLastTimeArray();
-      releaseLastValueArray();
     }
     return deletedNumber;
   }
@@ -287,6 +312,39 @@ public abstract class TVList implements WALEntryValue {
     cloneList.rowCount = rowCount;
     cloneList.sorted = sorted;
     cloneList.maxTime = maxTime;
+  }
+
+  protected void cloneSlicesAndBitMap(TVList cloneList) {
+    if (indices != null) {
+      for (int[] indicesArray : indices) {
+        cloneList.indices.add(cloneIndex(indicesArray));
+      }
+    }
+    if (bitMap != null) {
+      cloneList.bitMap = new ArrayList<>();
+      for (BitMap bm : bitMap) {
+        cloneList.bitMap.add(bm == null ? null : bm.clone());
+      }
+    }
+  }
+
+  protected void clearSlicesAndBitMap() {
+    if (indices != null) {
+      for (int[] dataArray : indices) {
+        PrimitiveArrayManager.release(dataArray);
+      }
+      indices.clear();
+    }
+    if (bitMap != null) {
+      bitMap.clear();
+    }
+  }
+
+  protected void expandSlicesAndBitMap() {
+    indices.add((int[]) getPrimitiveArraysByType(TSDataType.INT32));
+    if (bitMap != null) {
+      bitMap.add(null);
+    }
   }
 
   public void clear() {
@@ -416,6 +474,35 @@ public abstract class TVList implements WALEntryValue {
     return new TVListIterator();
   }
 
+  @SuppressWarnings("squid:S3776") // Suppress high Cognitive Complexity warning
+  protected int[] cloneIndex(int[] array) {
+    int[] cloneArray = new int[array.length];
+    System.arraycopy(array, 0, cloneArray, 0, array.length);
+    return cloneArray;
+  }
+
+  protected boolean isNullValue(int rowIndex) {
+    if (rowIndex >= rowCount) {
+      return false;
+    }
+    if (bitMap == null || bitMap.get(rowIndex / ARRAY_SIZE) == null) {
+      return false;
+    }
+    int arrayIndex = rowIndex / ARRAY_SIZE;
+    int elementIndex = rowIndex % ARRAY_SIZE;
+    return bitMap.get(arrayIndex).isMarked(elementIndex);
+  }
+
+  protected void set(int index, long timestamp, int value) {
+    if (index >= rowCount) {
+      throw new ArrayIndexOutOfBoundsException(index);
+    }
+    int arrayIndex = index / ARRAY_SIZE;
+    int elementIndex = index % ARRAY_SIZE;
+    timestamps.get(arrayIndex)[elementIndex] = timestamp;
+    indices.get(arrayIndex)[elementIndex] = value;
+  }
+
   /** TVList Iterator */
   public class TVListIterator {
     private int index;
@@ -429,6 +516,11 @@ public abstract class TVList implements WALEntryValue {
     }
 
     public boolean hasNext() {
+      if (bitMap != null) {
+        while (index < rowCount && isNullValue(getValueIndex(index))) {
+          index++;
+        }
+      }
       return index < rowCount;
     }
 
@@ -436,14 +528,37 @@ public abstract class TVList implements WALEntryValue {
       return getTimeValuePair(index++);
     }
 
-    public TimeValuePair current() {
-      if (index >= rowCount) {
-        return null;
+    public void seekToLast() {
+      index = rowCount - 1;
+    }
+
+    public boolean hasPrevious() {
+      if (bitMap != null) {
+        while (index >= 0 && isNullValue(getValueIndex(index))) {
+          index--;
+        }
       }
-      return getTimeValuePair(index);
+      return index >= 0;
+    }
+
+    public TimeValuePair previous() {
+      return getTimeValuePair(index--);
+    }
+
+    public TimeValuePair current() {
+      if (hasNext()) {
+        return getTimeValuePair(index);
+      }
+      return null;
     }
 
     public TimeValuePair peekNext() {
+      int nextIndex = index + 1;
+      if (bitMap != null) {
+        while (nextIndex < rowCount && isNullValue(getValueIndex(nextIndex))) {
+          nextIndex++;
+        }
+      }
       if (index + 1 >= rowCount) {
         return null;
       }
