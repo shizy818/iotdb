@@ -68,7 +68,8 @@ public class MemPageReader implements IPageReader {
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      if (recordFilter != null && !recordFilter.satisfy(tvPair.getTimestamp(), tvPair.getValue())) {
+      if (recordFilter != null
+          && !recordFilter.satisfy(tvPair.getTimestamp(), tvPair.getValue().getValue())) {
         continue;
       }
 
@@ -110,9 +111,9 @@ public class MemPageReader implements IPageReader {
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-
       // skip unsatisfied row
-      if (recordFilter != null && !recordFilter.satisfy(tvPair.getTimestamp(), tvPair.getValue())) {
+      if (recordFilter != null
+          && !recordFilter.satisfy(tvPair.getTimestamp(), tvPair.getValue().getValue())) {
         continue;
       }
       // skip offset rows

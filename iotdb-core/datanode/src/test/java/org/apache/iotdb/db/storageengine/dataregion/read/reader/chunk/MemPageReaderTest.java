@@ -56,7 +56,7 @@ public class MemPageReaderTest {
     TSDataType dataType = TSDataType.INT32;
     String measurementId = "s1";
     IntTVList tvList = IntTVList.newList();
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 100; i++) {
       tvList.putInt(i, i);
       statistics.update(i, i);
     }

@@ -25,7 +25,7 @@ public class ReadOnlyMemChunkIterator implements IPointReader {
   int[] deleteCursor;
 
   public ReadOnlyMemChunkIterator(List<TVList> sortedLists, List<TimeRange> deletionList) {
-    new ReadOnlyMemChunkIterator(sortedLists, deletionList, null, null);
+    this(sortedLists, deletionList, null, null);
   }
 
   public ReadOnlyMemChunkIterator(
