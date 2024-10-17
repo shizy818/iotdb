@@ -102,8 +102,8 @@ public class FloatTVListTest {
         nullCnt++;
         continue;
       }
-      Assert.assertEquals(i, tvList.getFloat((int) i - nullCnt - 1), delta);
-      Assert.assertEquals(i, tvList.getTime((int) i - nullCnt - 1));
+      Assert.assertEquals(i - nullCnt, tvList.getFloat((int) i - nullCnt - 1), delta);
+      Assert.assertEquals(i - nullCnt, tvList.getTime((int) i - nullCnt - 1));
     }
   }
 

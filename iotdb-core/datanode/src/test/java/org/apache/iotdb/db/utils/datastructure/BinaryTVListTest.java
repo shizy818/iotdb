@@ -81,8 +81,8 @@ public class BinaryTVListTest {
         continue;
       }
       Assert.assertEquals(
-          BytesUtils.valueOf(String.valueOf(i)), tvList.getBinary((int) i - nullCnt - 1));
-      Assert.assertEquals(i, tvList.getTime((int) i - nullCnt - 1));
+          BytesUtils.valueOf(String.valueOf(i - nullCnt)), tvList.getBinary((int) i - nullCnt - 1));
+      Assert.assertEquals(i - nullCnt, tvList.getTime((int) i - nullCnt - 1));
     }
   }
 
@@ -130,10 +130,10 @@ public class BinaryTVListTest {
     }
     tvList.putBinaries(
         ArrayUtils.toPrimitive(timeList.toArray(new Long[0])), binaryList, bitMap, 0, 10);
-    Assert.assertEquals(tvList.memoryBinaryChunkSize, 540);
+    Assert.assertEquals(tvList.memoryBinaryChunkSize, 720);
 
     tvList.delete(5, 15);
-    Assert.assertEquals(tvList.memoryBinaryChunkSize, 252);
+    Assert.assertEquals(tvList.memoryBinaryChunkSize, 720);
 
     tvList.clear();
     Assert.assertEquals(tvList.memoryBinaryChunkSize, 0);

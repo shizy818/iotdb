@@ -123,8 +123,8 @@ public class LongTVListTest {
         nullCnt++;
         continue;
       }
-      Assert.assertEquals(i, tvList.getLong((int) i - nullCnt - 1));
-      Assert.assertEquals(i, tvList.getTime((int) i - nullCnt - 1));
+      Assert.assertEquals(i - nullCnt, tvList.getLong((int) i - nullCnt - 1));
+      Assert.assertEquals(i - nullCnt, tvList.getTime((int) i - nullCnt - 1));
     }
   }
 

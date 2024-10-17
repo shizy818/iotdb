@@ -92,8 +92,9 @@ public class BooleanTVListTest {
         nullCnt++;
         continue;
       }
-      Assert.assertEquals(i % 2 == 0, tvList.getBoolean((int) i - nullCnt - 1));
-      Assert.assertEquals(i, tvList.getTime((int) i - nullCnt - 1));
+      Assert.assertEquals(
+          booleanList.get((int) (i - nullCnt)), tvList.getBoolean((int) i - nullCnt - 1));
+      Assert.assertEquals(i - nullCnt, tvList.getTime((int) i - nullCnt - 1));
     }
   }
 

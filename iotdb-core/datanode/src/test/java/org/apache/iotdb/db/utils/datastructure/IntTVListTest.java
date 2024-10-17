@@ -101,8 +101,8 @@ public class IntTVListTest {
         nullCnt++;
         continue;
       }
-      Assert.assertEquals(i, tvList.getInt((int) i - nullCnt - 1));
-      Assert.assertEquals(i, tvList.getTime((int) i - nullCnt - 1));
+      Assert.assertEquals(i - nullCnt, tvList.getInt((int) i - nullCnt - 1));
+      Assert.assertEquals(i - nullCnt, tvList.getTime((int) i - nullCnt - 1));
     }
   }
 
