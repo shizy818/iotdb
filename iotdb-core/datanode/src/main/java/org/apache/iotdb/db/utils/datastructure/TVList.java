@@ -503,6 +503,16 @@ public abstract class TVList implements WALEntryValue {
     indices.get(arrayIndex)[elementIndex] = value;
   }
 
+  public int validRowCount() {
+    int count = 0;
+    for (int row = 0; row < rowCount; row++) {
+      if (!isNullValue(row)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   /** TVList Iterator */
   public class TVListIterator {
     private int index;

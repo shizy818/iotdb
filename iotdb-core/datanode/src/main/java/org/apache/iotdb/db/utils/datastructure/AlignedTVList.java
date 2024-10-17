@@ -1309,6 +1309,7 @@ public abstract class AlignedTVList extends TVList {
     return bitMaps;
   }
 
+  @Override
   public int validRowCount() {
     BitMap rowBitMap = getRowBitMap();
     int count = 0;

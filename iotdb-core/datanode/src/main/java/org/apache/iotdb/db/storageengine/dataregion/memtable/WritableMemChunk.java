@@ -406,14 +406,17 @@ public class WritableMemChunk implements IWritableMemChunk {
     }
 
     // acquire list iterator & sortedLists iterators
+    int validRowCount = 0;
     List<TVList.TVListIterator> listIterators = new ArrayList<>();
     for (TVList sortedList : sortedLists) {
+      validRowCount += sortedList.validRowCount();
       listIterators.add(sortedList.iterator());
     }
+    validRowCount += list.validRowCount();
     listIterators.add(list.iterator());
 
     TimeValuePair prevTvPair = null;
-    for (int sortedRowIndex = 0; sortedRowIndex < count(); sortedRowIndex++) {
+    for (int sortedRowIndex = 0; sortedRowIndex < validRowCount; sortedRowIndex++) {
       // find next TimeValuePair from list & sortedLists
       int selectedTVListIndex = -1;
       long time = Long.MAX_VALUE;
