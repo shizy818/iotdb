@@ -114,8 +114,8 @@ public class AlignedReadOnlyMemChunkIterator implements IPointReader {
 
     if (needTvPairByColumnIndex(tvPair)) {
       TsPrimitiveType[] oldValues = tvPair.getValue().getVector();
-      TsPrimitiveType[] newValues = new TsPrimitiveType[dataTypes.size()];
-      for (int column = 0; column < dataTypes.size(); column++) {
+      TsPrimitiveType[] newValues = new TsPrimitiveType[columnIndexList.size()];
+      for (int column = 0; column < columnIndexList.size(); column++) {
         int columnIndex = columnIndexList.get(column);
         // it is possible columnIndex is larger than column size of tvPair
         if (columnIndex >= 0 && columnIndex < oldValues.length) {

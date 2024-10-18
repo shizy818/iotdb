@@ -288,16 +288,22 @@ public class WritableMemChunk implements IWritableMemChunk {
 
   private TimeValuePair first() {
     TimeValuePair tvPair = null;
-    long time = Long.MAX_VALUE;
-    for (TVList sortedList : sortedLists) {
-      if (sortedList.rowCount() > 0 && sortedList.getTime(0) <= time) {
-        tvPair = sortedList.getTimeValuePair(0);
-        time = tvPair.getTimestamp();
-      }
-    }
     TVList clonedList = cloneAndSortList();
-    if (clonedList.rowCount() > 0 && clonedList.getTime(0) <= time) {
-      tvPair = clonedList.getTimeValuePair(0);
+    List<TVList.TVListIterator> iterators = new ArrayList<>();
+    for (TVList sortedList : sortedLists) {
+      iterators.add(sortedList.iterator());
+    }
+    iterators.add(clonedList.iterator());
+
+    long time = Long.MAX_VALUE;
+    for (TVList.TVListIterator iterator : iterators) {
+      if (iterator.hasNext()) {
+        TimeValuePair tvp = iterator.next();
+        if (tvp.getTimestamp() <= time) {
+          time = tvp.getTimestamp();
+          tvPair = tvp;
+        }
+      }
     }
     return tvPair;
   }
@@ -313,16 +319,23 @@ public class WritableMemChunk implements IWritableMemChunk {
 
   private TimeValuePair last() {
     TimeValuePair tvPair = null;
-    long time = Long.MIN_VALUE;
-    for (TVList sortedList : sortedLists) {
-      if (sortedList.rowCount() > 0 && sortedList.getTime(sortedList.rowCount() - 1) >= time) {
-        tvPair = sortedList.getTimeValuePair(sortedList.rowCount() - 1);
-        time = tvPair.getTimestamp();
-      }
-    }
     TVList clonedList = cloneAndSortList();
-    if (clonedList.rowCount() > 0 && clonedList.getTime(clonedList.rowCount() - 1) >= time) {
-      tvPair = clonedList.getTimeValuePair(clonedList.rowCount() - 1);
+    List<TVList.TVListIterator> iterators = new ArrayList<>();
+    for (TVList sortedList : sortedLists) {
+      iterators.add(sortedList.iterator());
+    }
+    iterators.add(clonedList.iterator());
+
+    long time = Long.MIN_VALUE;
+    for (TVList.TVListIterator iterator : iterators) {
+      iterator.seekToLast();
+      if (iterator.hasPrevious()) {
+        TimeValuePair tvp = iterator.previous();
+        if (tvp.getTimestamp() >= time) {
+          time = tvp.getTimestamp();
+          tvPair = tvp;
+        }
+      }
     }
     return tvPair;
   }
@@ -428,7 +441,6 @@ public class WritableMemChunk implements IWritableMemChunk {
         }
       }
       TimeValuePair currentTvPair = listIterators.get(selectedTVListIndex).next();
-
       // skip duplicated data
       if (prevTvPair == null || prevTvPair.getTimestamp() == time) {
         prevTvPair = currentTvPair;
