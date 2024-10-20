@@ -265,9 +265,9 @@ public class WritableMemChunk implements IWritableMemChunk {
 
   @Override
   public long count() {
-    long count = list.rowCount();
+    long count = list.validRowCount();
     for (TVList sortedList : sortedLists) {
-      count += sortedList.rowCount();
+      count += sortedList.validRowCount();
     }
     return count;
   }

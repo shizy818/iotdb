@@ -463,7 +463,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
         for (int columnIndex = 0; columnIndex < dataTypes.size(); columnIndex++) {
           if (currentValues[columnIndex] != null) {
             // update not-null column in lastValidValueForTimeDup
-            lastValidValueForTimeDup[columnIndex] = currentValues[columnIndex];
+            lastValidValueForTimeDup[columnIndex] = currentValues[columnIndex].getValue();
           }
         }
       } else {
@@ -471,7 +471,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
           values.get(columnIndex)[pointsInPages] =
               lastValidValueForTimeDup != null
                   ? lastValidValueForTimeDup[columnIndex]
-                  : prevTvPair.getValue().getVector()[columnIndex];
+                  : prevTvPair.getValue().getVector()[columnIndex].getValue();
         }
         times[pointsInPages] = prevTvPair.getTimestamp();
         lastValidValueForTimeDup = null;
@@ -499,7 +499,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
         values.get(columnIndex)[pointsInPages] =
             lastValidValueForTimeDup != null
                 ? lastValidValueForTimeDup[columnIndex]
-                : prevTvPair.getValue().getVector()[columnIndex];
+                : prevTvPair.getValue().getVector()[columnIndex].getValue();
       }
       times[pointsInPages] = prevTvPair.getTimestamp();
       pointsInPages++;
