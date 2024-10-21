@@ -80,7 +80,7 @@ public abstract class AlignedTVList extends TVList {
 
   AlignedTVList(List<TSDataType> types) {
     super();
-    indices = new ArrayList<>(types.size());
+    indices = new ArrayList<>();
     dataTypes = types;
     memoryBinaryChunkSize = new long[dataTypes.size()];
     reachMaxChunkSizeFlag = false;
