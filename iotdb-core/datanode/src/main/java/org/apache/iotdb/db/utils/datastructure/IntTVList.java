@@ -28,6 +28,7 @@ import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.utils.BitMap;
+import org.apache.tsfile.utils.ReadWriteIOUtils;
 import org.apache.tsfile.utils.TsPrimitiveType;
 
 import java.io.DataInputStream;
@@ -64,6 +65,7 @@ public abstract class IntTVList extends TVList {
   public IntTVList clone() {
     IntTVList cloneList = IntTVList.newList();
     cloneAs(cloneList);
+    cloneSlicesAndBitMap(cloneList);
     for (int[] valueArray : values) {
       cloneList.values.add(cloneValue(valueArray));
     }
@@ -84,6 +86,7 @@ public abstract class IntTVList extends TVList {
     maxTime = Math.max(maxTime, timestamp);
     timestamps.get(arrayIndex)[elementIndex] = timestamp;
     values.get(arrayIndex)[elementIndex] = value;
+    indices.get(arrayIndex)[elementIndex] = rowCount;
     rowCount++;
     if (sorted && rowCount > 1 && timestamp < getTime(rowCount - 2)) {
       sorted = false;
@@ -92,22 +95,10 @@ public abstract class IntTVList extends TVList {
 
   @Override
   public int getInt(int index) {
-    if (index >= rowCount) {
-      throw new ArrayIndexOutOfBoundsException(index);
-    }
-    int arrayIndex = index / ARRAY_SIZE;
-    int elementIndex = index % ARRAY_SIZE;
+    int valueIndex = getValueIndex(index);
+    int arrayIndex = valueIndex / ARRAY_SIZE;
+    int elementIndex = valueIndex % ARRAY_SIZE;
     return values.get(arrayIndex)[elementIndex];
-  }
-
-  protected void set(int index, long timestamp, int value) {
-    if (index >= rowCount) {
-      throw new ArrayIndexOutOfBoundsException(index);
-    }
-    int arrayIndex = index / ARRAY_SIZE;
-    int elementIndex = index % ARRAY_SIZE;
-    timestamps.get(arrayIndex)[elementIndex] = timestamp;
-    values.get(arrayIndex)[elementIndex] = value;
   }
 
   @Override
@@ -118,11 +109,13 @@ public abstract class IntTVList extends TVList {
       }
       values.clear();
     }
+    clearSlicesAndBitMap();
   }
 
   @Override
   protected void expandValues() {
     values.add((int[]) getPrimitiveArraysByType(TSDataType.INT32));
+    expandSlicesAndBitMap();
   }
 
   @Override
@@ -145,7 +138,8 @@ public abstract class IntTVList extends TVList {
       List<TimeRange> deletionList) {
     int[] deleteCursor = {0};
     for (int i = 0; i < rowCount; i++) {
-      if (!isPointDeleted(getTime(i), deletionList, deleteCursor)
+      if (!isNullValue(i)
+          && !isPointDeleted(getTime(i), deletionList, deleteCursor)
           && (i == rowCount - 1 || getTime(i) != getTime(i + 1))) {
         builder.getTimeColumnBuilder().writeLong(getTime(i));
         builder.getColumnBuilder(0).writeInt(getInt(i));
@@ -155,30 +149,11 @@ public abstract class IntTVList extends TVList {
   }
 
   @Override
-  protected void releaseLastValueArray() {
-    PrimitiveArrayManager.release(values.remove(values.size() - 1));
-  }
-
-  @Override
   public void putInts(long[] time, int[] value, BitMap bitMap, int start, int end) {
     checkExpansion();
 
     int idx = start;
-    // constraint: time.length + timeIdxOffset == value.length
-    int timeIdxOffset = 0;
-    if (bitMap != null && !bitMap.isAllUnmarked()) {
-      // time array is a reference, should clone necessary time values
-      long[] clonedTime = new long[end - start];
-      System.arraycopy(time, start, clonedTime, 0, end - start);
-      time = clonedTime;
-      timeIdxOffset = start;
-      // drop null at the end of value array
-      int nullCnt =
-          dropNullValThenUpdateMaxTimeAndSorted(time, value, bitMap, start, end, timeIdxOffset);
-      end -= nullCnt;
-    } else {
-      updateMaxTimeAndSorted(time, start, end);
-    }
+    updateMaxTimeAndSorted(time, start, end);
 
     while (idx < end) {
       int inputRemaining = end - idx;
@@ -187,53 +162,32 @@ public abstract class IntTVList extends TVList {
       int internalRemaining = ARRAY_SIZE - elementIdx;
       if (internalRemaining >= inputRemaining) {
         // the remaining inputs can fit the last array, copy all remaining inputs into last array
-        System.arraycopy(
-            time, idx - timeIdxOffset, timestamps.get(arrayIdx), elementIdx, inputRemaining);
+        System.arraycopy(time, idx, timestamps.get(arrayIdx), elementIdx, inputRemaining);
         System.arraycopy(value, idx, values.get(arrayIdx), elementIdx, inputRemaining);
-        rowCount += inputRemaining;
+        for (int i = 0; i < inputRemaining; i++) {
+          indices.get(arrayIdx)[elementIdx + i] = rowCount;
+          if (values == null || bitMap != null && bitMap.isMarked(idx + i)) {
+            markNullValue(arrayIdx, elementIdx + i);
+          }
+          rowCount++;
+        }
         break;
       } else {
         // the remaining inputs cannot fit the last array, fill the last array and create a new
         // one and enter the next loop
-        System.arraycopy(
-            time, idx - timeIdxOffset, timestamps.get(arrayIdx), elementIdx, internalRemaining);
+        System.arraycopy(time, idx, timestamps.get(arrayIdx), elementIdx, internalRemaining);
         System.arraycopy(value, idx, values.get(arrayIdx), elementIdx, internalRemaining);
+        for (int i = 0; i < internalRemaining; i++) {
+          indices.get(arrayIdx)[elementIdx + i] = rowCount;
+          if (values == null || bitMap != null && bitMap.isMarked(idx + i)) {
+            markNullValue(arrayIdx, elementIdx + i);
+          }
+          rowCount++;
+        }
         idx += internalRemaining;
-        rowCount += internalRemaining;
         checkExpansion();
       }
     }
-  }
-
-  // move null values to the end of time array and value array, then return number of null values
-  int dropNullValThenUpdateMaxTimeAndSorted(
-      long[] time, int[] values, BitMap bitMap, int start, int end, int tIdxOffset) {
-    long inPutMinTime = Long.MAX_VALUE;
-    boolean inputSorted = true;
-
-    int nullCnt = 0;
-    for (int vIdx = start; vIdx < end; vIdx++) {
-      if (bitMap.isMarked(vIdx)) {
-        nullCnt++;
-        continue;
-      }
-      // move value ahead to replace null
-      int tIdx = vIdx - tIdxOffset;
-      if (nullCnt != 0) {
-        time[tIdx - nullCnt] = time[tIdx];
-        values[vIdx - nullCnt] = values[vIdx];
-      }
-      // update maxTime and sorted
-      tIdx = tIdx - nullCnt;
-      inPutMinTime = Math.min(inPutMinTime, time[tIdx]);
-      maxTime = Math.max(maxTime, time[tIdx]);
-      if (inputSorted && tIdx > 0 && time[tIdx - 1] > time[tIdx]) {
-        inputSorted = false;
-      }
-    }
-
-    sorted = sorted && inputSorted && (rowCount == 0 || inPutMinTime >= getTime(rowCount - 1));
-    return nullCnt;
   }
 
   @Override
@@ -243,7 +197,7 @@ public abstract class IntTVList extends TVList {
 
   @Override
   public int serializedSize() {
-    return Byte.BYTES + Integer.BYTES + rowCount * (Long.BYTES + Integer.BYTES);
+    return Byte.BYTES + Integer.BYTES + rowCount * (Long.BYTES + Integer.BYTES + Byte.BYTES);
   }
 
   @Override
@@ -253,6 +207,7 @@ public abstract class IntTVList extends TVList {
     for (int rowIdx = 0; rowIdx < rowCount; ++rowIdx) {
       buffer.putLong(getTime(rowIdx));
       buffer.putInt(getInt(rowIdx));
+      WALWriteUtils.write(isNullValue(rowIdx), buffer);
     }
   }
 
@@ -261,11 +216,15 @@ public abstract class IntTVList extends TVList {
     int rowCount = stream.readInt();
     long[] times = new long[rowCount];
     int[] values = new int[rowCount];
+    BitMap bitMap = new BitMap(rowCount);
     for (int rowIdx = 0; rowIdx < rowCount; ++rowIdx) {
       times[rowIdx] = stream.readLong();
       values[rowIdx] = stream.readInt();
+      if (ReadWriteIOUtils.readBool(stream)) {
+        bitMap.mark(rowIdx);
+      }
     }
-    tvList.putInts(times, values, null, 0, rowCount);
+    tvList.putInts(times, values, bitMap, 0, rowCount);
     return tvList;
   }
 }

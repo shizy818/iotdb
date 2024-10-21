@@ -102,8 +102,8 @@ public class DoubleTVListTest {
         nullCnt++;
         continue;
       }
-      Assert.assertEquals(i, tvList.getDouble((int) i - nullCnt - 1), delta);
-      Assert.assertEquals(i, tvList.getTime((int) i - nullCnt - 1));
+      Assert.assertEquals(i - nullCnt, tvList.getDouble((int) i - nullCnt - 1), delta);
+      Assert.assertEquals(i - nullCnt, tvList.getTime((int) i - nullCnt - 1));
     }
   }
 
