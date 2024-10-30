@@ -1,45 +1,67 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
-
 package org.apache.iotdb.db.utils.datastructure;
 
+import org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager;
+
+import org.apache.tsfile.enums.TSDataType;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager.ARRAY_SIZE;
 
-public interface BackwardSort extends QuickSort {
+public class BackwardSortPolicy extends QuickSortPolicy {
+  public static double INVERSION_RATIOS_THRESHOLD = 0.004;
 
-  double INVERSION_RATIOS_THRESHOLD = 0.004;
+  private final List<long[]> tmpTimestamps = new ArrayList<>();
+  private final List<int[]> tmpIndices = new ArrayList<>();
+  private int tmpLength = 0;
 
-  void setFromTmp(int src, int dest);
+  public BackwardSortPolicy(TVList tvList) {
+    super(tvList);
+  }
 
-  void setToTmp(int src, int dest);
+  public void setFromTmp(int src, int dest) {
+    tvList.set(
+        dest,
+        tmpTimestamps.get(src / ARRAY_SIZE)[src % ARRAY_SIZE],
+        tmpIndices.get(src / ARRAY_SIZE)[src % ARRAY_SIZE]);
+  }
 
-  void backward_set(int src, int dest);
+  public void setToTmp(int src, int dest) {
+    tmpTimestamps.get(dest / ARRAY_SIZE)[dest % ARRAY_SIZE] = tvList.getTime(src);
+    tmpIndices.get(dest / ARRAY_SIZE)[dest % ARRAY_SIZE] = tvList.getValueIndex(src);
+  }
 
-  int compareTmp(int idx, int tmpIdx);
+  public void backward_set(int src, int dest) {
+    tvList.set(src, dest);
+  }
 
-  void checkTmpLength(int len);
+  public int compareTmp(int idx, int tmpIdx) {
+    long t1 = tvList.getTime(idx);
+    long t2 = tmpTimestamps.get(tmpIdx / ARRAY_SIZE)[tmpIdx % ARRAY_SIZE];
+    return Long.compare(t1, t2);
+  }
 
-  void clearTmp();
+  public void checkTmpLength(int len) {
+    while (len > tmpLength) {
+      tmpTimestamps.add((long[]) tvList.getPrimitiveArraysByType(TSDataType.INT64));
+      tmpIndices.add((int[]) tvList.getPrimitiveArraysByType(TSDataType.INT32));
+      tmpLength += ARRAY_SIZE;
+    }
+  }
 
-  default void backwardSort(List<long[]> timestamps, int rowCount) {
+  public void clearTmp() {
+    for (long[] dataArray : tmpTimestamps) {
+      PrimitiveArrayManager.release(dataArray);
+    }
+    tmpTimestamps.clear();
+    for (int[] dataArray : tmpIndices) {
+      PrimitiveArrayManager.release(dataArray);
+    }
+    tmpIndices.clear();
+  }
+
+  public void backwardSort(List<long[]> timestamps, int rowCount) {
     int block_size = setBlockLength(timestamps, 1);
     // System.out.printf("rowCount=%d, block_size=%d\n",rowCount, block_size);
     int B = rowCount / block_size + 1;
@@ -60,7 +82,7 @@ public interface BackwardSort extends QuickSort {
    * @param step
    * @return
    */
-  default int setBlockLength(List<long[]> timestamps, int step) {
+  public int setBlockLength(List<long[]> timestamps, int step) {
     double overlap = 0;
     long last_time = timestamps.get(0)[0];
     int i = step, blocks = 0;
@@ -90,7 +112,7 @@ public interface BackwardSort extends QuickSort {
    * @param hi
    * @param rowCount
    */
-  default void backwardMergeBlocks(int lo, int hi, int rowCount) {
+  public void backwardMergeBlocks(int lo, int hi, int rowCount) {
     int overlapIdx = hi + 1;
     while (overlapIdx < rowCount && compare(hi, overlapIdx) == 1) {
       overlapIdx++;
@@ -131,7 +153,7 @@ public interface BackwardSort extends QuickSort {
    * @param lo
    * @param hi
    */
-  default void sortBlock(int lo, int hi) {
+  public void sortBlock(int lo, int hi) {
     qsort(lo, hi);
   }
 }

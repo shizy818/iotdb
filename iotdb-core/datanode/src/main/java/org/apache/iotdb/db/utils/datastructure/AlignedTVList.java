@@ -67,11 +67,6 @@ public abstract class AlignedTVList extends TVList {
   // Index relation: columnIndex(dataTypeIndex) -> arrayIndex -> elementIndex
   protected List<List<Object>> values;
 
-  // List of index array, add 1 when expanded -> data point index array
-  // Index relation: arrayIndex -> elementIndex
-  // Used in sort method, sort only changes indices
-  protected List<int[]> indices;
-
   // Data type list -> list of BitMap, add 1 when expanded -> BitMap(maybe null), marked means the
   // Value is null
   // Index relation: columnIndex(dataTypeIndex) -> arrayIndex -> elementIndex
@@ -85,7 +80,7 @@ public abstract class AlignedTVList extends TVList {
 
   AlignedTVList(List<TSDataType> types) {
     super();
-    indices = new ArrayList<>(types.size());
+    indices = new ArrayList<>();
     dataTypes = types;
     memoryBinaryChunkSize = new long[dataTypes.size()];
     reachMaxChunkSizeFlag = false;
@@ -105,39 +100,6 @@ public abstract class AlignedTVList extends TVList {
       default:
         return new TimAlignedTVList(dataTypes);
     }
-  }
-
-  @Override
-  public TVList getTvListByColumnIndex(
-      List<Integer> columnIndex, List<TSDataType> dataTypeList, boolean ignoreAllNullRows) {
-    List<List<Object>> values = new ArrayList<>();
-    List<List<BitMap>> bitMaps = null;
-    for (int i = 0; i < columnIndex.size(); i++) {
-      // columnIndex == -1 means querying a non-exist column, add null column here
-      if (columnIndex.get(i) == -1) {
-        values.add(null);
-      } else {
-        values.add(this.values.get(columnIndex.get(i)));
-        if (this.bitMaps != null && this.bitMaps.get(columnIndex.get(i)) != null) {
-          if (bitMaps == null) {
-            bitMaps = new ArrayList<>(columnIndex.size());
-            for (int j = 0; j < columnIndex.size(); j++) {
-              bitMaps.add(null);
-            }
-          }
-          bitMaps.set(i, this.bitMaps.get(columnIndex.get(i)));
-        }
-      }
-    }
-    AlignedTVList alignedTvList = AlignedTVList.newAlignedList(dataTypeList);
-    alignedTvList.timestamps = this.timestamps;
-    alignedTvList.indices = this.indices;
-    alignedTvList.values = values;
-    alignedTvList.bitMaps = bitMaps;
-    alignedTvList.rowCount = this.rowCount;
-    // for table model, we won't discard any row even if all value columns are null
-    alignedTvList.rowBitMap = ignoreAllNullRows ? getRowBitMap() : null;
-    return alignedTvList;
   }
 
   @Override
@@ -579,20 +541,6 @@ public abstract class AlignedTVList extends TVList {
     bitMaps.remove(columnIndex);
   }
 
-  protected void set(int index, long timestamp, int value) {
-    int arrayIndex = index / ARRAY_SIZE;
-    int elementIndex = index % ARRAY_SIZE;
-    timestamps.get(arrayIndex)[elementIndex] = timestamp;
-    indices.get(arrayIndex)[elementIndex] = value;
-  }
-
-  @SuppressWarnings("squid:S3776") // Suppress high Cognitive Complexity warning
-  protected int[] cloneIndex(int[] array) {
-    int[] cloneArray = new int[array.length];
-    System.arraycopy(array, 0, cloneArray, 0, array.length);
-    return cloneArray;
-  }
-
   protected Object cloneValue(TSDataType type, Object value) {
     switch (type) {
       case TEXT:
@@ -672,21 +620,6 @@ public abstract class AlignedTVList extends TVList {
   }
 
   /**
-   * Get the row index value in index column.
-   *
-   * @param index row index
-   */
-  @Override
-  public int getValueIndex(int index) {
-    if (index >= rowCount) {
-      throw new ArrayIndexOutOfBoundsException(index);
-    }
-    int arrayIndex = index / ARRAY_SIZE;
-    int elementIndex = index % ARRAY_SIZE;
-    return indices.get(arrayIndex)[elementIndex];
-  }
-
-  /**
    * Get the valid original row index in a column by a given time duplicated original row index
    * list.
    *
@@ -711,14 +644,6 @@ public abstract class AlignedTVList extends TVList {
       int index, long time, Integer floatPrecision, List<TSEncoding> encodingList) {
     return new TimeValuePair(
         time, (TsPrimitiveType) getAlignedValueForQuery(index, floatPrecision, encodingList));
-  }
-
-  @Override
-  protected void releaseLastValueArray() {
-    PrimitiveArrayManager.release(indices.remove(indices.size() - 1));
-    for (List<Object> valueList : values) {
-      PrimitiveArrayManager.release(valueList.remove(valueList.size() - 1));
-    }
   }
 
   @Override
@@ -1382,5 +1307,89 @@ public abstract class AlignedTVList extends TVList {
 
   public List<List<BitMap>> getBitMaps() {
     return bitMaps;
+  }
+
+  @Override
+  public int validRowCount() {
+    BitMap rowBitMap = getRowBitMap();
+    if (rowBitMap == null) {
+      return rowCount;
+    }
+    int count = 0;
+    for (int row = 0; row < rowCount; row++) {
+      if (!rowBitMap.isMarked(row)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  public AlignedTVListIterator iterator(boolean isIgnoreAllNullRows) {
+    return new AlignedTVListIterator(isIgnoreAllNullRows);
+  }
+
+  /** AlignedTVList Iterator */
+  public class AlignedTVListIterator extends TVListIterator {
+    BitMap rowBitMap;
+    private int index;
+
+    public AlignedTVListIterator(boolean isIgnoreAllNullRows) {
+      rowBitMap = isIgnoreAllNullRows ? getRowBitMap() : null;
+      seekToFirst();
+    }
+
+    public void seekToFirst() {
+      index = 0;
+    }
+
+    public boolean hasNext() {
+      if (rowBitMap != null) {
+        while (index < rowCount && rowBitMap.isMarked(getValueIndex(index))) {
+          index++;
+        }
+      }
+      return index < rowCount;
+    }
+
+    public TimeValuePair next() {
+      return getTimeValuePair(index++);
+    }
+
+    public void seekToLast() {
+      index = rowCount - 1;
+    }
+
+    public boolean hasPrevious() {
+      if (rowBitMap != null) {
+        while (index >= 0 && rowBitMap.isMarked(getValueIndex(index))) {
+          index--;
+        }
+      }
+      return index >= 0;
+    }
+
+    public TimeValuePair previous() {
+      return getTimeValuePair(index--);
+    }
+
+    public TimeValuePair current() {
+      if (hasNext()) {
+        return getTimeValuePair(index);
+      }
+      return null;
+    }
+
+    public TimeValuePair peekNext() {
+      int nextIndex = index + 1;
+      if (rowBitMap != null) {
+        while (nextIndex < rowCount && rowBitMap.isMarked(getValueIndex(nextIndex))) {
+          nextIndex++;
+        }
+      }
+      if (nextIndex >= rowCount) {
+        return null;
+      }
+      return getTimeValuePair(nextIndex);
+    }
   }
 }

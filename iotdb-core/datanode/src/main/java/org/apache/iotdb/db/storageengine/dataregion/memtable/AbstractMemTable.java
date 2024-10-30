@@ -60,16 +60,17 @@ import org.apache.tsfile.file.metadata.IDeviceID.Deserializer;
 import org.apache.tsfile.file.metadata.enums.CompressionType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.file.metadata.statistics.TimeStatistics;
+import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
-import org.apache.tsfile.utils.BitMap;
+import org.apache.tsfile.read.reader.IPointReader;
 import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
+import org.apache.tsfile.write.schema.VectorMeasurementSchema;
 
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -79,9 +80,8 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 
-import static org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager.ARRAY_SIZE;
+import static org.apache.iotdb.commons.path.AlignedPath.VECTOR_PLACEHOLDER;
 
 public abstract class AbstractMemTable implements IMemTable {
 
@@ -583,7 +583,8 @@ public abstract class AbstractMemTable implements IMemTable {
       long ttlLowerBound,
       Map<String, List<IChunkMetadata>> chunkMetaDataMap,
       Map<String, List<IChunkHandle>> memChunkHandleMap,
-      List<Pair<Modification, IMemTable>> modsToMemTabled) {
+      List<Pair<Modification, IMemTable>> modsToMemTabled)
+      throws QueryProcessException, IOException {
 
     IDeviceID deviceID = fullPath.getDeviceId();
     if (fullPath instanceof NonAlignedFullPath) {
@@ -635,7 +636,7 @@ public abstract class AbstractMemTable implements IMemTable {
       Map<String, List<IChunkMetadata>> chunkMetadataMap,
       Map<String, List<IChunkHandle>> memChunkHandleMap,
       List<Pair<Modification, IMemTable>> modsToMemTabled)
-      throws MetadataException {
+      throws MetadataException, QueryProcessException, IOException {
 
     Map<IDeviceID, IWritableMemChunkGroup> memTableMap = getMemTableMap();
 
@@ -669,12 +670,24 @@ public abstract class AbstractMemTable implements IMemTable {
       String measurementId,
       Map<String, List<IChunkMetadata>> chunkMetadataMap,
       Map<String, List<IChunkHandle>> memChunkHandleMap,
-      List<TimeRange> deletionList) {
+      List<TimeRange> deletionList)
+      throws QueryProcessException, IOException {
+    WritableMemChunk memChunk =
+        (WritableMemChunk) memTableMap.get(deviceID).getMemChunkMap().get(measurementId);
+    List<TVList> sortedLists = new ArrayList<>(memChunk.getSortedLists());
+    TVList clonedList = memChunk.cloneAndSortList();
+    sortedLists.add(clonedList);
 
-    IWritableMemChunk memChunk = memTableMap.get(deviceID).getMemChunkMap().get(measurementId);
-
-    TVList tvListCopy = memChunk.getSortedTvListForQuery();
-    long[] timestamps = filterDeletedTimestamp(tvListCopy, deletionList);
+    ReadOnlyMemChunk readOnlyMemChunk =
+        new ReadOnlyMemChunk(
+            new QueryContext(),
+            measurementId,
+            memChunk.getDataType(),
+            memChunk.getSchema().getEncodingType(),
+            sortedLists,
+            memChunk.getSchema().getProps(),
+            deletionList);
+    long[] timestamps = filterDeletedTimestamp(readOnlyMemChunk);
 
     chunkMetadataMap
         .computeIfAbsent(measurementId, k -> new ArrayList<>())
@@ -682,7 +695,7 @@ public abstract class AbstractMemTable implements IMemTable {
             buildChunkMetaDataForMemoryChunk(
                 measurementId,
                 timestamps[0],
-                timestamps[tvListCopy.rowCount() - 1],
+                timestamps[timestamps.length - 1],
                 Collections.emptyList()));
     memChunkHandleMap
         .computeIfAbsent(measurementId, k -> new ArrayList<>())
@@ -694,7 +707,8 @@ public abstract class AbstractMemTable implements IMemTable {
       List<IMeasurementSchema> schemaList,
       Map<String, List<IChunkMetadata>> chunkMetadataList,
       Map<String, List<IChunkHandle>> memChunkHandleMap,
-      List<List<TimeRange>> deletionList) {
+      List<List<TimeRange>> deletionList)
+      throws QueryProcessException, IOException {
 
     AlignedWritableMemChunk alignedMemChunk =
         ((AlignedWritableMemChunkGroup) memTableMap.get(deviceID)).getAlignedMemChunk();
@@ -710,16 +724,36 @@ public abstract class AbstractMemTable implements IMemTable {
       return;
     }
 
-    AlignedTVList alignedTVListCopy =
-        (AlignedTVList) alignedMemChunk.getSortedTvListForQuery(schemaList, true);
+    List<AlignedTVList> sortedLists = new ArrayList<>(alignedMemChunk.getSortedLists());
+    AlignedTVList clonedList = alignedMemChunk.cloneAndSortList();
+    sortedLists.add(clonedList);
 
+    AlignedReadOnlyMemChunk alignedReadOnlyMemChunk =
+        new AlignedReadOnlyMemChunk(
+            new QueryContext(), getVectorSchema(schemaList), null, sortedLists, null, deletionList);
     buildAlignedMemChunkHandle(
         deviceID,
-        alignedTVListCopy,
+        alignedReadOnlyMemChunk,
         deletionList,
         schemaList,
         chunkMetadataList,
         memChunkHandleMap);
+  }
+
+  public VectorMeasurementSchema getVectorSchema(List<IMeasurementSchema> schemaList) {
+    TSDataType[] types = new TSDataType[schemaList.size()];
+    TSEncoding[] encodings = new TSEncoding[schemaList.size()];
+
+    for (int i = 0; i < schemaList.size(); i++) {
+      types[i] = schemaList.get(i).getType();
+      encodings[i] = schemaList.get(i).getEncodingType();
+    }
+    String[] array = new String[schemaList.size()];
+    for (int i = 0; i < array.length; i++) {
+      array[i] = schemaList.get(i).getMeasurementId();
+    }
+    return new VectorMeasurementSchema(
+        VECTOR_PLACEHOLDER, array, types, encodings, CompressionType.UNCOMPRESSED);
   }
 
   private void getMemAlignedChunkHandleFromMemTable(
@@ -728,13 +762,11 @@ public abstract class AbstractMemTable implements IMemTable {
       Map<String, List<IChunkMetadata>> chunkMetadataList,
       Map<String, List<IChunkHandle>> memChunkHandleMap,
       long ttlLowerBound,
-      List<Pair<Modification, IMemTable>> modsToMemTabled) {
+      List<Pair<Modification, IMemTable>> modsToMemTabled)
+      throws QueryProcessException, IOException {
 
     AlignedWritableMemChunk memChunk = writableMemChunkGroup.getAlignedMemChunk();
     List<IMeasurementSchema> schemaList = memChunk.getSchemaList();
-
-    AlignedTVList alignedTVListCopy =
-        (AlignedTVList) memChunk.getSortedTvListForQuery(schemaList, true);
 
     List<List<TimeRange>> deletionList = new ArrayList<>();
     if (modsToMemTabled != null) {
@@ -744,9 +776,17 @@ public abstract class AbstractMemTable implements IMemTable {
                 deviceID, schema.getMeasurementId(), this, modsToMemTabled, ttlLowerBound));
       }
     }
+
+    List<AlignedTVList> sortedLists = new ArrayList<>(memChunk.getSortedLists());
+    AlignedTVList clonedList = memChunk.cloneAndSortList();
+    sortedLists.add(clonedList);
+
+    AlignedReadOnlyMemChunk alignedReadOnlyMemChunk =
+        new AlignedReadOnlyMemChunk(
+            new QueryContext(), getVectorSchema(schemaList), null, sortedLists, null, deletionList);
     buildAlignedMemChunkHandle(
         deviceID,
-        alignedTVListCopy,
+        alignedReadOnlyMemChunk,
         deletionList,
         schemaList,
         chunkMetadataList,
@@ -759,14 +799,18 @@ public abstract class AbstractMemTable implements IMemTable {
       Map<String, List<IChunkMetadata>> chunkMetadataMap,
       Map<String, List<IChunkHandle>> memChunkHandleMap,
       long ttlLowerBound,
-      List<Pair<Modification, IMemTable>> modsToMemTabled) {
+      List<Pair<Modification, IMemTable>> modsToMemTabled)
+      throws QueryProcessException, IOException {
 
     for (Entry<String, IWritableMemChunk> entry :
         writableMemChunkGroup.getMemChunkMap().entrySet()) {
 
       String measurementId = entry.getKey();
-      IWritableMemChunk writableMemChunk = entry.getValue();
-      TVList tvListCopy = writableMemChunk.getSortedTvListForQuery();
+      WritableMemChunk writableMemChunk = (WritableMemChunk) entry.getValue();
+
+      List<TVList> sortedLists = new ArrayList<>(writableMemChunk.getSortedLists());
+      TVList clonedList = writableMemChunk.cloneAndSortList();
+      sortedLists.add(clonedList);
 
       List<TimeRange> deletionList = new ArrayList<>();
       if (modsToMemTabled != null) {
@@ -774,14 +818,25 @@ public abstract class AbstractMemTable implements IMemTable {
             ModificationUtils.constructDeletionList(
                 deviceID, measurementId, this, modsToMemTabled, ttlLowerBound);
       }
-      long[] timestamps = filterDeletedTimestamp(tvListCopy, deletionList);
+
+      ReadOnlyMemChunk readOnlyMemChunk =
+          new ReadOnlyMemChunk(
+              new QueryContext(),
+              measurementId,
+              writableMemChunk.getDataType(),
+              writableMemChunk.getSchema().getEncodingType(),
+              sortedLists,
+              writableMemChunk.getSchema().getProps(),
+              deletionList);
+
+      long[] timestamps = filterDeletedTimestamp(readOnlyMemChunk);
       chunkMetadataMap
           .computeIfAbsent(measurementId, k -> new ArrayList<>())
           .add(
               buildChunkMetaDataForMemoryChunk(
                   measurementId,
                   timestamps[0],
-                  timestamps[tvListCopy.rowCount() - 1],
+                  timestamps[timestamps.length - 1],
                   Collections.emptyList()));
       memChunkHandleMap
           .computeIfAbsent(measurementId, k -> new ArrayList<>())
@@ -791,26 +846,34 @@ public abstract class AbstractMemTable implements IMemTable {
 
   private void buildAlignedMemChunkHandle(
       IDeviceID deviceID,
-      AlignedTVList alignedTVList,
+      AlignedReadOnlyMemChunk alignedReadOnlyMemChunk,
       List<List<TimeRange>> deletionList,
       List<IMeasurementSchema> schemaList,
       Map<String, List<IChunkMetadata>> chunkMetadataList,
-      Map<String, List<IChunkHandle>> chunkHandleMap) {
+      Map<String, List<IChunkHandle>> chunkHandleMap)
+      throws IOException {
 
-    List<List<BitMap>> bitMaps = alignedTVList.getBitMaps();
-    long[] timestamps =
-        alignedTVList.getTimestamps().stream().flatMapToLong(LongStream::of).toArray();
-    timestamps = Arrays.copyOfRange(timestamps, 0, alignedTVList.rowCount());
+    IPointReader iterator = alignedReadOnlyMemChunk.getPointReader();
+    List<Long> tsList = new ArrayList<>();
+
+    while (iterator.hasNextTimeValuePair()) {
+      TimeValuePair tvPair = iterator.nextTimeValuePair();
+      tsList.add(tvPair.getTimestamp());
+    }
+
+    long[] timestamps = new long[tsList.size()];
+    for (int i = 0; i < tsList.size(); i++) {
+      timestamps[i] = tsList.get(i);
+    }
 
     for (int i = 0; i < schemaList.size(); i++) {
       String measurement = schemaList.get(i).getMeasurementId();
-      List<BitMap> curBitMap = bitMaps == null ? Collections.emptyList() : bitMaps.get(i);
       List<TimeRange> deletion =
           deletionList == null || deletionList.isEmpty()
               ? Collections.emptyList()
               : deletionList.get(i);
 
-      long[] startEndTime = calculateStartEndTime(timestamps, curBitMap);
+      long[] startEndTime = calculateStartEndTime(timestamps);
       chunkMetadataList
           .computeIfAbsent(measurement, k -> new ArrayList<>())
           .add(
@@ -818,35 +881,12 @@ public abstract class AbstractMemTable implements IMemTable {
                   measurement, startEndTime[0], startEndTime[1], deletion));
       chunkHandleMap
           .computeIfAbsent(measurement, k -> new ArrayList<>())
-          .add(
-              new MemAlignedChunkHandleImpl(
-                  deviceID, measurement, timestamps, curBitMap, deletion, startEndTime));
+          .add(new MemAlignedChunkHandleImpl(deviceID, measurement, timestamps, startEndTime));
     }
   }
 
-  private long[] calculateStartEndTime(long[] timestamps, List<BitMap> bitMaps) {
-    if (bitMaps.isEmpty()) {
-      return new long[] {timestamps[0], timestamps[timestamps.length - 1]};
-    }
-    long startTime = -1, endTime = -1;
-    for (int i = 0; i < timestamps.length; i++) {
-      int arrayIndex = i / ARRAY_SIZE;
-      int elementIndex = i % ARRAY_SIZE;
-      if (!bitMaps.get(arrayIndex).isMarked(elementIndex)) {
-        startTime = timestamps[i];
-        break;
-      }
-    }
-
-    for (int i = timestamps.length - 1; i >= 0; i--) {
-      int arrayIndex = i / ARRAY_SIZE;
-      int elementIndex = i % ARRAY_SIZE;
-      if (!bitMaps.get(arrayIndex).isMarked(elementIndex)) {
-        endTime = timestamps[i];
-        break;
-      }
-    }
-    return new long[] {startTime, endTime};
+  private long[] calculateStartEndTime(long[] timestamps) {
+    return new long[] {timestamps[0], timestamps[timestamps.length - 1]};
   }
 
   private IChunkMetadata buildChunkMetaDataForMemoryChunk(
@@ -870,26 +910,15 @@ public abstract class AbstractMemTable implements IMemTable {
     return chunkMetadata;
   }
 
-  private long[] filterDeletedTimestamp(TVList tvList, List<TimeRange> deletionList) {
-    if (deletionList.isEmpty()) {
-      long[] timestamps = tvList.getTimestamps().stream().flatMapToLong(LongStream::of).toArray();
-      return Arrays.copyOfRange(timestamps, 0, tvList.rowCount());
-    }
+  private long[] filterDeletedTimestamp(ReadOnlyMemChunk readOnlyMemChunk) throws IOException {
+    IPointReader iterator = readOnlyMemChunk.getPointReader();
+    List<Long> timestamps = new ArrayList<>();
 
-    long lastTime = -1;
-    int[] deletionCursor = {0};
-    int rowCount = tvList.rowCount();
-    List<Long> result = new ArrayList<>();
-
-    for (int i = 0; i < rowCount; i++) {
-      long curTime = tvList.getTime(i);
-      if (!ModificationUtils.isPointDeleted(curTime, deletionList, deletionCursor)
-          && (i == rowCount - 1 || curTime != lastTime)) {
-        result.add(curTime);
-      }
-      lastTime = curTime;
+    while (iterator.hasNextTimeValuePair()) {
+      TimeValuePair tvPair = iterator.nextTimeValuePair();
+      timestamps.add(tvPair.getTimestamp());
     }
-    return result.stream().mapToLong(Long::longValue).toArray();
+    return timestamps.stream().mapToLong(Long::longValue).toArray();
   }
 
   /**
