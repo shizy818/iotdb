@@ -257,7 +257,11 @@ public abstract class TVList implements WALEntryValue {
     return version;
   }
 
-  protected abstract void set(int src, int dest);
+  protected void set(int src, int dest) {
+    long srcT = getTime(src);
+    int srcV = getValueIndex(src);
+    set(dest, srcT, srcV);
+  }
 
   protected abstract void expandValues();
 
