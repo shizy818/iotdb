@@ -137,6 +137,16 @@ public abstract class TVList implements WALEntryValue {
     return rowCount;
   }
 
+  public int count() {
+    int count = 0;
+    for (int i = 0; i < rowCount; i++) {
+      if (!isNullValue(i)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   public long getTime(int index) {
     if (index >= rowCount) {
       throw new ArrayIndexOutOfBoundsException(index);
@@ -502,7 +512,7 @@ public abstract class TVList implements WALEntryValue {
    * @param rowIndex value index
    * @return boolean
    */
-  protected boolean isNullValue(int rowIndex) {
+  public boolean isNullValue(int rowIndex) {
     if (rowIndex >= rowCount) {
       return false;
     }
@@ -512,5 +522,9 @@ public abstract class TVList implements WALEntryValue {
     int arrayIndex = rowIndex / ARRAY_SIZE;
     int elementIndex = rowIndex % ARRAY_SIZE;
     return bitMap.get(arrayIndex).isMarked(elementIndex);
+  }
+
+  public List<BitMap> getBitMap() {
+    return bitMap;
   }
 }
