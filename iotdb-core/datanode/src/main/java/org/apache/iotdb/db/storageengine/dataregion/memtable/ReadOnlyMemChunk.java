@@ -157,20 +157,24 @@ public class ReadOnlyMemChunk {
     int cnt = 0;
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
+    System.out.println("tvlist : " + Arrays.toString(tvLists.get(0).getTimestamps().get(0)));
     MergeSortTvListIterator timeValuePairIterator =
         new MergeSortTvListIterator(dataType, encoding, floatPrecision, tvLists);
     int[] tvListOffsets = timeValuePairIterator.getTVListOffsets();
     int[] firstPageStartOffsets = Arrays.copyOf(tvListOffsets, tvListOffsets.length);
     while (timeValuePairIterator.hasNextTimeValuePair()) {
+      int[] tvListOffsetsBeforeNext = timeValuePairIterator.getLastTVListOffsets();
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
       if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
         if (cnt % MAX_NUMBER_OF_POINTS_IN_PAGE == 0) {
           Statistics stats = Statistics.getStatsByType(dataType);
           pageStatisticsList.add(stats);
+          //          pageOffsetsList.add(
+          //              Arrays.copyOf(tvListOffsetsBeforeNext, tvListOffsetsBeforeNext.length));
           pageOffsetsList.add(
               cnt == 0
                   ? firstPageStartOffsets
-                  : Arrays.copyOf(tvListOffsets, tvListOffsets.length));
+                  : Arrays.copyOf(tvListOffsetsBeforeNext, tvListOffsetsBeforeNext.length));
         }
 
         Statistics pageStatistics = pageStatisticsList.get(pageStatisticsList.size() - 1);
@@ -211,6 +215,9 @@ public class ReadOnlyMemChunk {
       }
     }
     chunkStatistics.setEmpty(cnt == 0);
+    for (int[] pageOffsets : pageOffsetsList) {
+      System.out.println(Arrays.toString(pageOffsets));
+    }
   }
 
   public TSDataType getDataType() {

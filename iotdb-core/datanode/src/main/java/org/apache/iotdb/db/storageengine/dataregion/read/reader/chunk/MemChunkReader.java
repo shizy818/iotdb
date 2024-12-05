@@ -37,6 +37,7 @@ import org.apache.tsfile.read.reader.IPointReader;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
@@ -175,6 +176,7 @@ public class MemChunkReader implements IChunkReader, IPointReader {
         TSDataType tsDataType = readableChunk.getDataType();
         TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(tsDataType));
         writeValidValuesIntoTsBlock(builder);
+        System.out.println("**************** builder.build **************");
         return builder.build();
       } catch (IOException e) {
         throw new RuntimeException(e);
@@ -182,13 +184,15 @@ public class MemChunkReader implements IChunkReader, IPointReader {
     }
 
     private boolean isOutOfMemPageBounds() {
+      int[] currTvListOffsets =
+          ((MergeSortTvListIterator) timeValuePairIterator).getTVListOffsets();
+      System.out.println("currTvListOffsets: " + Arrays.toString(currTvListOffsets));
+      System.out.println("pageEndOffsets: " + Arrays.toString(pageEndOffsets));
       if (pageEndOffsets == null) {
         return false;
       }
-      int[] currTvListOffsets =
-          ((MergeSortTvListIterator) timeValuePairIterator).getTVListOffsets();
       for (int i = 0; i < pageEndOffsets.length; i++) {
-        if (currTvListOffsets[i] >= pageEndOffsets[i]) {
+        if (currTvListOffsets[i] > pageEndOffsets[i]) {
           return true;
         }
       }
@@ -200,8 +204,12 @@ public class MemChunkReader implements IChunkReader, IPointReader {
         throws IOException {
       TSDataType tsDataType = readableChunk.getDataType();
       int[] deleteCursor = {0};
+      TVList tvlist = ((MergeSortTvListIterator) timeValuePairIterator).getFirstTVList();
+      System.out.println(
+          "writeValidValuesIntoTsBlock tvlist : " + Arrays.toString(tvlist.getTimestamps().get(0)));
       while (timeValuePairIterator.hasNextTimeValuePair()) {
         if (isOutOfMemPageBounds()) {
+          System.out.println("Out Of Page");
           break;
         }
         TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();

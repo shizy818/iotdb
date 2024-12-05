@@ -242,6 +242,7 @@ public class MemPageReader implements IPageReader {
     if (tsBlock == null) {
       initializeOffsets();
       tsBlock = tsBlockSupplier.get();
+      System.out.println("******* Start init page stats *********");
       if (pageMetadata.getStatistics() == null) {
         initPageStatistics();
       }

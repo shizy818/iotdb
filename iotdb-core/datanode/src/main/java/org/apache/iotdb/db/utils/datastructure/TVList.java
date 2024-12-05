@@ -90,6 +90,8 @@ public abstract class TVList implements WALEntryValue {
   protected AtomicInteger referenceCount;
   private long version;
 
+  private TVList outer = this;
+
   protected TVList() {
     timestamps = new CopyOnWriteArrayList<>();
     indices = new CopyOnWriteArrayList<>();
@@ -615,14 +617,17 @@ public abstract class TVList implements WALEntryValue {
         // skip deleted & duplicated timestamp
         while ((index < rowCount && isNullValue(getValueIndex(index)))
             || (index + 1 < rowCount && getTime(index + 1) == getTime(index))) {
+          System.out.println("index++ 1 " + index);
           index++;
         }
       } else {
         // skip duplicated timestamp
         while (index + 1 < rowCount && getTime(index + 1) == getTime(index)) {
+          System.out.println("index++ 2 " + index);
           index++;
         }
       }
+      System.out.println("current index: " + index + ", rowCount: " + rowCount);
       return index < rowCount;
     }
 
@@ -646,6 +651,10 @@ public abstract class TVList implements WALEntryValue {
 
     public void setIndex(int index) {
       this.index = index;
+    }
+
+    public TVList getTVList() {
+      return outer;
     }
   }
 }
