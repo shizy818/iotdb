@@ -132,7 +132,7 @@ public abstract class AlignedTVList extends TVList {
     alignedTvList.indices = this.indices;
     alignedTvList.values = values;
     alignedTvList.bitMaps = bitMaps;
-    alignedTvList.rowCount = this.rowCount;
+    alignedTvList.rowCount.set(this.rowCount.get());
     // for table model, we won't discard any row even if all value columns are null
     alignedTvList.allValueColDeletedMap = ignoreAllNullRows ? getAllValueColDeletedMap() : null;
     alignedTvList.timeColDeletedMap = this.timeColDeletedMap;
@@ -179,8 +179,8 @@ public abstract class AlignedTVList extends TVList {
   @Override
   public void putAlignedValue(long timestamp, Object[] value) {
     checkExpansion();
-    int arrayIndex = rowCount / ARRAY_SIZE;
-    int elementIndex = rowCount % ARRAY_SIZE;
+    int arrayIndex = rowCount.get() / ARRAY_SIZE;
+    int elementIndex = rowCount.get() % ARRAY_SIZE;
     maxTime = Math.max(maxTime, timestamp);
     timestamps.get(arrayIndex)[elementIndex] = timestamp;
     for (int i = 0; i < values.size(); i++) {
@@ -229,10 +229,10 @@ public abstract class AlignedTVList extends TVList {
           break;
       }
     }
-    indices.get(arrayIndex)[elementIndex] = rowCount;
-    rowCount++;
+    indices.get(arrayIndex)[elementIndex] = rowCount.get();
+    rowCount.incrementAndGet();
     if (sorted) {
-      if (rowCount > 1 && timestamp < getTime(rowCount - 2)) {
+      if (rowCount.get() > 1 && timestamp < getTime(rowCount.get() - 2)) {
         sorted = false;
       } else {
         seqRowCount++;
@@ -259,7 +259,7 @@ public abstract class AlignedTVList extends TVList {
 
   private Object getAlignedValueForQuery(
       int index, Integer floatPrecision, List<TSEncoding> encodingList) {
-    if (index >= rowCount) {
+    if (index >= rowCount.get()) {
       throw new ArrayIndexOutOfBoundsException(index);
     }
     int arrayIndex = index / ARRAY_SIZE;
@@ -273,7 +273,7 @@ public abstract class AlignedTVList extends TVList {
       int[] validIndexesForTimeDuplicatedRows,
       Integer floatPrecision,
       List<TSEncoding> encodingList) {
-    if (valueIndex >= rowCount) {
+    if (valueIndex >= rowCount.get()) {
       throw new ArrayIndexOutOfBoundsException(valueIndex);
     }
     TsPrimitiveType[] vector = new TsPrimitiveType[values.size()];
@@ -379,15 +379,15 @@ public abstract class AlignedTVList extends TVList {
       BitMap bitMap = new BitMap(ARRAY_SIZE);
       // The following code is for these 2 kinds of scenarios.
 
-      // Eg1: If rowCount=5 and ARRAY_SIZE=2, we need to supply 3 bitmaps for the extending column.
+      // Eg1: If rowCount.get()=5 and ARRAY_SIZE=2, we need to supply 3 bitmaps for the extending column.
       // The first 2 bitmaps should mark all bits to represent 4 nulls and the 3rd bitmap should
       // mark
       // the 1st bit to represent 1 null value.
 
-      // Eg2: If rowCount=4 and ARRAY_SIZE=2, we need to supply 2 bitmaps for the extending column.
+      // Eg2: If rowCount.get()=4 and ARRAY_SIZE=2, we need to supply 2 bitmaps for the extending column.
       // These 2 bitmaps should mark all bits to represent 4 nulls.
-      if (i == timestamps.size() - 1 && rowCount % ARRAY_SIZE != 0) {
-        for (int j = 0; j < rowCount % ARRAY_SIZE; j++) {
+      if (i == timestamps.size() - 1 && rowCount.get() % ARRAY_SIZE != 0) {
+        for (int j = 0; j < rowCount.get() % ARRAY_SIZE; j++) {
           bitMap.mark(j);
         }
       } else {
@@ -497,7 +497,7 @@ public abstract class AlignedTVList extends TVList {
    * @return boolean
    */
   public boolean isNullValue(int unsortedRowIndex, int columnIndex) {
-    if (unsortedRowIndex >= rowCount) {
+    if (unsortedRowIndex >= rowCount.get()) {
       return false;
     }
     if (allValueColDeletedMap != null && allValueColDeletedMap.isMarked(unsortedRowIndex)) {
@@ -538,7 +538,7 @@ public abstract class AlignedTVList extends TVList {
   public int deleteTime(long lowerBound, long upperBound) {
     delete(lowerBound, upperBound);
     int deletedNumber = 0;
-    for (int i = 0; i < rowCount; i++) {
+    for (int i = 0; i < rowCount.get(); i++) {
       long time = getTime(i);
       if (time >= lowerBound && time <= upperBound) {
         markRowNull(i);
@@ -554,7 +554,7 @@ public abstract class AlignedTVList extends TVList {
 
   private void updateMaxTime() {
     long maxTime = Long.MIN_VALUE;
-    for (int i = 0; i < rowCount; i++) {
+    for (int i = 0; i < rowCount.get(); i++) {
       if (!isTimeDeleted(i)) {
         maxTime = Math.max(maxTime, getTime(i));
       }
@@ -573,7 +573,7 @@ public abstract class AlignedTVList extends TVList {
   public Pair<Integer, Boolean> delete(long lowerBound, long upperBound, int columnIndex) {
     int deletedNumber = 0;
     boolean deleteColumn = true;
-    for (int i = 0; i < rowCount; i++) {
+    for (int i = 0; i < rowCount.get(); i++) {
       long time = getTime(i);
       if (time >= lowerBound && time <= upperBound) {
         int originRowIndex = getValueIndex(i);
@@ -694,12 +694,12 @@ public abstract class AlignedTVList extends TVList {
 
   private void markRowNull(int i) {
     if (timeColDeletedMap == null) {
-      timeColDeletedMap = new BitMap(rowCount);
-    } else if (timeColDeletedMap.getSize() < rowCount) {
+      timeColDeletedMap = new BitMap(rowCount.get());
+    } else if (timeColDeletedMap.getSize() < rowCount.get()) {
       byte[] prevBytes = timeColDeletedMap.getByteArray();
-      byte[] newBytes = new byte[rowCount / 8 + 1];
+      byte[] newBytes = new byte[rowCount.get() / 8 + 1];
       System.arraycopy(prevBytes, 0, newBytes, 0, prevBytes.length);
-      timeColDeletedMap = new BitMap(rowCount, newBytes);
+      timeColDeletedMap = new BitMap(rowCount.get(), newBytes);
     }
     // use value index so that sorts will not change the nullability
     timeColDeletedMap.mark(getValueIndex(i));
@@ -742,7 +742,7 @@ public abstract class AlignedTVList extends TVList {
 
   @Override
   public boolean reachChunkSizeOrPointNumThreshold() {
-    return reachMaxChunkSizeFlag || rowCount >= MAX_SERIES_POINT_NUMBER;
+    return reachMaxChunkSizeFlag || rowCount.get() >= MAX_SERIES_POINT_NUMBER;
   }
 
   @SuppressWarnings("squid:S3776") // Suppress high Cognitive Complexity warning
@@ -756,15 +756,15 @@ public abstract class AlignedTVList extends TVList {
 
     while (idx < end) {
       int inputRemaining = end - idx;
-      int arrayIdx = rowCount / ARRAY_SIZE;
-      int elementIdx = rowCount % ARRAY_SIZE;
+      int arrayIdx = rowCount.get() / ARRAY_SIZE;
+      int elementIdx = rowCount.get() % ARRAY_SIZE;
       int internalRemaining = ARRAY_SIZE - elementIdx;
       if (internalRemaining >= inputRemaining) {
         // the remaining inputs can fit the last array, copy all remaining inputs into last array
         System.arraycopy(time, idx, timestamps.get(arrayIdx), elementIdx, inputRemaining);
         arrayCopy(value, idx, arrayIdx, elementIdx, inputRemaining);
         for (int i = 0; i < inputRemaining; i++) {
-          indices.get(arrayIdx)[elementIdx + i] = rowCount;
+          indices.get(arrayIdx)[elementIdx + i] = rowCount.get();
           for (int j = 0; j < values.size(); j++) {
             if (value[j] == null
                 || bitMaps != null && bitMaps[j] != null && bitMaps[j].isMarked(idx + i)
@@ -774,7 +774,7 @@ public abstract class AlignedTVList extends TVList {
               markNullValue(j, arrayIdx, elementIdx + i);
             }
           }
-          rowCount++;
+          rowCount.incrementAndGet();
         }
         break;
       } else {
@@ -783,7 +783,7 @@ public abstract class AlignedTVList extends TVList {
         System.arraycopy(time, idx, timestamps.get(arrayIdx), elementIdx, internalRemaining);
         arrayCopy(value, idx, arrayIdx, elementIdx, internalRemaining);
         for (int i = 0; i < internalRemaining; i++) {
-          indices.get(arrayIdx)[elementIdx + i] = rowCount;
+          indices.get(arrayIdx)[elementIdx + i] = rowCount.get();
           for (int j = 0; j < values.size(); j++) {
             if (value[j] == null
                 || bitMaps != null && bitMaps[j] != null && bitMaps[j].isMarked(idx + i)
@@ -793,7 +793,7 @@ public abstract class AlignedTVList extends TVList {
               markNullValue(j, arrayIdx, elementIdx + i);
             }
           }
-          rowCount++;
+          rowCount.incrementAndGet();
         }
         idx += internalRemaining;
         checkExpansion();
@@ -981,7 +981,7 @@ public abstract class AlignedTVList extends TVList {
     boolean[] timeInvalidInfo = null;
     int[] deleteCursor = {0};
     // time column
-    for (int sortedRowIndex = 0; sortedRowIndex < rowCount; sortedRowIndex++) {
+    for (int sortedRowIndex = 0; sortedRowIndex < rowCount.get(); sortedRowIndex++) {
       // skip empty row
       if (allValueColDeletedMap != null
           && allValueColDeletedMap.isMarked(getValueIndex(sortedRowIndex))) {
@@ -991,20 +991,20 @@ public abstract class AlignedTVList extends TVList {
         continue;
       }
       int nextRowIndex = sortedRowIndex + 1;
-      while (nextRowIndex < rowCount
+      while (nextRowIndex < rowCount.get()
           && ((allValueColDeletedMap != null
                   && allValueColDeletedMap.isMarked(getValueIndex(nextRowIndex)))
               || (isTimeDeleted(nextRowIndex)))) {
         nextRowIndex++;
       }
       long timestamp = getTime(sortedRowIndex);
-      if ((nextRowIndex == rowCount || timestamp != getTime(nextRowIndex))
+      if ((nextRowIndex == rowCount.get() || timestamp != getTime(nextRowIndex))
           && !isPointDeleted(timestamp, timeColumnDeletion, deleteCursor)) {
         timeBuilder.writeLong(getTime(sortedRowIndex));
         validRowCount++;
       } else {
         if (Objects.isNull(timeInvalidInfo)) {
-          timeInvalidInfo = new boolean[rowCount];
+          timeInvalidInfo = new boolean[rowCount.get()];
         }
         timeInvalidInfo[sortedRowIndex] = true;
       }
@@ -1024,7 +1024,7 @@ public abstract class AlignedTVList extends TVList {
       }
       ColumnBuilder valueBuilder = builder.getColumnBuilder(columnIndex);
       currentWriteRowIndex = 0;
-      for (int sortedRowIndex = 0; sortedRowIndex < rowCount; sortedRowIndex++) {
+      for (int sortedRowIndex = 0; sortedRowIndex < rowCount.get(); sortedRowIndex++) {
         // skip empty row
         if ((allValueColDeletedMap != null
                 && allValueColDeletedMap.isMarked(getValueIndex(sortedRowIndex)))
@@ -1164,40 +1164,40 @@ public abstract class AlignedTVList extends TVList {
   public int serializedSize() {
     int size = (1 + dataTypes.size()) * Byte.BYTES + 2 * Integer.BYTES;
     // time
-    size += rowCount * Long.BYTES;
+    size += rowCount.get() * Long.BYTES;
     // value
     for (int columnIndex = 0; columnIndex < values.size(); ++columnIndex) {
       switch (dataTypes.get(columnIndex)) {
         case TEXT:
         case BLOB:
         case STRING:
-          for (int rowIdx = 0; rowIdx < rowCount; ++rowIdx) {
+          for (int rowIdx = 0; rowIdx < rowCount.get(); ++rowIdx) {
             size += ReadWriteIOUtils.sizeToWrite(getBinaryByValueIndex(rowIdx, columnIndex));
           }
           break;
         case FLOAT:
-          size += rowCount * Float.BYTES;
+          size += rowCount.get() * Float.BYTES;
           break;
         case INT32:
         case DATE:
-          size += rowCount * Integer.BYTES;
+          size += rowCount.get() * Integer.BYTES;
           break;
         case INT64:
         case TIMESTAMP:
-          size += rowCount * Long.BYTES;
+          size += rowCount.get() * Long.BYTES;
           break;
         case DOUBLE:
-          size += rowCount * Double.BYTES;
+          size += rowCount.get() * Double.BYTES;
           break;
         case BOOLEAN:
-          size += rowCount * Byte.BYTES;
+          size += rowCount.get() * Byte.BYTES;
           break;
         default:
           throw new UnsupportedOperationException(ERR_DATATYPE_NOT_CONSISTENT);
       }
     }
     // bitmap
-    size += rowCount * dataTypes.size() * Byte.BYTES;
+    size += rowCount.get() * dataTypes.size() * Byte.BYTES;
 
     // have timeColDeletedMap
     size += Byte.BYTES;
@@ -1215,15 +1215,15 @@ public abstract class AlignedTVList extends TVList {
     for (TSDataType dataType : dataTypes) {
       buffer.put(dataType.serialize());
     }
-    buffer.putInt(rowCount);
+    buffer.putInt(rowCount.get());
     // time
-    for (int rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
+    for (int rowIndex = 0; rowIndex < rowCount.get(); ++rowIndex) {
       buffer.putLong(getTime(rowIndex));
     }
     // serialize value and bitmap by column
     for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
       List<Object> columnValues = values.get(columnIndex);
-      for (int rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
+      for (int rowIndex = 0; rowIndex < rowCount.get(); ++rowIndex) {
         int arrayIndex = rowIndex / ARRAY_SIZE;
         int elementIndex = rowIndex % ARRAY_SIZE;
         // value
@@ -1414,8 +1414,8 @@ public abstract class AlignedTVList extends TVList {
       }
     }
 
-    byte[] rowBitsArr = new byte[rowCount / Byte.SIZE + 1];
-    for (int row = 0; row < rowCount; row += Byte.SIZE) {
+    byte[] rowBitsArr = new byte[rowCount.get() / Byte.SIZE + 1];
+    for (int row = 0; row < rowCount.get(); row += Byte.SIZE) {
       boolean isFirstColumn = true;
       byte rowBits = 0x00;
       for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
@@ -1442,7 +1442,7 @@ public abstract class AlignedTVList extends TVList {
       rowBitsArr[row / Byte.SIZE] = rowBits;
     }
 
-    return new BitMap(rowCount, rowBitsArr);
+    return new BitMap(rowCount.get(), rowBitsArr);
   }
 
   public List<List<BitMap>> getBitMaps() {

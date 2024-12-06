@@ -36,7 +36,7 @@ public class FloatTVListTest {
       tvList.putFloat(i, (float) i);
     }
     tvList.sort();
-    for (int i = 0; i < tvList.rowCount; i++) {
+    for (int i = 0; i < tvList.rowCount.get(); i++) {
       Assert.assertEquals((float) i, tvList.getFloat(i), delta);
       Assert.assertEquals(i, tvList.getTime(i));
     }
@@ -49,7 +49,7 @@ public class FloatTVListTest {
       tvList.putFloat(i, (float) i);
     }
     tvList.sort();
-    for (int i = 0; i < tvList.rowCount; i++) {
+    for (int i = 0; i < tvList.rowCount.get(); i++) {
       Assert.assertEquals((float) i, tvList.getFloat(i), delta);
       Assert.assertEquals(i, tvList.getTime(i));
     }
@@ -70,9 +70,9 @@ public class FloatTVListTest {
         null,
         0,
         1000);
-    for (long i = 0; i < tvList.rowCount; i++) {
-      Assert.assertEquals((float) tvList.rowCount - i, tvList.getFloat((int) i), delta);
-      Assert.assertEquals(tvList.rowCount - i, tvList.getTime((int) i));
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
+      Assert.assertEquals((float) tvList.rowCount.get() - i, tvList.getFloat((int) i), delta);
+      Assert.assertEquals(tvList.rowCount.get() - i, tvList.getTime((int) i));
     }
   }
 
@@ -128,7 +128,7 @@ public class FloatTVListTest {
         1000);
     tvList.sort();
     FloatTVList clonedTvList = tvList.clone();
-    for (long i = 0; i < tvList.rowCount; i++) {
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
       Assert.assertEquals(tvList.getFloat((int) i), clonedTvList.getFloat((int) i), delta);
       Assert.assertEquals(tvList.getTime((int) i), clonedTvList.getTime((int) i));
     }

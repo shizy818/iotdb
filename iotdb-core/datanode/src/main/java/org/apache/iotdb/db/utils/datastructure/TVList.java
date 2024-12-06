@@ -60,7 +60,7 @@ public abstract class TVList implements WALEntryValue {
   // list of timestamp array, add 1 when expanded -> data point timestamp array
   // index relation: arrayIndex -> elementIndex
   protected List<long[]> timestamps;
-  protected int rowCount;
+  protected AtomicInteger rowCount;
   // the count of sequential part started from the beginning
   protected int seqRowCount;
 
@@ -95,7 +95,7 @@ public abstract class TVList implements WALEntryValue {
   protected TVList() {
     timestamps = new CopyOnWriteArrayList<>();
     indices = new CopyOnWriteArrayList<>();
-    rowCount = 0;
+    rowCount = new AtomicInteger(0);
     seqRowCount = 0;
     maxTime = Long.MIN_VALUE;
     minTime = Long.MAX_VALUE;
@@ -160,7 +160,7 @@ public abstract class TVList implements WALEntryValue {
   }
 
   public int rowCount() {
-    return rowCount;
+    return rowCount.get();
   }
 
   public int seqRowCount() {
@@ -169,10 +169,10 @@ public abstract class TVList implements WALEntryValue {
 
   public int count() {
     if (bitMap == null) {
-      return rowCount;
+      return rowCount.get();
     }
     int count = 0;
-    for (int row = 0; row < rowCount; row++) {
+    for (int row = 0; row < rowCount.get(); row++) {
       if (!isNullValue(row)) {
         count++;
       }
@@ -181,7 +181,7 @@ public abstract class TVList implements WALEntryValue {
   }
 
   public long getTime(int index) {
-    if (index >= rowCount) {
+    if (index >= rowCount.get()) {
       throw new ArrayIndexOutOfBoundsException(index);
     }
     int arrayIndex = index / ARRAY_SIZE;
@@ -190,7 +190,7 @@ public abstract class TVList implements WALEntryValue {
   }
 
   protected void set(int index, long timestamp, int value) {
-    if (index >= rowCount) {
+    if (index >= rowCount.get()) {
       throw new ArrayIndexOutOfBoundsException(index);
     }
     int arrayIndex = index / ARRAY_SIZE;
@@ -209,7 +209,7 @@ public abstract class TVList implements WALEntryValue {
    * @param index row index
    */
   public int getValueIndex(int index) {
-    if (index >= rowCount) {
+    if (index >= rowCount.get()) {
       throw new ArrayIndexOutOfBoundsException(index);
     }
     int arrayIndex = index / ARRAY_SIZE;
@@ -241,7 +241,7 @@ public abstract class TVList implements WALEntryValue {
    * @return boolean
    */
   public boolean isNullValue(int rowIndex) {
-    if (rowIndex >= rowCount) {
+    if (rowIndex >= rowCount.get()) {
       throw new IndexOutOfBoundsException("Index out of bound error!");
     }
     if (bitMap == null || bitMap.get(rowIndex / ARRAY_SIZE) == null) {
@@ -306,7 +306,7 @@ public abstract class TVList implements WALEntryValue {
   }
 
   public boolean reachChunkSizeOrPointNumThreshold() {
-    return rowCount >= MAX_SERIES_POINT_NUMBER;
+    return rowCount.get() >= MAX_SERIES_POINT_NUMBER;
   }
 
   public void putBoolean(long time, boolean value) {
@@ -413,7 +413,7 @@ public abstract class TVList implements WALEntryValue {
     int deletedNumber = 0;
     long maxTime = Long.MIN_VALUE;
     long minTime = Long.MAX_VALUE;
-    for (int i = 0; i < rowCount; i++) {
+    for (int i = 0; i < rowCount.get(); i++) {
       long time = getTime(i);
       if (time >= lowerBound && time <= upperBound) {
         int originRowIndex = getValueIndex(i);
@@ -441,7 +441,7 @@ public abstract class TVList implements WALEntryValue {
   }
 
   public void clear() {
-    rowCount = 0;
+    rowCount.set(0);
     seqRowCount = 0;
     sorted = true;
     maxTime = Long.MIN_VALUE;
@@ -464,7 +464,7 @@ public abstract class TVList implements WALEntryValue {
   abstract void clearValue();
 
   protected void checkExpansion() {
-    if ((rowCount % ARRAY_SIZE) == 0) {
+    if ((rowCount.get() % ARRAY_SIZE) == 0) {
       expandValues();
       timestamps.add((long[]) getPrimitiveArraysByType(TSDataType.INT64));
     }
@@ -497,10 +497,11 @@ public abstract class TVList implements WALEntryValue {
         }
       }
     }
-    if (sorted && (rowCount == 0 || time[start] > getTime(rowCount - 1))) {
+    int cnt = rowCount.get();
+    if (sorted && (cnt == 0 || time[start] > getTime(cnt))) {
       seqRowCount += inputSeqRowCount;
     }
-    sorted = sorted && inputSorted && (rowCount == 0 || inPutMinTime >= getTime(rowCount - 1));
+    sorted = sorted && inputSorted && (cnt == 0 || inPutMinTime >= getTime(cnt - 1));
   }
 
   /** for log */
@@ -613,22 +614,23 @@ public abstract class TVList implements WALEntryValue {
     }
 
     public boolean hasNext() {
+      int cnt = rowCount.get();
       if (bitMap != null) {
         // skip deleted & duplicated timestamp
-        while ((index < rowCount && isNullValue(getValueIndex(index)))
-            || (index + 1 < rowCount && getTime(index + 1) == getTime(index))) {
+        while ((index < cnt && isNullValue(getValueIndex(index)))
+            || (index + 1 < cnt && getTime(index + 1) == getTime(index))) {
           System.out.println("index++ 1 " + index);
           index++;
         }
       } else {
         // skip duplicated timestamp
-        while (index + 1 < rowCount && getTime(index + 1) == getTime(index)) {
+        while (index + 1 < cnt && getTime(index + 1) == getTime(index)) {
           System.out.println("index++ 2 " + index);
           index++;
         }
       }
-      System.out.println("current index: " + index + ", rowCount: " + rowCount);
-      return index < rowCount;
+      System.out.println("current index: " + index + ", rowCount: " + cnt);
+      return index < cnt;
     }
 
     public TimeValuePair next() {
@@ -639,7 +641,7 @@ public abstract class TVList implements WALEntryValue {
     }
 
     public TimeValuePair current() {
-      if (index >= rowCount || isNullValue(getValueIndex(index))) {
+      if (index >= rowCount.get() || isNullValue(getValueIndex(index))) {
         return null;
       }
       return getTimeValuePair(index);

@@ -45,7 +45,7 @@ public class AlignedTVListTest {
       }
       tvList.putAlignedValue(i, value);
     }
-    for (int i = 0; i < tvList.rowCount; i++) {
+    for (int i = 0; i < tvList.rowCount.get(); i++) {
       StringBuilder builder = new StringBuilder("[");
       builder.append(i);
       for (int j = 1; j < 5; j++) {
@@ -78,7 +78,7 @@ public class AlignedTVListTest {
       tvList.putAlignedValue(i, value);
     }
     tvList.sort();
-    for (int i = 0; i < tvList.rowCount; i++) {
+    for (int i = 0; i < tvList.rowCount.get(); i++) {
       StringBuilder builder = new StringBuilder("[");
       builder.append("false, 100, 1000, 0.1, 0.2, Test");
       builder.append("]");
@@ -105,8 +105,8 @@ public class AlignedTVListTest {
 
     tvList.putAlignedValues(
         ArrayUtils.toPrimitive(timeList.toArray(new Long[0])), vectorArray, null, 0, 1000, null);
-    for (long i = 0; i < tvList.rowCount; i++) {
-      Assert.assertEquals(tvList.rowCount - i, tvList.getTime((int) i));
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
+      Assert.assertEquals(tvList.rowCount.get() - i, tvList.getTime((int) i));
     }
   }
 
@@ -133,8 +133,8 @@ public class AlignedTVListTest {
 
     tvList.putAlignedValues(
         ArrayUtils.toPrimitive(timeList.toArray(new Long[0])), vectorArray, bitMaps, 0, 1000, null);
-    for (long i = 0; i < tvList.rowCount; i++) {
-      Assert.assertEquals(tvList.rowCount - i, tvList.getTime((int) i));
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
+      Assert.assertEquals(tvList.rowCount.get() - i, tvList.getTime((int) i));
       if (i % 100 == 0) {
         Assert.assertEquals(
             "[null, null, null, null, null]", tvList.getAlignedValue((int) i).toString());
@@ -167,7 +167,7 @@ public class AlignedTVListTest {
         ArrayUtils.toPrimitive(timeList.toArray(new Long[0])), vectorArray, bitMaps, 0, 1000, null);
 
     AlignedTVList clonedTvList = tvList.clone();
-    for (long i = 0; i < tvList.rowCount; i++) {
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
       Assert.assertEquals(tvList.getTime((int) i), clonedTvList.getTime((int) i));
       Assert.assertEquals(
           tvList.getAlignedValue((int) i).toString(),

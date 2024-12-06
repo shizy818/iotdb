@@ -35,7 +35,7 @@ public class BackLongTVList extends QuickLongTVList implements BackwardSort {
   @Override
   public void sort() {
     if (!sorted) {
-      backwardSort(timestamps, rowCount);
+      backwardSort(timestamps, rowCount.get());
       clearTmp();
     }
     sorted = true;

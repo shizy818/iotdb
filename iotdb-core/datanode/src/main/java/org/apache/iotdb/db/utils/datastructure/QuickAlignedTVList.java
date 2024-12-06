@@ -30,7 +30,7 @@ public class QuickAlignedTVList extends AlignedTVList implements QuickSort {
   @Override
   public void sort() {
     if (!sorted) {
-      qsort(0, rowCount - 1);
+      qsort(0, rowCount.get() - 1);
     }
     sorted = true;
   }

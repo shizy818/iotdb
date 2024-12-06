@@ -41,17 +41,17 @@ public class TimAlignedTVList extends AlignedTVList implements TimSort {
   @Override
   public void sort() {
     if (sortedTimestamps == null
-        || sortedTimestamps.length < PrimitiveArrayManager.getArrayRowCount(rowCount)) {
+        || sortedTimestamps.length < PrimitiveArrayManager.getArrayRowCount(rowCount.get())) {
       sortedTimestamps =
-          (long[][]) PrimitiveArrayManager.createDataListsByType(TSDataType.INT64, rowCount);
+          (long[][]) PrimitiveArrayManager.createDataListsByType(TSDataType.INT64, rowCount.get());
     }
     if (sortedIndices == null
-        || sortedIndices.length < PrimitiveArrayManager.getArrayRowCount(rowCount)) {
+        || sortedIndices.length < PrimitiveArrayManager.getArrayRowCount(rowCount.get())) {
       sortedIndices =
-          (int[][]) PrimitiveArrayManager.createDataListsByType(TSDataType.INT32, rowCount);
+          (int[][]) PrimitiveArrayManager.createDataListsByType(TSDataType.INT32, rowCount.get());
     }
     if (!sorted) {
-      sort(0, rowCount);
+      sort(0, rowCount.get());
     }
     clearSortedValue();
     clearSortedTime();

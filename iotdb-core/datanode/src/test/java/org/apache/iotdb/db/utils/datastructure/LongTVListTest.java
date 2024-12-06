@@ -38,7 +38,7 @@ public class LongTVListTest {
       tvList.putLong(i, i);
     }
     tvList.sort();
-    for (long i = 0; i < tvList.rowCount; i++) {
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
       Assert.assertEquals(i, tvList.getLong((int) i));
       Assert.assertEquals(i, tvList.getTime((int) i));
     }
@@ -51,7 +51,7 @@ public class LongTVListTest {
       tvList.putLong(i, i);
     }
     tvList.sort();
-    for (long i = 0; i < tvList.rowCount; i++) {
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
       Assert.assertEquals(i, tvList.getLong((int) i));
       Assert.assertEquals(i, tvList.getTime((int) i));
     }
@@ -70,7 +70,7 @@ public class LongTVListTest {
     }
     tvList.sort();
     inputs.sort(TimeValuePair::compareTo);
-    for (long i = 0; i < tvList.rowCount; i++) {
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
       Assert.assertEquals(inputs.get((int) i).getTimestamp(), tvList.getTime((int) i));
       Assert.assertEquals(inputs.get((int) i).getValue().getLong(), tvList.getLong((int) i));
     }
@@ -91,9 +91,9 @@ public class LongTVListTest {
         null,
         0,
         1000);
-    for (long i = 0; i < tvList.rowCount; i++) {
-      Assert.assertEquals(tvList.rowCount - i, tvList.getLong((int) i));
-      Assert.assertEquals(tvList.rowCount - i, tvList.getTime((int) i));
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
+      Assert.assertEquals(tvList.rowCount.get() - i, tvList.getLong((int) i));
+      Assert.assertEquals(tvList.rowCount.get() - i, tvList.getTime((int) i));
     }
   }
 
@@ -149,7 +149,7 @@ public class LongTVListTest {
         1000);
     tvList.sort();
     LongTVList clonedTvList = tvList.clone();
-    for (long i = 0; i < tvList.rowCount; i++) {
+    for (long i = 0; i < tvList.rowCount.get(); i++) {
       Assert.assertEquals(tvList.getLong((int) i), clonedTvList.getLong((int) i));
       Assert.assertEquals(tvList.getTime((int) i), clonedTvList.getTime((int) i));
     }

@@ -89,16 +89,16 @@ public abstract class BinaryTVList extends TVList {
   @Override
   public void putBinary(long timestamp, Binary value) {
     checkExpansion();
-    int arrayIndex = rowCount / ARRAY_SIZE;
-    int elementIndex = rowCount % ARRAY_SIZE;
+    int arrayIndex = rowCount.get() / ARRAY_SIZE;
+    int elementIndex = rowCount.get() % ARRAY_SIZE;
     maxTime = Math.max(maxTime, timestamp);
     minTime = Math.min(minTime, timestamp);
     timestamps.get(arrayIndex)[elementIndex] = timestamp;
     values.get(arrayIndex)[elementIndex] = value;
-    indices.get(arrayIndex)[elementIndex] = rowCount;
-    rowCount++;
+    indices.get(arrayIndex)[elementIndex] = rowCount.get();
+    rowCount.incrementAndGet();
     if (sorted) {
-      if (rowCount > 1 && timestamp < getTime(rowCount - 2)) {
+      if (rowCount.get() > 1 && timestamp < getTime(rowCount.get() - 2)) {
         sorted = false;
       } else {
         seqRowCount++;
@@ -109,12 +109,12 @@ public abstract class BinaryTVList extends TVList {
 
   @Override
   public boolean reachChunkSizeOrPointNumThreshold() {
-    return memoryBinaryChunkSize >= TARGET_CHUNK_SIZE || rowCount >= MAX_SERIES_POINT_NUMBER;
+    return memoryBinaryChunkSize >= TARGET_CHUNK_SIZE || rowCount.get() >= MAX_SERIES_POINT_NUMBER;
   }
 
   @Override
   public Binary getBinary(int index) {
-    if (index >= rowCount) {
+    if (index >= rowCount.get()) {
       throw new ArrayIndexOutOfBoundsException(index);
     }
     int valueIndex = getValueIndex(index);
@@ -160,10 +160,10 @@ public abstract class BinaryTVList extends TVList {
       TSEncoding encoding,
       List<TimeRange> deletionList) {
     int[] deleteCursor = {0};
-    for (int i = 0; i < rowCount; i++) {
+    for (int i = 0; i < rowCount.get(); i++) {
       if (!isNullValue(i)
           && !isPointDeleted(getTime(i), deletionList, deleteCursor)
-          && (i == rowCount - 1 || getTime(i) != getTime(i + 1))) {
+          && (i == rowCount.get() - 1 || getTime(i) != getTime(i + 1))) {
         builder.getTimeColumnBuilder().writeLong(getTime(i));
         builder.getColumnBuilder(0).writeBinary(getBinary(i));
         builder.declarePosition();
@@ -204,17 +204,17 @@ public abstract class BinaryTVList extends TVList {
 
     while (idx < end) {
       int inputRemaining = end - idx;
-      int arrayIdx = rowCount / ARRAY_SIZE;
-      int elementIdx = rowCount % ARRAY_SIZE;
+      int arrayIdx = rowCount.get() / ARRAY_SIZE;
+      int elementIdx = rowCount.get() % ARRAY_SIZE;
       int internalRemaining = ARRAY_SIZE - elementIdx;
       if (internalRemaining >= inputRemaining) {
         // the remaining inputs can fit the last array, copy all remaining inputs into last array
         System.arraycopy(
             time, idx - timeIdxOffset, timestamps.get(arrayIdx), elementIdx, inputRemaining);
         System.arraycopy(value, idx, values.get(arrayIdx), elementIdx, inputRemaining);
-        int[] indexes = IntStream.range(rowCount, rowCount + inputRemaining).toArray();
+        int[] indexes = IntStream.range(rowCount.get(), rowCount.get() + inputRemaining).toArray();
         System.arraycopy(indexes, 0, indices.get(arrayIdx), elementIdx, inputRemaining);
-        rowCount += inputRemaining;
+        rowCount.addAndGet(inputRemaining);
         break;
       } else {
         // the remaining inputs cannot fit the last array, fill the last array and create a new
@@ -222,10 +222,10 @@ public abstract class BinaryTVList extends TVList {
         System.arraycopy(
             time, idx - timeIdxOffset, timestamps.get(arrayIdx), elementIdx, internalRemaining);
         System.arraycopy(value, idx, values.get(arrayIdx), elementIdx, internalRemaining);
-        int[] indexes = IntStream.range(rowCount, rowCount + internalRemaining).toArray();
+        int[] indexes = IntStream.range(rowCount.get(), rowCount.get() + internalRemaining).toArray();
         System.arraycopy(indexes, 0, indices.get(arrayIdx), elementIdx, internalRemaining);
         idx += internalRemaining;
-        rowCount += internalRemaining;
+        rowCount.addAndGet(internalRemaining);
         checkExpansion();
       }
     }
@@ -265,11 +265,11 @@ public abstract class BinaryTVList extends TVList {
     }
 
     if (sorted
-        && (rowCount == 0
-            || (end - start > nullCnt) && time[start - tIdxOffset] > getTime(rowCount - 1))) {
+        && (rowCount.get() == 0
+            || (end - start > nullCnt) && time[start - tIdxOffset] > getTime(rowCount.get() - 1))) {
       seqRowCount += inputSeqRowCount;
     }
-    sorted = sorted && inputSorted && (rowCount == 0 || inPutMinTime >= getTime(rowCount - 1));
+    sorted = sorted && inputSorted && (rowCount.get() == 0 || inPutMinTime >= getTime(rowCount.get() - 1));
     return nullCnt;
   }
 
@@ -280,8 +280,8 @@ public abstract class BinaryTVList extends TVList {
 
   @Override
   public int serializedSize() {
-    int size = Byte.BYTES + Integer.BYTES + rowCount * (Long.BYTES + Byte.BYTES);
-    for (int rowIdx = 0; rowIdx < rowCount; ++rowIdx) {
+    int size = Byte.BYTES + Integer.BYTES + rowCount.get() * (Long.BYTES + Byte.BYTES);
+    for (int rowIdx = 0; rowIdx < rowCount.get(); ++rowIdx) {
       size += ReadWriteIOUtils.sizeToWrite(getBinary(rowIdx));
     }
     return size;
@@ -290,8 +290,8 @@ public abstract class BinaryTVList extends TVList {
   @Override
   public void serializeToWAL(IWALByteBufferView buffer) {
     WALWriteUtils.write(TSDataType.TEXT, buffer);
-    buffer.putInt(rowCount);
-    for (int rowIdx = 0; rowIdx < rowCount; ++rowIdx) {
+    buffer.putInt(rowCount.get());
+    for (int rowIdx = 0; rowIdx < rowCount.get(); ++rowIdx) {
       buffer.putLong(getTime(rowIdx));
       Binary valueT = getBinary(rowIdx);
       if (valueT != null) {
