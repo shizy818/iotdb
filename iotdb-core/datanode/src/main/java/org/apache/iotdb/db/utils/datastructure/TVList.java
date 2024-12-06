@@ -143,11 +143,15 @@ public abstract class TVList implements WALEntryValue {
     return timestamps.size() * tvListArrayMemCost(getDataType());
   }
 
-  public boolean isSorted() {
+  public synchronized boolean isSorted() {
     return sorted;
   }
 
   public abstract void sort();
+
+  public synchronized void safelySort() {
+    sort();
+  }
 
   public void increaseReferenceCount() {
     referenceCount.incrementAndGet();
