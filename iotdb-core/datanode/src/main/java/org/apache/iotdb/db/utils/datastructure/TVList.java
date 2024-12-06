@@ -60,9 +60,9 @@ public abstract class TVList implements WALEntryValue {
   // list of timestamp array, add 1 when expanded -> data point timestamp array
   // index relation: arrayIndex -> elementIndex
   protected List<long[]> timestamps;
-  protected int rowCount;
+  protected volatile int rowCount;
   // the count of sequential part started from the beginning
-  protected int seqRowCount;
+  protected volatile int seqRowCount;
 
   // List of index array, add 1 when expanded -> data point index array
   // Index relation: arrayIndex -> elementIndex
