@@ -610,12 +610,13 @@ public abstract class TVList implements WALEntryValue {
   /* TVList Iterator */
   public class TVListIterator {
     private int index;
+    private boolean prepared = false;
 
     public TVListIterator() {
       index = 0;
     }
 
-    public boolean hasNext() {
+    public void prepareNext() {
       if (bitMap != null) {
         // skip deleted & duplicated timestamp
         while ((index < rowCount && isNullValue(getValueIndex(index)))
@@ -628,21 +629,52 @@ public abstract class TVList implements WALEntryValue {
           index++;
         }
       }
+      prepared = true;
+    }
+
+    public boolean hasNext() {
+      prepareNext();
       return index < rowCount;
     }
 
+    public void stepNext() {
+      if (!prepared) {
+        prepareNext();
+      }
+      if (index >= rowCount) {
+        return;
+      }
+      prepared = false;
+      index++;
+    }
+
     public TimeValuePair next() {
-      if (!hasNext()) {
+      if (!prepared) {
+        prepareNext();
+      }
+      if (index >= rowCount) {
         return null;
       }
+      prepared = false;
       return getTimeValuePair(index++);
     }
 
+    public boolean hasCurrent() {
+      return index < rowCount;
+    }
+
     public TimeValuePair current() {
-      if (index >= rowCount || isNullValue(getValueIndex(index))) {
+      if (!hasCurrent()) {
         return null;
       }
       return getTimeValuePair(index);
+    }
+
+    public long currentTime() {
+      if (!hasCurrent()) {
+        return Long.MIN_VALUE;
+      }
+      return getTime(index);
     }
 
     public int getIndex() {
@@ -651,6 +683,7 @@ public abstract class TVList implements WALEntryValue {
 
     public void setIndex(int index) {
       this.index = index;
+      prepared = false;
     }
   }
 }
