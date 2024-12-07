@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -72,11 +71,6 @@ public class ReadOnlyMemChunk {
   private int floatPrecision;
   private TSEncoding encoding;
   private List<TimeRange> deletionList;
-
-  // Read only chunk is now regarded as multiple pages. Apart from chunk statistics,
-  // we need to collect page statistic and MergeSortTvListIterator offset for each page.
-  private List<Statistics> pageStatisticsList;
-  private List<int[]> pageOffsetsList;
 
   // tvlist rowCount during query
   protected Map<TVList, Integer> tvListQueryMap;
@@ -121,24 +115,64 @@ public class ReadOnlyMemChunk {
     this.encoding = encoding;
     this.deletionList = deletionList;
     this.tvListQueryMap = tvListQueryMap;
-    this.pageStatisticsList = new ArrayList<>();
-    this.pageOffsetsList = new ArrayList<>();
     this.context.addTVListToSet(tvListQueryMap);
 
-    initChunkAndPageStatistics();
+    // build tsblock
+    sortTvLists();
+    tsBlock = buildTsBlock();
+
+    // init chunk stats
+    initChunkMetaFromTsBlock();
   }
 
-  private void initChunkAndPageStatistics() {
-    // create chunk metadata
-    Statistics chunkStatistics = Statistics.getStatsByType(dataType);
+  private void initChunkMetaFromTsBlock() throws QueryProcessException {
+    Statistics statsByType = Statistics.getStatsByType(dataType);
     IChunkMetadata metaData =
-        new ChunkMetadata(measurementUid, dataType, null, null, 0, chunkStatistics);
+        new ChunkMetadata(measurementUid, dataType, null, null, 0, statsByType);
+    if (!isEmpty()) {
+      switch (dataType) {
+        case BOOLEAN:
+          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getBoolean(i));
+          }
+          break;
+        case TEXT:
+        case BLOB:
+        case STRING:
+          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getBinary(i));
+          }
+          break;
+        case FLOAT:
+          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getFloat(i));
+          }
+          break;
+        case INT32:
+        case DATE:
+          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getInt(i));
+          }
+          break;
+        case INT64:
+        case TIMESTAMP:
+          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getLong(i));
+          }
+          break;
+        case DOUBLE:
+          for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+            statsByType.update(tsBlock.getTimeByIndex(i), tsBlock.getColumn(0).getDouble(i));
+          }
+          break;
+        default:
+          throw new QueryProcessException("Unsupported data type:" + dataType);
+      }
+    }
+    statsByType.setEmpty(isEmpty());
     metaData.setChunkLoader(new MemChunkLoader(context, this));
     metaData.setVersion(Long.MAX_VALUE);
     cachedMetaData = metaData;
-
-    sortTvLists();
-    updateChunkAndPageStatisticsFromTvLists();
   }
 
   private void sortTvLists() {
@@ -149,63 +183,6 @@ public class ReadOnlyMemChunk {
         tvList.safelySort();
       }
     }
-  }
-
-  private void updateChunkAndPageStatisticsFromTvLists() {
-    Statistics chunkStatistics = cachedMetaData.getStatistics();
-
-    int cnt = 0;
-    int[] deleteCursor = {0};
-    List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
-    MergeSortTvListIterator timeValuePairIterator =
-        new MergeSortTvListIterator(dataType, encoding, floatPrecision, tvLists);
-    int[] tvListOffsets = timeValuePairIterator.getTVListOffsets();
-    while (timeValuePairIterator.hasNextTimeValuePair()) {
-      if (cnt % MAX_NUMBER_OF_POINTS_IN_PAGE == 0) {
-        Statistics stats = Statistics.getStatsByType(dataType);
-        pageStatisticsList.add(stats);
-        pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
-      }
-      TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
-        Statistics pageStatistics = pageStatisticsList.get(pageStatisticsList.size() - 1);
-        switch (dataType) {
-          case BOOLEAN:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
-            break;
-          case INT32:
-          case DATE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
-            break;
-          case INT64:
-          case TIMESTAMP:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
-            break;
-          case FLOAT:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
-            break;
-          case DOUBLE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
-            break;
-          case TEXT:
-          case BLOB:
-          case STRING:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
-            break;
-          default:
-            // do nothing
-        }
-        pageStatistics.setEmpty(false);
-      }
-      cnt++;
-    }
-    chunkStatistics.setEmpty(cnt == 0);
   }
 
   public TSDataType getDataType() {
@@ -324,13 +301,5 @@ public class ReadOnlyMemChunk {
 
   public List<TimeRange> getDeletionList() {
     return deletionList;
-  }
-
-  public List<Statistics> getPageStatisticsList() {
-    return pageStatisticsList;
-  }
-
-  public List<int[]> getPageOffsetsList() {
-    return pageOffsetsList;
   }
 }
