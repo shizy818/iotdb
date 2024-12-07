@@ -638,11 +638,22 @@ public abstract class TVList implements WALEntryValue {
       return getTimeValuePair(index++);
     }
 
+    public boolean hasCurrent() {
+      return index < rowCount && !isNullValue(getValueIndex(index));
+    }
+
     public TimeValuePair current() {
-      if (index >= rowCount || isNullValue(getValueIndex(index))) {
+      if (!hasCurrent()) {
         return null;
       }
       return getTimeValuePair(index);
+    }
+
+    public long currentTime() {
+      if (!hasCurrent()) {
+        return Long.MIN_VALUE;
+      }
+      return getTime(index);
     }
 
     public int getIndex() {
