@@ -631,6 +631,13 @@ public abstract class TVList implements WALEntryValue {
       return index < rowCount;
     }
 
+    public void stepNext() {
+      if (!hasNext()) {
+        return;
+      }
+      index++;
+    }
+
     public TimeValuePair next() {
       if (!hasNext()) {
         return null;
@@ -639,7 +646,7 @@ public abstract class TVList implements WALEntryValue {
     }
 
     public boolean hasCurrent() {
-      return index < rowCount && !isNullValue(getValueIndex(index));
+      return index < rowCount;
     }
 
     public TimeValuePair current() {
