@@ -39,6 +39,7 @@ import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.Binary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,43 +167,45 @@ public class ReadOnlyMemChunk {
         pageStatisticsList.add(stats);
         pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
       }
-      TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
+      long currTime = timeValuePairIterator.currentTime();
+      if (!isPointDeleted(currTime, deletionList, deleteCursor)) {
+        Object currValue = timeValuePairIterator.currentValue();
         Statistics pageStatistics = pageStatisticsList.get(pageStatisticsList.size() - 1);
         switch (dataType) {
           case BOOLEAN:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
+            chunkStatistics.update(currTime, (boolean) currValue);
+            pageStatistics.update(currTime, (boolean) currValue);
             break;
           case INT32:
           case DATE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
+            chunkStatistics.update(currTime, (int) currValue);
+            pageStatistics.update(currTime, (int) currValue);
             break;
           case INT64:
           case TIMESTAMP:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
+            chunkStatistics.update(currTime, (long) currValue);
+            pageStatistics.update(currTime, (long) currValue);
             break;
           case FLOAT:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
+            chunkStatistics.update(currTime, (float) currValue);
+            pageStatistics.update(currTime, (float) currValue);
             break;
           case DOUBLE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
+            chunkStatistics.update(currTime, (double) currValue);
+            pageStatistics.update(currTime, (double) currValue);
             break;
           case TEXT:
           case BLOB:
           case STRING:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
+            chunkStatistics.update(currTime, (Binary) currValue);
+            pageStatistics.update(currTime, (Binary) currValue);
             break;
           default:
             // do nothing
         }
         pageStatistics.setEmpty(false);
       }
+      timeValuePairIterator.stepNext();
       cnt++;
     }
     chunkStatistics.setEmpty(cnt == 0);

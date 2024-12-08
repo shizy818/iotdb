@@ -112,6 +112,11 @@ public abstract class DoubleTVList extends TVList {
   }
 
   @Override
+  public Object getValue(int index) {
+    return getDouble(index);
+  }
+
+  @Override
   void clearValue() {
     if (values != null) {
       for (double[] dataArray : values) {

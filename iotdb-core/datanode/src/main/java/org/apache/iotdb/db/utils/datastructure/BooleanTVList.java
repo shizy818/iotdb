@@ -111,6 +111,11 @@ public abstract class BooleanTVList extends TVList {
   }
 
   @Override
+  public Object getValue(int index) {
+    return getBoolean(index);
+  }
+
+  @Override
   void clearValue() {
     if (values != null) {
       for (boolean[] dataArray : values) {

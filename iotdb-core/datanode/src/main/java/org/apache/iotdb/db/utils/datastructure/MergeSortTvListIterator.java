@@ -125,6 +125,40 @@ public class MergeSortTvListIterator implements IPointReader {
     return currentTvPair;
   }
 
+  public long currentTime() {
+    if (!hasNextTimeValuePair()) {
+      return Long.MIN_VALUE;
+    }
+    return tvListIterators.get(selectedTVListIndex).currentTime();
+  }
+
+  public Object currentValue() {
+    if (!hasNextTimeValuePair()) {
+      return null;
+    }
+    return tvListIterators.get(selectedTVListIndex).currentValue();
+  }
+
+  public void stepNext() {
+    if (!hasNextTimeValuePair()) {
+      return;
+    }
+    long currTime = tvListIterators.get(selectedTVListIndex).currentTime();
+    tvListIterators.get(selectedTVListIndex).stepNext();
+    tvListOffsets[selectedTVListIndex] = tvListIterators.get(selectedTVListIndex).getIndex();
+
+    // call next to skip identical timestamp in other iterators
+    for (int i = 0; i < tvListIterators.size(); i++) {
+      TVList.TVListIterator iterator = tvListIterators.get(i);
+      if (iterator.hasCurrent() && iterator.currentTime() == currTime) {
+        iterator.stepNext();
+        tvListOffsets[i] = iterator.getIndex();
+      }
+    }
+
+    selectedTVListIndex = -1;
+  }
+
   @Override
   public long getUsedMemorySize() {
     // not used
