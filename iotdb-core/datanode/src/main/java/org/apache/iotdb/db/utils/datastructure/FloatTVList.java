@@ -112,6 +112,11 @@ public abstract class FloatTVList extends TVList {
   }
 
   @Override
+  public Object getValue(int index) {
+    return getFloat(index);
+  }
+
+  @Override
   void clearValue() {
     if (values != null) {
       for (float[] dataArray : values) {

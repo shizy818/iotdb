@@ -34,6 +34,7 @@ import org.apache.tsfile.read.filter.basic.Filter;
 import org.apache.tsfile.read.reader.IChunkReader;
 import org.apache.tsfile.read.reader.IPageReader;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.Binary;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 public class MemChunkReader implements IChunkReader, IPointReader {
 
   private final ReadOnlyMemChunk readableChunk;
-  private final IPointReader timeValuePairIterator;
+  private final MergeSortTvListIterator timeValuePairIterator;
   private final Filter globalTimeFilter;
   private final List<IPageReader> pageReaderList;
 
@@ -185,8 +186,7 @@ public class MemChunkReader implements IChunkReader, IPointReader {
       if (pageEndOffsets == null) {
         return false;
       }
-      int[] currTvListOffsets =
-          ((MergeSortTvListIterator) timeValuePairIterator).getTVListOffsets();
+      int[] currTvListOffsets = timeValuePairIterator.getTVListOffsets();
       for (int i = 0; i < pageEndOffsets.length; i++) {
         if (currTvListOffsets[i] >= pageEndOffsets[i]) {
           return true;
@@ -204,37 +204,39 @@ public class MemChunkReader implements IChunkReader, IPointReader {
         if (isOutOfMemPageBounds()) {
           break;
         }
-        TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-        if (!isPointDeleted(tvPair.getTimestamp(), readableChunk.getDeletionList(), deleteCursor)) {
-          builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
+        long time = timeValuePairIterator.currentTime();
+        if (!isPointDeleted(time, readableChunk.getDeletionList(), deleteCursor)) {
+          builder.getTimeColumnBuilder().writeLong(time);
+          Object value = timeValuePairIterator.currentValue();
           switch (tsDataType) {
             case BOOLEAN:
-              builder.getColumnBuilder(0).writeBoolean(tvPair.getValue().getBoolean());
+              builder.getColumnBuilder(0).writeBoolean((boolean) value);
               break;
             case INT32:
             case DATE:
-              builder.getColumnBuilder(0).writeInt(tvPair.getValue().getInt());
+              builder.getColumnBuilder(0).writeInt((int) value);
               break;
             case INT64:
             case TIMESTAMP:
-              builder.getColumnBuilder(0).writeLong(tvPair.getValue().getLong());
+              builder.getColumnBuilder(0).writeLong((long) value);
               break;
             case FLOAT:
-              builder.getColumnBuilder(0).writeFloat(tvPair.getValue().getFloat());
+              builder.getColumnBuilder(0).writeFloat((float) value);
               break;
             case DOUBLE:
-              builder.getColumnBuilder(0).writeDouble(tvPair.getValue().getDouble());
+              builder.getColumnBuilder(0).writeDouble((double) value);
               break;
             case TEXT:
             case STRING:
             case BLOB:
-              builder.getColumnBuilder(0).writeBinary(tvPair.getValue().getBinary());
+              builder.getColumnBuilder(0).writeBinary((Binary) value);
               break;
             default:
               break;
           }
           builder.declarePosition();
         }
+        timeValuePairIterator.stepNext();
       }
     }
   }

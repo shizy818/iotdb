@@ -111,6 +111,11 @@ public abstract class IntTVList extends TVList {
   }
 
   @Override
+  public Object getValue(int index) {
+    return getInt(index);
+  }
+
+  @Override
   void clearValue() {
     if (values != null) {
       for (int[] dataArray : values) {

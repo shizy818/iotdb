@@ -39,6 +39,7 @@ import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.Binary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,43 +167,46 @@ public class ReadOnlyMemChunk {
         pageStatisticsList.add(stats);
         pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
       }
-      TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
+
+      long time = timeValuePairIterator.currentTime();
+      if (!isPointDeleted(time, deletionList, deleteCursor)) {
+        Object value = timeValuePairIterator.currentValue();
         Statistics pageStatistics = pageStatisticsList.get(pageStatisticsList.size() - 1);
         switch (dataType) {
           case BOOLEAN:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
+            chunkStatistics.update(time, (boolean) value);
+            pageStatistics.update(time, (boolean) value);
             break;
           case INT32:
           case DATE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
+            chunkStatistics.update(time, (int) value);
+            pageStatistics.update(time, (int) value);
             break;
           case INT64:
           case TIMESTAMP:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
+            chunkStatistics.update(time, (long) value);
+            pageStatistics.update(time, (long) value);
             break;
           case FLOAT:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
+            chunkStatistics.update(time, (float) value);
+            pageStatistics.update(time, (float) value);
             break;
           case DOUBLE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
+            chunkStatistics.update(time, (double) value);
+            pageStatistics.update(time, (double) value);
             break;
           case TEXT:
           case BLOB:
           case STRING:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
+            chunkStatistics.update(time, (Binary) value);
+            pageStatistics.update(time, (Binary) value);
             break;
           default:
             // do nothing
         }
         pageStatistics.setEmpty(false);
       }
+      timeValuePairIterator.stepNext();
       cnt++;
     }
     chunkStatistics.setEmpty(cnt == 0);
@@ -236,6 +240,7 @@ public class ReadOnlyMemChunk {
     return tsBlock.getTsBlockSingleColumnIterator();
   }
 
+  @TestOnly
   private TsBlock buildTsBlock() {
     try {
       TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(dataType));
@@ -247,6 +252,7 @@ public class ReadOnlyMemChunk {
   }
 
   // read all data in memory chunk and write to tsblock
+  @TestOnly
   private void writeValidValuesIntoTsBlock(TsBlockBuilder builder) throws IOException {
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());

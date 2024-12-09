@@ -124,6 +124,11 @@ public abstract class BinaryTVList extends TVList {
   }
 
   @Override
+  public Object getValue(int index) {
+    return getBinary(index);
+  }
+
+  @Override
   void clearValue() {
     if (values != null) {
       for (Binary[] dataArray : values) {
