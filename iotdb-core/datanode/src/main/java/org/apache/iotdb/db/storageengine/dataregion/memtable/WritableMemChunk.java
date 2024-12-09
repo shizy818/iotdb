@@ -437,29 +437,29 @@ public class WritableMemChunk implements IWritableMemChunk {
     return out.toString();
   }
 
-  private void writeData(ChunkWriterImpl chunkWriterImpl, TimeValuePair tvPair) {
+  private void writeData(ChunkWriterImpl chunkWriterImpl, long time, Object value) {
     switch (schema.getType()) {
       case BOOLEAN:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
+        chunkWriterImpl.write(time, (boolean) value);
         break;
       case INT32:
       case DATE:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getInt());
+        chunkWriterImpl.write(time, (int) value);
         break;
       case INT64:
       case TIMESTAMP:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getLong());
+        chunkWriterImpl.write(time, (long) value);
         break;
       case FLOAT:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getFloat());
+        chunkWriterImpl.write(time, (float) value);
         break;
       case DOUBLE:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getDouble());
+        chunkWriterImpl.write(time, (double) value);
         break;
       case TEXT:
       case BLOB:
       case STRING:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getBinary());
+        chunkWriterImpl.write(time, (Binary) value);
         break;
       default:
         LOGGER.error("WritableMemChunk does not support data type: {}", schema.getType());
@@ -476,20 +476,26 @@ public class WritableMemChunk implements IWritableMemChunk {
     tvLists.add(list);
     MergeSortTvListIterator iterator = new MergeSortTvListIterator(schema.getType(), tvLists);
 
-    TimeValuePair prevTvPair = null;
+    long prevTime = Long.MIN_VALUE;
+    Object prevValue = null;
     while (iterator.hasNextTimeValuePair()) {
-      TimeValuePair currTvPair = iterator.nextTimeValuePair();
-      if (prevTvPair == null) {
-        prevTvPair = currTvPair;
+      long currTime = iterator.currentTime();
+      Object currValue = iterator.currentValue();
+      if (prevValue == null) {
+        prevTime = currTime;
+        prevValue = currValue;
+        iterator.stepNext();
         continue;
       }
-      writeData(chunkWriterImpl, prevTvPair);
-      prevTvPair = currTvPair;
+      writeData(chunkWriterImpl, prevTime, prevValue);
+      prevTime = currTime;
+      prevValue = currValue;
+      iterator.stepNext();
     }
     // last point for SDT
-    if (prevTvPair != null) {
+    if (prevValue != null) {
       chunkWriterImpl.setLastPoint(true);
-      writeData(chunkWriterImpl, prevTvPair);
+      writeData(chunkWriterImpl, prevTime, prevValue);
     }
   }
 
