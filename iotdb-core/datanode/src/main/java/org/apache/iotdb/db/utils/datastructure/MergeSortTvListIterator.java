@@ -57,6 +57,11 @@ public class MergeSortTvListIterator implements IPointReader {
   }
 
   private void prepareNextRow() {
+    if (tvListIterators.length == 1) {
+      selectedTVListIndex = tvListIterators[0].hasNext() ? 0 : -1;
+      return;
+    }
+
     long time = Long.MAX_VALUE;
     selectedTVListIndex = -1;
     for (int i = 0; i < tvListIterators.length; i++) {
@@ -88,11 +93,16 @@ public class MergeSortTvListIterator implements IPointReader {
     tvListOffsets[selectedTVListIndex] = tvListIterators[selectedTVListIndex].getIndex();
 
     // call next to skip identical timestamp in other iterators
-    for (int i = 0; i < tvListIterators.length; i++) {
-      TimeValuePair tvPair = tvListIterators[i].current();
-      if (tvPair != null && tvPair.getTimestamp() == currentTvPair.getTimestamp()) {
-        tvListIterators[i].stepNext();
-        tvListOffsets[i] = tvListIterators[i].getIndex();
+    if (tvListIterators.length > 1) {
+      for (int i = 0; i < tvListIterators.length; i++) {
+        if (i == selectedTVListIndex) {
+          continue;
+        }
+        TimeValuePair tvPair = tvListIterators[i].current();
+        if (tvPair != null && tvPair.getTimestamp() == currentTvPair.getTimestamp()) {
+          tvListIterators[i].stepNext();
+          tvListOffsets[i] = tvListIterators[i].getIndex();
+        }
       }
     }
 
@@ -156,15 +166,20 @@ public class MergeSortTvListIterator implements IPointReader {
     if (!hasNextTimeValuePair()) {
       return;
     }
-    long time = tvListIterators[selectedTVListIndex].currentTime();
+    long time = tvListIterators.length > 1 ? tvListIterators[selectedTVListIndex].currentTime() : 0;
     tvListIterators[selectedTVListIndex].stepNext();
     tvListOffsets[selectedTVListIndex] = tvListIterators[selectedTVListIndex].getIndex();
 
     // call next to skip identical timestamp in other iterators
-    for (int i = 0; i < tvListIterators.length; i++) {
-      if (tvListIterators[i].hasCurrent() && tvListIterators[i].currentTime() == time) {
-        tvListIterators[i].stepNext();
-        tvListOffsets[i] = tvListIterators[i].getIndex();
+    if (tvListIterators.length > 1) {
+      for (int i = 0; i < tvListIterators.length; i++) {
+        if (i == selectedTVListIndex) {
+          continue;
+        }
+        if (tvListIterators[i].hasCurrent() && tvListIterators[i].currentTime() == time) {
+          tvListIterators[i].stepNext();
+          tvListOffsets[i] = tvListIterators[i].getIndex();
+        }
       }
     }
     selectedTVListIndex = -1;

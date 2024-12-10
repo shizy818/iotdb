@@ -534,15 +534,14 @@ public abstract class TVList implements WALEntryValue {
       TSEncoding encoding,
       List<TimeRange> deletionList);
 
-  protected float roundValueWithGivenPrecision(
-      float value, int floatPrecision, TSEncoding encoding) {
+  public float roundValueWithGivenPrecision(float value, int floatPrecision, TSEncoding encoding) {
     if (!Float.isNaN(value) && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
       return MathUtils.roundWithGivenPrecision(value, floatPrecision);
     }
     return value;
   }
 
-  protected double roundValueWithGivenPrecision(
+  public double roundValueWithGivenPrecision(
       double value, int floatPrecision, TSEncoding encoding) {
     if (!Double.isNaN(value) && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
       return MathUtils.roundWithGivenPrecision(value, floatPrecision);
