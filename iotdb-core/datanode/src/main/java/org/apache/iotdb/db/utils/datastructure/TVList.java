@@ -628,6 +628,7 @@ public abstract class TVList implements WALEntryValue {
             || (index + 1 < rowCount && getTime(index + 1) == currentTime)) {
           index++;
         }
+        currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
       } else {
         // skip duplicated timestamp
         while (index + 1 < rowCount && getTime(index + 1) == currentTime) {
@@ -655,10 +656,10 @@ public abstract class TVList implements WALEntryValue {
     }
 
     public boolean hasCurrent() {
-      if (bitMap != null) {
-        return index < rowCount && !isNullValue(getValueIndex(index));
+      if (bitMap == null) {
+        return index < rowCount;
       }
-      return index < rowCount;
+      return index < rowCount && !isNullValue(getValueIndex(index));
     }
 
     public long currentTime() {
