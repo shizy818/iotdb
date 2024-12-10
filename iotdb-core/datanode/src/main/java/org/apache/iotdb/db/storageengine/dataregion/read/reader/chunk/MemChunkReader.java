@@ -80,7 +80,7 @@ public class MemChunkReader implements IChunkReader, IPointReader {
               tsBlockSupplier,
               (MergeSortTvListIterator) timeValuePairIterator,
               pageOffsetsList.get(i),
-              i < pageStats.size() - 1 ? pageOffsetsList.get(i + 1) : null,
+              pageOffsetsList.get(i + 1),
               metadata.getDataType(),
               metadata.getMeasurementUid(),
               pageStats.get(i),
