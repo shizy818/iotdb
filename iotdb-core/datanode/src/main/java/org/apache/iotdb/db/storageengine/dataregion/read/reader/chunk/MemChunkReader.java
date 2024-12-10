@@ -79,9 +79,9 @@ public class MemChunkReader implements IChunkReader, IPointReader {
       MemPageReader pageReader =
           new MemPageReader(
               tsBlockSupplier,
-              (MergeSortTvListIterator) timeValuePairIterator,
+              timeValuePairIterator,
               pageOffsetsList.get(i),
-              i < pageStats.size() - 1 ? pageOffsetsList.get(i + 1) : null,
+              pageOffsetsList.get(i + 1),
               metadata.getDataType(),
               metadata.getMeasurementUid(),
               pageStats.get(i),
