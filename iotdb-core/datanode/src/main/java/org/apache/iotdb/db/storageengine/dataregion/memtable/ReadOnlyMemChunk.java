@@ -209,6 +209,7 @@ public class ReadOnlyMemChunk {
       timeValuePairIterator.stepNext();
       cnt++;
     }
+    pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
     chunkStatistics.setEmpty(cnt == 0);
   }
 

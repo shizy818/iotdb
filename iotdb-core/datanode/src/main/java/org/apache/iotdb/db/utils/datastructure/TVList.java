@@ -627,13 +627,11 @@ public abstract class TVList implements WALEntryValue {
         while ((index < rowCount && isNullValue(getValueIndex(index)))
             || (index + 1 < rowCount && getTime(index + 1) == currentTime)) {
           index++;
-          currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
         }
       } else {
         // skip duplicated timestamp
         while (index + 1 < rowCount && getTime(index + 1) == currentTime) {
           index++;
-          currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
         }
       }
       return index < rowCount;
