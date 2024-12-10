@@ -614,22 +614,26 @@ public abstract class TVList implements WALEntryValue {
   /* TVList Iterator */
   public class TVListIterator {
     private int index;
+    private long currentTime;
 
     public TVListIterator() {
       index = 0;
+      currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
     }
 
     public boolean hasNext() {
       if (bitMap != null) {
         // skip deleted & duplicated timestamp
         while ((index < rowCount && isNullValue(getValueIndex(index)))
-            || (index + 1 < rowCount && getTime(index + 1) == getTime(index))) {
+            || (index + 1 < rowCount && getTime(index + 1) == currentTime)) {
           index++;
+          currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
         }
       } else {
         // skip duplicated timestamp
-        while (index + 1 < rowCount && getTime(index + 1) == getTime(index)) {
+        while (index + 1 < rowCount && getTime(index + 1) == currentTime) {
           index++;
+          currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
         }
       }
       return index < rowCount;
@@ -639,7 +643,9 @@ public abstract class TVList implements WALEntryValue {
       if (!hasNext()) {
         return null;
       }
-      return getTimeValuePair(index++);
+      TimeValuePair ret = getTimeValuePair(index++);
+      currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
+      return ret;
     }
 
     public void stepNext() {
@@ -647,6 +653,7 @@ public abstract class TVList implements WALEntryValue {
         return;
       }
       index++;
+      currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
     }
 
     public boolean hasCurrent() {
@@ -660,7 +667,7 @@ public abstract class TVList implements WALEntryValue {
       if (!hasCurrent()) {
         return Long.MIN_VALUE;
       }
-      return getTime(index);
+      return currentTime;
     }
 
     public Object currentValue() {
@@ -683,6 +690,7 @@ public abstract class TVList implements WALEntryValue {
 
     public void setIndex(int index) {
       this.index = index;
+      this.currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
     }
   }
 }
