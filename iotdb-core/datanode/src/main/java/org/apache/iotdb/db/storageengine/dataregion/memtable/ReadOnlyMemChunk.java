@@ -137,12 +137,9 @@ public class ReadOnlyMemChunk {
     metaData.setChunkLoader(new MemChunkLoader(context, this));
     metaData.setVersion(Long.MAX_VALUE);
     cachedMetaData = metaData;
-
-    sortTvLists();
-    updateChunkAndPageStatisticsFromTvLists();
   }
 
-  private void sortTvLists() {
+  public void sortTvLists() {
     for (Map.Entry<TVList, Integer> entry : getTvListQueryMap().entrySet()) {
       TVList tvList = entry.getKey();
       int queryRowCount = entry.getValue();
@@ -152,7 +149,7 @@ public class ReadOnlyMemChunk {
     }
   }
 
-  private void updateChunkAndPageStatisticsFromTvLists() {
+  public void updateChunkAndPageStatisticsFromTvLists() {
     Statistics chunkStatistics = cachedMetaData.getStatistics();
 
     int cnt = 0;
