@@ -111,6 +111,11 @@ public abstract class LongTVList extends TVList {
   }
 
   @Override
+  public Object getValue(int index) {
+    return getLong(index);
+  }
+
+  @Override
   void clearValue() {
     if (values != null) {
       for (long[] dataArray : values) {

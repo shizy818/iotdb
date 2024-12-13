@@ -192,6 +192,10 @@ public abstract class TVList implements WALEntryValue {
     return timestamps.get(arrayIndex)[elementIndex];
   }
 
+  public Object getValue(int index) {
+    throw new UnsupportedOperationException(ERR_DATATYPE_NOT_CONSISTENT);
+  }
+
   protected void set(int index, long timestamp, int value) {
     if (index >= rowCount) {
       throw new ArrayIndexOutOfBoundsException(index);
@@ -662,6 +666,13 @@ public abstract class TVList implements WALEntryValue {
         return Long.MIN_VALUE;
       }
       return currentTime;
+    }
+
+    public Object currentValue() {
+      if (!hasCurrent()) {
+        return Long.MIN_VALUE;
+      }
+      return getValue(index);
     }
 
     public int getIndex() {

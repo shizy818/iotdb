@@ -127,6 +127,55 @@ public class MergeSortTvListIterator implements IPointReader {
     return currentTvPair;
   }
 
+  public long currentTime() {
+    if (!hasNextTimeValuePair()) {
+      return Long.MIN_VALUE;
+    }
+    return tvListIterators.get(selectedTVListIndex).currentTime();
+  }
+
+  public Object currentValue() {
+    if (!hasNextTimeValuePair()) {
+      return null;
+    }
+    Object value = tvListIterators.get(selectedTVListIndex).currentValue();
+    if (encoding != null && floatPrecision != -1) {
+      if (tsDataType == TSDataType.FLOAT) {
+        float fv = (float) value;
+        if (!Float.isNaN(fv) && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+          return MathUtils.roundWithGivenPrecision(fv, floatPrecision);
+        }
+      } else if (tsDataType == TSDataType.DOUBLE) {
+        double dv = (double) value;
+        if (!Double.isNaN(dv) && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+          return MathUtils.roundWithGivenPrecision(dv, floatPrecision);
+        }
+      }
+    }
+    return value;
+  }
+
+  public void step() {
+    if (!hasNextTimeValuePair()) {
+      return;
+    }
+    long time = tvListIterators.get(selectedTVListIndex).currentTime();
+    tvListIterators.get(selectedTVListIndex).step();
+    tvListOffsets[selectedTVListIndex] = tvListIterators.get(selectedTVListIndex).getIndex();
+
+    // call next to skip identical timestamp in other iterators
+    for (int i = 0; i < tvListIterators.size(); i++) {
+      if (selectedTVListIndex == i) {
+        continue;
+      }
+      if (tvListIterators.get(i).hasCurrent() && tvListIterators.get(i).currentTime() == time) {
+        tvListIterators.get(i).step();
+        tvListOffsets[i] = tvListIterators.get(i).getIndex();
+      }
+    }
+    selectedTVListIndex = -1;
+  }
+
   @Override
   public long getUsedMemorySize() {
     // not used
