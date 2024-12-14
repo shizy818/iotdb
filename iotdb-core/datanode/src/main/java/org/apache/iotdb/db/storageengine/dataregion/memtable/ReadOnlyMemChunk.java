@@ -50,8 +50,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
-
 /**
  * ReadOnlyMemChunk is a snapshot of the working MemTable and flushing memtable in the memory used
  * for querying.
@@ -141,10 +139,9 @@ public class ReadOnlyMemChunk {
     // create chunk statistics
     Statistics chunkStatistics = Statistics.getStatsByType(dataType);
     int cnt = 0;
-    int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     MergeSortTvListIterator timeValuePairIterator =
-        new MergeSortTvListIterator(dataType, encoding, floatPrecision, tvLists);
+        new MergeSortTvListIterator(tvLists, deletionList, floatPrecision, encoding);
     int[] tvListOffsets = timeValuePairIterator.getTVListOffsets();
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       if (cnt % MAX_NUMBER_OF_POINTS_IN_PAGE == 0) {
@@ -153,47 +150,43 @@ public class ReadOnlyMemChunk {
         pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
       }
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
-        Statistics pageStatistics = pageStatisticsList.get(pageStatisticsList.size() - 1);
-        switch (dataType) {
-          case BOOLEAN:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
-            break;
-          case INT32:
-          case DATE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
-            break;
-          case INT64:
-          case TIMESTAMP:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
-            break;
-          case FLOAT:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
-            break;
-          case DOUBLE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
-            break;
-          case TEXT:
-          case BLOB:
-          case STRING:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
-            break;
-          default:
-            throw new UnSupportedDataTypeException(
-                String.format("Data type %s is not supported.", dataType));
-        }
-        pageStatistics.setEmpty(false);
+      Statistics pageStatistics = pageStatisticsList.get(pageStatisticsList.size() - 1);
+      switch (dataType) {
+        case BOOLEAN:
+          chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
+          pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
+          break;
+        case INT32:
+        case DATE:
+          chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
+          pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
+          break;
+        case INT64:
+        case TIMESTAMP:
+          chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
+          pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
+          break;
+        case FLOAT:
+          chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
+          pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
+          break;
+        case DOUBLE:
+          chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
+          pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
+          break;
+        case TEXT:
+        case BLOB:
+        case STRING:
+          chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
+          pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
+          break;
+        default:
+          throw new UnSupportedDataTypeException(
+              String.format("Data type %s is not supported.", dataType));
       }
       cnt++;
     }
     pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
-    chunkStatistics.setEmpty(cnt == 0);
 
     // chunk meta
     IChunkMetadata metaData =
@@ -243,53 +236,49 @@ public class ReadOnlyMemChunk {
 
   // read all data in memory chunk and write to tsblock
   private void writeValidValuesIntoTsBlock(TsBlockBuilder builder) throws IOException {
-    int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     IPointReader timeValuePairIterator =
-        new MergeSortTvListIterator(dataType, encoding, floatPrecision, tvLists);
+        new MergeSortTvListIterator(tvLists, deletionList, floatPrecision, encoding);
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
-        builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
-        switch (dataType) {
-          case BOOLEAN:
-            builder.getColumnBuilder(0).writeBoolean(tvPair.getValue().getBoolean());
-            break;
-          case INT32:
-          case DATE:
-            builder.getColumnBuilder(0).writeInt(tvPair.getValue().getInt());
-            break;
-          case INT64:
-          case TIMESTAMP:
-            builder.getColumnBuilder(0).writeLong(tvPair.getValue().getLong());
-            break;
-          case FLOAT:
-            float fv = tvPair.getValue().getFloat();
-            if (!Float.isNaN(fv)
-                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-              fv = MathUtils.roundWithGivenPrecision(fv, floatPrecision);
-            }
-            builder.getColumnBuilder(0).writeFloat(fv);
-            break;
-          case DOUBLE:
-            double dv = tvPair.getValue().getDouble();
-            if (!Double.isNaN(dv)
-                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-              dv = MathUtils.roundWithGivenPrecision(dv, floatPrecision);
-            }
-            builder.getColumnBuilder(0).writeDouble(dv);
-            break;
-          case TEXT:
-          case STRING:
-          case BLOB:
-            builder.getColumnBuilder(0).writeBinary(tvPair.getValue().getBinary());
-            break;
-          default:
-            break;
-        }
-        builder.declarePosition();
+      builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
+      switch (dataType) {
+        case BOOLEAN:
+          builder.getColumnBuilder(0).writeBoolean(tvPair.getValue().getBoolean());
+          break;
+        case INT32:
+        case DATE:
+          builder.getColumnBuilder(0).writeInt(tvPair.getValue().getInt());
+          break;
+        case INT64:
+        case TIMESTAMP:
+          builder.getColumnBuilder(0).writeLong(tvPair.getValue().getLong());
+          break;
+        case FLOAT:
+          float fv = tvPair.getValue().getFloat();
+          if (!Float.isNaN(fv) && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+            fv = MathUtils.roundWithGivenPrecision(fv, floatPrecision);
+          }
+          builder.getColumnBuilder(0).writeFloat(fv);
+          break;
+        case DOUBLE:
+          double dv = tvPair.getValue().getDouble();
+          if (!Double.isNaN(dv)
+              && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+            dv = MathUtils.roundWithGivenPrecision(dv, floatPrecision);
+          }
+          builder.getColumnBuilder(0).writeDouble(dv);
+          break;
+        case TEXT:
+        case STRING:
+        case BLOB:
+          builder.getColumnBuilder(0).writeBinary(tvPair.getValue().getBinary());
+          break;
+        default:
+          break;
       }
+      builder.declarePosition();
     }
   }
 

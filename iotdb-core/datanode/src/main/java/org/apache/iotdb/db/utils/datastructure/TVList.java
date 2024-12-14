@@ -48,6 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager.ARRAY_SIZE;
+import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_ARRAY_HEADER;
 import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_OBJECT_REF;
 
@@ -603,33 +604,57 @@ public abstract class TVList implements WALEntryValue {
     queryListLock.unlock();
   }
 
-  public TVListIterator iterator() {
-    return new TVListIterator();
+  public TVListIterator iterator(
+      List<TimeRange> deletionList, Integer floatPrecision, TSEncoding encoding) {
+    return new TVListIterator(deletionList, floatPrecision, encoding);
   }
 
   /* TVList Iterator */
   public class TVListIterator {
     private int index;
     private long currentTime;
+    private boolean probeNext;
+    private final Integer floatPrecision;
+    private final TSEncoding encoding;
+    private final List<TimeRange> deletionList;
+    private final int[] deleteCursor;
 
-    public TVListIterator() {
-      index = 0;
-      currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
+    public TVListIterator(
+        List<TimeRange> deletionList, Integer floatPrecision, TSEncoding encoding) {
+      this.index = 0;
+      this.currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
+      this.floatPrecision = floatPrecision;
+      this.encoding = encoding;
+      this.deletionList = deletionList;
+      this.deleteCursor = new int[] {0};
     }
 
-    public boolean hasNext() {
+    private void prepareNext() {
       if (bitMap != null) {
         // skip deleted & duplicated timestamp
         while ((index < rowCount && isNullValue(getValueIndex(index)))
+            || (index < rowCount
+                && deletionList != null
+                && isPointDeleted(currentTime, deletionList, deleteCursor))
             || (index + 1 < rowCount && getTime(index + 1) == currentTime)) {
           index++;
         }
-        currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
       } else {
         // skip duplicated timestamp
-        while (index + 1 < rowCount && getTime(index + 1) == currentTime) {
+        while ((index < rowCount
+                && deletionList != null
+                && isPointDeleted(currentTime, deletionList, deleteCursor))
+            || index + 1 < rowCount && getTime(index + 1) == currentTime) {
           index++;
         }
+      }
+      currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
+      probeNext = true;
+    }
+
+    public boolean hasNext() {
+      if (!probeNext) {
+        prepareNext();
       }
       return index < rowCount;
     }
@@ -638,8 +663,9 @@ public abstract class TVList implements WALEntryValue {
       if (!hasNext()) {
         return null;
       }
-      TimeValuePair ret = getTimeValuePair(index++);
+      TimeValuePair ret = getTimeValuePair(index++, currentTime, floatPrecision, encoding);
       currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
+      probeNext = false;
       return ret;
     }
 
@@ -647,7 +673,7 @@ public abstract class TVList implements WALEntryValue {
       if (!hasCurrent()) {
         return null;
       }
-      return getTimeValuePair(index);
+      return getTimeValuePair(index, currentTime, floatPrecision, encoding);
     }
 
     public boolean hasCurrent() {
@@ -670,11 +696,13 @@ public abstract class TVList implements WALEntryValue {
 
     public void setIndex(int index) {
       this.index = index;
-      currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
+      this.probeNext = false;
+      this.currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
     }
 
     protected void step() {
       index++;
+      probeNext = false;
       currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
     }
   }
