@@ -136,7 +136,7 @@ public abstract class FloatTVList extends TVList {
 
   @Override
   protected TimeValuePair getTimeValuePair(
-      int index, long time, Integer floatPrecision, TSEncoding encoding) {
+      int index, long time, int floatPrecision, TSEncoding encoding) {
     float value = getFloat(index);
     if (!Float.isNaN(value) && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
       value = MathUtils.roundWithGivenPrecision(value, floatPrecision);

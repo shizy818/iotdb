@@ -38,13 +38,12 @@ public class MergeSortTvListIterator implements IPointReader {
   public MergeSortTvListIterator(List<TVList> tvLists) {
     tvListIterators = new ArrayList<>();
     for (TVList tvList : tvLists) {
-      tvListIterators.add(tvList.iterator(null, null));
+      tvListIterators.add(tvList.iterator(-1, null));
     }
     this.tvListOffsets = new int[tvLists.size()];
   }
 
-  public MergeSortTvListIterator(
-      List<TVList> tvLists, Integer floatPrecision, TSEncoding encoding) {
+  public MergeSortTvListIterator(List<TVList> tvLists, int floatPrecision, TSEncoding encoding) {
     tvListIterators = new ArrayList<>();
     for (TVList tvList : tvLists) {
       tvListIterators.add(tvList.iterator(floatPrecision, encoding));

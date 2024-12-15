@@ -247,7 +247,7 @@ public abstract class AlignedTVList extends TVList {
 
   @Override
   protected TimeValuePair getTimeValuePair(
-      int index, long time, Integer floatPrecision, TSEncoding encoding) {
+      int index, long time, int floatPrecision, TSEncoding encoding) {
     throw new UnsupportedOperationException(ERR_DATATYPE_NOT_CONSISTENT);
   }
 
@@ -727,7 +727,7 @@ public abstract class AlignedTVList extends TVList {
   }
 
   protected TimeValuePair getTimeValuePair(
-      int index, long time, Integer floatPrecision, List<TSEncoding> encodingList) {
+      int index, long time, int floatPrecision, List<TSEncoding> encodingList) {
     return new TimeValuePair(
         time, (TsPrimitiveType) getAlignedValueForQuery(index, floatPrecision, encodingList));
   }

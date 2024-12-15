@@ -510,7 +510,7 @@ public abstract class TVList implements WALEntryValue {
   public abstract TimeValuePair getTimeValuePair(int index);
 
   protected abstract TimeValuePair getTimeValuePair(
-      int index, long time, Integer floatPrecision, TSEncoding encoding);
+      int index, long time, int floatPrecision, TSEncoding encoding);
 
   @TestOnly
   public TsBlock buildTsBlock() {
@@ -603,7 +603,7 @@ public abstract class TVList implements WALEntryValue {
     queryListLock.unlock();
   }
 
-  public TVListIterator iterator(Integer floatPrecision, TSEncoding encoding) {
+  public TVListIterator iterator(int floatPrecision, TSEncoding encoding) {
     return new TVListIterator(floatPrecision, encoding);
   }
 
@@ -612,10 +612,10 @@ public abstract class TVList implements WALEntryValue {
     private int index;
     private long currentTime;
     private boolean probeNext;
-    private final Integer floatPrecision;
+    private final int floatPrecision;
     private final TSEncoding encoding;
 
-    public TVListIterator(Integer floatPrecision, TSEncoding encoding) {
+    public TVListIterator(int floatPrecision, TSEncoding encoding) {
       this.index = 0;
       this.currentTime = index < rowCount ? getTime(index) : Long.MIN_VALUE;
       this.probeNext = false;

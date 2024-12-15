@@ -23,7 +23,6 @@ import org.apache.iotdb.commons.utils.TestOnly;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.MemChunkLoader;
-import org.apache.iotdb.db.utils.MathUtils;
 import org.apache.iotdb.db.utils.datastructure.MergeSortTvListIterator;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
@@ -263,20 +262,10 @@ public class ReadOnlyMemChunk {
             builder.getColumnBuilder(0).writeLong(tvPair.getValue().getLong());
             break;
           case FLOAT:
-            float fv = tvPair.getValue().getFloat();
-            if (!Float.isNaN(fv)
-                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-              fv = MathUtils.roundWithGivenPrecision(fv, floatPrecision);
-            }
-            builder.getColumnBuilder(0).writeFloat(fv);
+            builder.getColumnBuilder(0).writeFloat(tvPair.getValue().getFloat());
             break;
           case DOUBLE:
-            double dv = tvPair.getValue().getDouble();
-            if (!Double.isNaN(dv)
-                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-              dv = MathUtils.roundWithGivenPrecision(dv, floatPrecision);
-            }
-            builder.getColumnBuilder(0).writeDouble(dv);
+            builder.getColumnBuilder(0).writeDouble(tvPair.getValue().getDouble());
             break;
           case TEXT:
           case STRING:

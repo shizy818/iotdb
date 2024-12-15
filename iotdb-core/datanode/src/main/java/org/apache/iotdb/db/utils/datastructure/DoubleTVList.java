@@ -136,7 +136,7 @@ public abstract class DoubleTVList extends TVList {
 
   @Override
   protected TimeValuePair getTimeValuePair(
-      int index, long time, Integer floatPrecision, TSEncoding encoding) {
+      int index, long time, int floatPrecision, TSEncoding encoding) {
     double value = getDouble(index);
     if (!Double.isNaN(value) && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
       value = MathUtils.roundWithGivenPrecision(value, floatPrecision);

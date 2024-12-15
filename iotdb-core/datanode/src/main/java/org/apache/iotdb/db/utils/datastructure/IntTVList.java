@@ -135,7 +135,7 @@ public abstract class IntTVList extends TVList {
 
   @Override
   protected TimeValuePair getTimeValuePair(
-      int index, long time, Integer floatPrecision, TSEncoding encoding) {
+      int index, long time, int floatPrecision, TSEncoding encoding) {
     return new TimeValuePair(time, TsPrimitiveType.getByType(TSDataType.INT32, getInt(index)));
   }
 
