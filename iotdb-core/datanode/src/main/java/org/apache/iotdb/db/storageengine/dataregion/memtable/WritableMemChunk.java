@@ -525,17 +525,17 @@ public class WritableMemChunk implements IWritableMemChunk {
 
   @Override
   public void encode(IChunkWriter chunkWriter) {
-    if (TVLIST_SORT_THRESHOLD == 0) {
-      encodeWorkingTVList(chunkWriter);
-      return;
-    }
+    //    if (TVLIST_SORT_THRESHOLD == 0) {
+    //      encodeWorkingTVList(chunkWriter);
+    //      return;
+    //    }
 
     ChunkWriterImpl chunkWriterImpl = (ChunkWriterImpl) chunkWriter;
 
     // create MergeSortTvListIterator. It need not handle float/double precision here.
     List<TVList> tvLists = new ArrayList<>(sortedList);
     tvLists.add(list);
-    MergeSortTvListIterator iterator = new MergeSortTvListIterator(schema.getType(), tvLists);
+    MergeSortTvListIterator iterator = new MergeSortTvListIterator(tvLists);
 
     TimeValuePair prevTvPair = null;
     while (iterator.hasNextTimeValuePair()) {

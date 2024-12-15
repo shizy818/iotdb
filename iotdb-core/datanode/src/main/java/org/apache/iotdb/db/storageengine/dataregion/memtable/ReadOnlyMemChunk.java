@@ -144,7 +144,7 @@ public class ReadOnlyMemChunk {
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     MergeSortTvListIterator timeValuePairIterator =
-        new MergeSortTvListIterator(dataType, encoding, floatPrecision, tvLists);
+        new MergeSortTvListIterator(tvLists, floatPrecision, encoding);
     int[] tvListOffsets = timeValuePairIterator.getTVListOffsets();
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       if (cnt % MAX_NUMBER_OF_POINTS_IN_PAGE == 0) {
@@ -188,12 +188,10 @@ public class ReadOnlyMemChunk {
             throw new UnSupportedDataTypeException(
                 String.format("Data type %s is not supported.", dataType));
         }
-        pageStatistics.setEmpty(false);
       }
       cnt++;
     }
     pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
-    chunkStatistics.setEmpty(cnt == 0);
 
     // chunk meta
     IChunkMetadata metaData =
@@ -246,7 +244,7 @@ public class ReadOnlyMemChunk {
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     IPointReader timeValuePairIterator =
-        new MergeSortTvListIterator(dataType, encoding, floatPrecision, tvLists);
+        new MergeSortTvListIterator(tvLists, floatPrecision, encoding);
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
