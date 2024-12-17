@@ -55,7 +55,10 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
   private final List<String> valueChunkNames;
 
+  // data types from query path
   private final List<TSDataType> dataTypes;
+  // full data types from AlignedWritableMemChunk
+  private final List<TSDataType> dataTypeList;
 
   private final int floatPrecision;
   private final List<TSEncoding> encodingList;
@@ -84,12 +87,14 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
    */
   public AlignedReadOnlyMemChunk(
       QueryContext context,
+      List<TSDataType> dataTypeList,
       List<Integer> columnIndexList,
       IMeasurementSchema schema,
       Map<AlignedTVList, Integer> alignedTvListQueryMap,
       List<TimeRange> timeColumnDeletion,
       List<List<TimeRange>> valueColumnsDeletionList) {
     super(context);
+    this.dataTypeList = dataTypeList;
     this.pageOffsetsList = new ArrayList<>();
     this.timeChunkName = schema.getMeasurementName();
     this.valueChunkNames = schema.getSubMeasurementsList();
@@ -132,6 +137,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
     MergeSortAlignedTVListIterator timeValuePairIterator =
         new MergeSortAlignedTVListIterator(
             alignedTvLists,
+            dataTypeList,
             columnIndexList,
             floatPrecision,
             encodingList,
@@ -296,6 +302,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
     IPointReader timeValuePairIterator =
         new MergeSortAlignedTVListIterator(
             alignedTvLists,
+            dataTypeList,
             columnIndexList,
             floatPrecision,
             encodingList,
@@ -372,6 +379,10 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
   public List<TSDataType> getDataTypes() {
     return dataTypes;
+  }
+
+  public List<TSDataType> getDataTypeList() {
+    return dataTypeList;
   }
 
   public List<Statistics<? extends Serializable>> getTimeStatisticsList() {

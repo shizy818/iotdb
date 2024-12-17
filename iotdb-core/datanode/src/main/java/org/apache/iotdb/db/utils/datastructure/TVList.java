@@ -609,10 +609,10 @@ public abstract class TVList implements WALEntryValue {
 
   /* TVList Iterator */
   public class TVListIterator {
-    protected int index;
-    protected int rows;
-    protected long currentTime;
-    protected boolean probeNext;
+    private int index;
+    private final int rows;
+    private long currentTime;
+    private boolean probeNext;
     private final Integer floatPrecision;
     private final TSEncoding encoding;
 

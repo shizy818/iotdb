@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.db.utils.datastructure;
 
+import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
@@ -28,15 +29,20 @@ import org.apache.tsfile.utils.TsPrimitiveType;
 import java.io.IOException;
 import java.util.List;
 
+import static org.apache.iotdb.db.utils.datastructure.TVList.ERR_DATATYPE_NOT_CONSISTENT;
+
 public class MergeSortAlignedTVListIterator implements IPointReader {
   private final AlignedTVList.AlignedTVListIterator[] alignedTvListIterators;
   private boolean probeNext = false;
   private TimeValuePair currentTvPair;
+  private final List<Integer> columnIndexList;
+  private List<TSDataType> dataTypeList;
 
   private final int[] alignedTvListOffsets;
 
   public MergeSortAlignedTVListIterator(
       List<AlignedTVList> alignedTvLists,
+      List<TSDataType> dataTypeList,
       List<Integer> columnIndexList,
       Integer floatPrecision,
       List<TSEncoding> encodingList,
@@ -57,6 +63,47 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
                   valueColumnsDeletionList);
     }
     this.alignedTvListOffsets = new int[alignedTvLists.size()];
+    this.columnIndexList = columnIndexList;
+    this.dataTypeList = dataTypeList;
+  }
+
+  private TimeValuePair buildTimeValuePair(long time, Object[] values) {
+    TsPrimitiveType[] vector = new TsPrimitiveType[values.length];
+    for (int i = 0; i < values.length; i++) {
+      if (values[i] == null) {
+        continue;
+      }
+
+      TSDataType tsDataType =
+          columnIndexList == null ? dataTypeList.get(i) : dataTypeList.get(columnIndexList.get(i));
+      switch (tsDataType) {
+        case BOOLEAN:
+          vector[i] = TsPrimitiveType.getByType(TSDataType.BOOLEAN, values[i]);
+          break;
+        case INT32:
+        case DATE:
+          vector[i] = TsPrimitiveType.getByType(TSDataType.INT32, values[i]);
+          break;
+        case INT64:
+        case TIMESTAMP:
+          vector[i] = TsPrimitiveType.getByType(TSDataType.INT64, values[i]);
+          break;
+        case FLOAT:
+          vector[i] = TsPrimitiveType.getByType(TSDataType.FLOAT, values[i]);
+          break;
+        case DOUBLE:
+          vector[i] = TsPrimitiveType.getByType(TSDataType.DOUBLE, values[i]);
+          break;
+        case TEXT:
+        case BLOB:
+        case STRING:
+          vector[i] = TsPrimitiveType.getByType(TSDataType.TEXT, values[i]);
+          break;
+        default:
+          throw new UnsupportedOperationException(ERR_DATATYPE_NOT_CONSISTENT);
+      }
+    }
+    return new TimeValuePair(time, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
   }
 
   private void prepareNextRow() {
@@ -65,16 +112,15 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     for (int i = 0; i < alignedTvListIterators.length; i++) {
       AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[i];
       if (iterator.hasNext() && iterator.currentTime() <= time) {
-        TimeValuePair tvPair = iterator.current();
+        Object[] values = iterator.current();
         // check valueColumnsDeletionList
         if (currentTvPair == null || iterator.currentTime() < time) {
-          currentTvPair = tvPair;
+          currentTvPair = buildTimeValuePair(iterator.currentTime(), values);
         } else {
-          TsPrimitiveType[] primitiveValues = tvPair.getValue().getVector();
-          for (int columnIndex = 0; columnIndex < primitiveValues.length; columnIndex++) {
+          for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
             // update currentTvPair if the column is not null
-            if (primitiveValues[columnIndex] != null) {
-              currentTvPair.getValue().getVector()[columnIndex] = primitiveValues[columnIndex];
+            if (values[columnIndex] != null) {
+              currentTvPair.getValue().getVector()[columnIndex].setObject(values[columnIndex]);
             }
           }
         }

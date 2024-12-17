@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class AlignedWritableMemChunk implements IWritableMemChunk {
 
@@ -219,10 +220,8 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
     } finally {
       list.unlockQueryList();
     }
-    List<TSDataType> dataTypeList = new ArrayList<>();
-    for (IMeasurementSchema schema : schemaList) {
-      dataTypeList.add(schema.getType());
-    }
+    List<TSDataType> dataTypeList =
+        schemaList.stream().map(IMeasurementSchema::getType).collect(Collectors.toList());
     this.list = AlignedTVList.newAlignedList(dataTypeList);
   }
 
@@ -603,9 +602,11 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
     // create MergeSortAlignedTVListIterator.
     List<AlignedTVList> alignedTvLists = new ArrayList<>(sortedList);
     alignedTvLists.add(list);
+    List<TSDataType> dataTypeList =
+        schemaList.stream().map(IMeasurementSchema::getType).collect(Collectors.toList());
     MergeSortAlignedTVListIterator timeValuePairIterator =
         new MergeSortAlignedTVListIterator(
-            alignedTvLists, null, null, null, null, null, ignoreAllNullRows);
+            alignedTvLists, dataTypeList, null, null, null, null, null, ignoreAllNullRows);
 
     int pointsInPage = 0;
     long[] times = new long[MAX_NUMBER_OF_POINTS_IN_PAGE];

@@ -55,6 +55,7 @@ public class MemAlignedChunkReader implements IChunkReader {
     timeValuePairIterator =
         new MergeSortAlignedTVListIterator(
             alignedTVLists,
+            readableChunk.getDataTypeList(),
             readableChunk.getColumnIndexList(),
             readableChunk.getFloatPrecision(),
             readableChunk.getEncodingList(),
