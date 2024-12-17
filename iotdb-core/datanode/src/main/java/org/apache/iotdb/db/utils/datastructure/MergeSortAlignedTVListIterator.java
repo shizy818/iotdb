@@ -34,9 +34,11 @@ import static org.apache.iotdb.db.utils.datastructure.TVList.ERR_DATATYPE_NOT_CO
 public class MergeSortAlignedTVListIterator implements IPointReader {
   private final AlignedTVList.AlignedTVListIterator[] alignedTvListIterators;
   private boolean probeNext = false;
-  private TimeValuePair currentTvPair;
+  private boolean validRow = false;
+  private long currentTime;
+  private Object[] currentValues;
   private final List<Integer> columnIndexList;
-  private List<TSDataType> dataTypeList;
+  private final List<TSDataType> dataTypeList;
 
   private final int[] alignedTvListOffsets;
 
@@ -107,20 +109,20 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
   }
 
   private void prepareNextRow() {
-    currentTvPair = null;
+    validRow = false;
     long time = Long.MAX_VALUE;
-    for (int i = 0; i < alignedTvListIterators.length; i++) {
-      AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[i];
+    for (AlignedTVList.AlignedTVListIterator iterator : alignedTvListIterators) {
       if (iterator.hasNext() && iterator.currentTime() <= time) {
         Object[] values = iterator.current();
-        // check valueColumnsDeletionList
-        if (currentTvPair == null || iterator.currentTime() < time) {
-          currentTvPair = buildTimeValuePair(iterator.currentTime(), values);
+        if (!validRow || iterator.currentTime() < time) {
+          currentValues = values;
+          currentTime = iterator.currentTime();
+          validRow = true;
         } else {
           for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
             // update currentTvPair if the column is not null
             if (values[columnIndex] != null) {
-              currentTvPair.getValue().getVector()[columnIndex].setObject(values[columnIndex]);
+              currentValues[columnIndex] = values[columnIndex];
             }
           }
         }
@@ -135,7 +137,26 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     if (!probeNext) {
       prepareNextRow();
     }
-    return currentTvPair != null;
+    return validRow;
+  }
+
+  public long currentTime() {
+    return currentTime;
+  }
+
+  public Object[] currentValues() {
+    return currentValues;
+  }
+
+  public void step() {
+    for (int i = 0; i < alignedTvListIterators.length; i++) {
+      AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[i];
+      if (iterator.hasCurrent() && iterator.currentTime() == currentTime) {
+        alignedTvListIterators[i].step();
+        alignedTvListOffsets[i] = alignedTvListIterators[i].getIndex();
+      }
+    }
+    probeNext = false;
   }
 
   @Override
@@ -146,15 +167,14 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
 
     for (int i = 0; i < alignedTvListIterators.length; i++) {
       AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[i];
-      if (iterator.hasCurrent() && iterator.currentTime() == currentTvPair.getTimestamp()) {
+      if (iterator.hasCurrent() && iterator.currentTime() == currentTime) {
         alignedTvListIterators[i].step();
         alignedTvListOffsets[i] = alignedTvListIterators[i].getIndex();
       }
     }
-
-    TimeValuePair ret = currentTvPair;
     probeNext = false;
-    return ret;
+    validRow = false;
+    return buildTimeValuePair(currentTime, currentValues);
   }
 
   @Override
@@ -162,7 +182,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     if (!hasNextTimeValuePair()) {
       return null;
     }
-    return currentTvPair;
+    return buildTimeValuePair(currentTime, currentValues);
   }
 
   @Override
@@ -184,5 +204,6 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
       this.alignedTvListOffsets[i] = alignedTvListOffsets[i];
     }
     probeNext = false;
+    validRow = false;
   }
 }

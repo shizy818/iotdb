@@ -39,6 +39,7 @@ import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
@@ -164,15 +165,15 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
       }
 
       // Update Page & Chunk Statistics
-      TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      pageTimeStats.update(tvPair.getTimestamp());
-      chunkTimeStatistics.update(tvPair.getTimestamp());
+      long timestamp = timeValuePairIterator.currentTime();
+      pageTimeStats.update(timestamp);
+      chunkTimeStatistics.update(timestamp);
 
       Statistics<? extends Serializable>[] pageValuesStats =
           valueStatisticsList.get(valueStatisticsList.size() - 1);
-      TsPrimitiveType[] primitiveValues = tvPair.getValue().getVector();
-      for (int column = 0; column < primitiveValues.length; column++) {
-        if (primitiveValues[column] == null) {
+      Object[] values = timeValuePairIterator.currentValues();
+      for (int column = 0; column < values.length; column++) {
+        if (values[column] == null) {
           continue;
         }
 
@@ -189,43 +190,32 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
         switch (dataTypes.get(column)) {
           case BOOLEAN:
-            pageValuesStats[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getBoolean());
-            chunkValueStatistics[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getBoolean());
+            pageValuesStats[column].update(timestamp, (boolean) values[column]);
+            chunkValueStatistics[column].update(timestamp, (boolean) values[column]);
             break;
           case INT32:
           case DATE:
-            pageValuesStats[column].update(tvPair.getTimestamp(), primitiveValues[column].getInt());
-            chunkValueStatistics[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getInt());
+            pageValuesStats[column].update(timestamp, (int) values[column]);
+            chunkValueStatistics[column].update(timestamp, (int) values[column]);
             break;
           case INT64:
           case TIMESTAMP:
-            pageValuesStats[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getLong());
-            chunkValueStatistics[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getLong());
+            pageValuesStats[column].update(timestamp, (long) values[column]);
+            chunkValueStatistics[column].update(timestamp, (long) values[column]);
             break;
           case FLOAT:
-            pageValuesStats[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getFloat());
-            chunkValueStatistics[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getFloat());
+            pageValuesStats[column].update(timestamp, (float) values[column]);
+            chunkValueStatistics[column].update(timestamp, (float) values[column]);
             break;
           case DOUBLE:
-            pageValuesStats[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getDouble());
-            chunkValueStatistics[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getDouble());
+            pageValuesStats[column].update(timestamp, (double) values[column]);
+            chunkValueStatistics[column].update(timestamp, (double) values[column]);
             break;
           case TEXT:
           case BLOB:
           case STRING:
-            pageValuesStats[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getBinary());
-            chunkValueStatistics[column].update(
-                tvPair.getTimestamp(), primitiveValues[column].getBinary());
+            pageValuesStats[column].update(timestamp, (Binary) values[column]);
+            chunkValueStatistics[column].update(timestamp, (Binary) values[column]);
             break;
           default:
             throw new UnSupportedDataTypeException(
@@ -233,6 +223,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         }
       }
       cnt++;
+      timeValuePairIterator.step();
     }
     pageOffsetsList.add(Arrays.copyOf(alignedTvListOffsets, alignedTvListOffsets.length));
     chunkTimeStatistics.setEmpty(cnt == 0);
