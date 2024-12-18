@@ -50,12 +50,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
+
 public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
   private final String timeChunkName;
 
   private final List<String> valueChunkNames;
 
   private final List<TSDataType> dataTypes;
+  private final List<TSDataType> dataTypeList;
 
   private final int floatPrecision;
   private final List<TSEncoding> encodingList;
@@ -84,12 +87,14 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
    */
   public AlignedReadOnlyMemChunk(
       QueryContext context,
+      List<TSDataType> dataTypeList,
       List<Integer> columnIndexList,
       IMeasurementSchema schema,
       Map<AlignedTVList, Integer> alignedTvListQueryMap,
       List<TimeRange> timeColumnDeletion,
       List<List<TimeRange>> valueColumnsDeletionList) {
     super(context);
+    this.dataTypeList = dataTypeList;
     this.pageOffsetsList = new ArrayList<>();
     this.timeChunkName = schema.getMeasurementName();
     this.valueChunkNames = schema.getSubMeasurementsList();
@@ -116,6 +121,15 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
     }
   }
 
+  private boolean isAllColumnNull(TsPrimitiveType[] values) {
+    for (TsPrimitiveType v : values) {
+      if (v != null) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @Override
   public void initChunkMetaFromTvLists() {
     // init chunk meta
@@ -140,6 +154,13 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
             context.isIgnoreAllNullRows());
     int[] alignedTvListOffsets = timeValuePairIterator.getAlignedTVListOffsets();
 
+    int[] timeDeleteCursor = new int[] {0};
+    List<int[]> valueColumnDeleteCursor = new ArrayList<>();
+    int columnNum = columnIndexList == null ? dataTypeList.size() : columnIndexList.size();
+    for (int i = 0; i < columnNum; i++) {
+      valueColumnDeleteCursor.add(new int[] {0});
+    }
+
     Statistics<? extends Serializable> pageTimeStats = null;
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       // Split pages
@@ -157,14 +178,33 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         pageOffsetsList.add(Arrays.copyOf(alignedTvListOffsets, alignedTvListOffsets.length));
       }
 
-      // Update Page & Chunk Statistics
+      // Ignore delete or empty row
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
+      if (timeColumnDeletion != null
+          && isPointDeleted(tvPair.getTimestamp(), timeColumnDeletion, timeDeleteCursor)) {
+        continue;
+      }
+
+      TsPrimitiveType[] primitiveValues = tvPair.getValue().getVector();
+      for (int columnIndex = 0; columnIndex < primitiveValues.length; columnIndex++) {
+        if (valueColumnsDeletionList != null
+            && isPointDeleted(
+                tvPair.getTimestamp(),
+                valueColumnsDeletionList.get(columnIndex),
+                valueColumnDeleteCursor.get(columnIndex))) {
+          primitiveValues[columnIndex] = null;
+        }
+      }
+      if (context.isIgnoreAllNullRows() && isAllColumnNull(primitiveValues)) {
+        continue;
+      }
+
+      // Update Page & Chunk Statistics
       pageTimeStats.update(tvPair.getTimestamp());
       chunkTimeStatistics.update(tvPair.getTimestamp());
 
       Statistics<? extends Serializable>[] pageValuesStats =
           valueStatisticsList.get(valueStatisticsList.size() - 1);
-      TsPrimitiveType[] primitiveValues = tvPair.getValue().getVector();
       for (int column = 0; column < primitiveValues.length; column++) {
         if (primitiveValues[column] == null) {
           continue;
@@ -302,10 +342,36 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
             timeColumnDeletion,
             valueColumnsDeletionList,
             context.isIgnoreAllNullRows());
+
+    int[] timeDeleteCursor = new int[] {0};
+    List<int[]> valueColumnDeleteCursor = new ArrayList<>();
+    int columnNum = columnIndexList == null ? dataTypeList.size() : columnIndexList.size();
+    for (int i = 0; i < columnNum; i++) {
+      valueColumnDeleteCursor.add(new int[] {0});
+    }
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
+      // Ignore delete or empty row
+      if (timeColumnDeletion != null
+          && isPointDeleted(tvPair.getTimestamp(), timeColumnDeletion, timeDeleteCursor)) {
+        continue;
+      }
 
+      TsPrimitiveType[] primitiveValues = tvPair.getValue().getVector();
+      for (int columnIndex = 0; columnIndex < primitiveValues.length; columnIndex++) {
+        if (valueColumnsDeletionList != null
+            && isPointDeleted(
+                tvPair.getTimestamp(),
+                valueColumnsDeletionList.get(columnIndex),
+                valueColumnDeleteCursor.get(columnIndex))) {
+          primitiveValues[columnIndex] = null;
+        }
+      }
+      if (context.isIgnoreAllNullRows() && isAllColumnNull(primitiveValues)) {
+        continue;
+      }
+
+      builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
       // value columns
       TsPrimitiveType[] values = tvPair.getValue().getVector();
       for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
@@ -380,5 +446,9 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
   public List<Statistics<? extends Serializable>[]> getValuesStatisticsList() {
     return valueStatisticsList;
+  }
+
+  public List<TSDataType> getDataTypeList() {
+    return dataTypeList;
   }
 }

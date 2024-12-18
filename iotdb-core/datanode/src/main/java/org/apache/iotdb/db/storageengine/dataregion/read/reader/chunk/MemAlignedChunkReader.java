@@ -28,6 +28,7 @@ import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
 import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.BatchData;
+import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.filter.basic.Filter;
@@ -40,6 +41,8 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
+
+import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 
 /** To read aligned chunk data in memory. */
 public class MemAlignedChunkReader implements IChunkReader {
@@ -149,14 +152,55 @@ public class MemAlignedChunkReader implements IChunkReader {
       return true;
     }
 
+    private boolean isAllColumnNull(TsPrimitiveType[] values) {
+      for (TsPrimitiveType v : values) {
+        if (v != null) {
+          return false;
+        }
+      }
+      return true;
+    }
+
     // read one page and write to tsblock
     private synchronized void writeValidValuesIntoTsBlock(TsBlockBuilder builder) {
       List<TSDataType> tsDataTypes = readableChunk.getDataTypes();
+      List<TimeRange> timeColumnDeletion = readableChunk.getTimeColumnDeletion();
+      List<List<TimeRange>> valueColumnsDeletionList = readableChunk.getValueColumnsDeletionList();
+      List<Integer> columnIndexList = readableChunk.getColumnIndexList();
+      boolean isIgnoreAllNullRows = readableChunk.getContext().isIgnoreAllNullRows();
+
+      int[] timeDeleteCursor = new int[] {0};
+      List<int[]> valueColumnDeleteCursor = new ArrayList<>();
+      int columnNum =
+          columnIndexList == null ? readableChunk.getDataTypeList().size() : columnIndexList.size();
+      for (int i = 0; i < columnNum; i++) {
+        valueColumnDeleteCursor.add(new int[] {0});
+      }
       while (timeValuePairIterator.hasNextTimeValuePair()) {
         if (isOutOfMemPageBounds()) {
           break;
         }
         TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
+        // Ignore delete or empty row
+        if (timeColumnDeletion != null
+            && isPointDeleted(tvPair.getTimestamp(), timeColumnDeletion, timeDeleteCursor)) {
+          continue;
+        }
+
+        TsPrimitiveType[] primitiveValues = tvPair.getValue().getVector();
+        for (int columnIndex = 0; columnIndex < primitiveValues.length; columnIndex++) {
+          if (valueColumnsDeletionList != null
+              && isPointDeleted(
+                  tvPair.getTimestamp(),
+                  valueColumnsDeletionList.get(columnIndex),
+                  valueColumnDeleteCursor.get(columnIndex))) {
+            primitiveValues[columnIndex] = null;
+          }
+        }
+        if (isIgnoreAllNullRows && isAllColumnNull(primitiveValues)) {
+          continue;
+        }
+
         builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
 
         // value columns
