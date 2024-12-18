@@ -19,6 +19,9 @@
 
 package org.apache.iotdb.db.utils.datastructure;
 
+import org.apache.iotdb.db.utils.MathUtils;
+
+import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
@@ -34,6 +37,9 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
   private TimeValuePair currentTvPair;
 
   private final int[] alignedTvListOffsets;
+
+  private Integer floatPrecision;
+  private List<TSEncoding> encodingList;
 
   public MergeSortAlignedTVListIterator(
       List<AlignedTVList> alignedTvLists,
@@ -57,6 +63,8 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
                   valueColumnsDeletionList);
     }
     this.alignedTvListOffsets = new int[alignedTvLists.size()];
+    this.floatPrecision = floatPrecision;
+    this.encodingList = encodingList;
   }
 
   private void prepareNextRow() {
@@ -105,16 +113,42 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
         alignedTvListOffsets[i] = alignedTvListIterators[i].getIndex();
       }
     }
-
-    TimeValuePair ret = currentTvPair;
     probeNext = false;
-    return ret;
+    return getCurrentTvPair();
   }
 
   @Override
   public TimeValuePair currentTimeValuePair() {
     if (!hasNextTimeValuePair()) {
       return null;
+    }
+    return getCurrentTvPair();
+  }
+
+  public TimeValuePair getCurrentTvPair() {
+    if (encodingList != null && floatPrecision != -1) {
+      TsPrimitiveType[] primitiveValues = currentTvPair.getValue().getVector();
+      for (int i = 0; i < primitiveValues.length; i++) {
+        if (primitiveValues[i] == null) {
+          continue;
+        }
+        if (primitiveValues[i].getDataType() == TSDataType.FLOAT) {
+          float valueF = primitiveValues[i].getFloat();
+          if (!Float.isNaN(valueF)
+              && (encodingList.get(i) == TSEncoding.RLE
+                  || encodingList.get(i) == TSEncoding.TS_2DIFF)) {
+            primitiveValues[i].setFloat(MathUtils.roundWithGivenPrecision(valueF, floatPrecision));
+          }
+        }
+        if (primitiveValues[i].getDataType() == TSDataType.DOUBLE) {
+          double valueD = primitiveValues[i].getDouble();
+          if (!Double.isNaN(valueD)
+              && (encodingList.get(i) == TSEncoding.RLE
+                  || encodingList.get(i) == TSEncoding.TS_2DIFF)) {
+            primitiveValues[i].setDouble(MathUtils.roundWithGivenPrecision(valueD, floatPrecision));
+          }
+        }
+      }
     }
     return currentTvPair;
   }

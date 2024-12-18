@@ -1507,8 +1507,8 @@ public abstract class AlignedTVList extends TVList {
     private final BitMap allValueColDeletedMap;
     private TimeValuePair currTvPair;
 
-    private final Integer floatPrecision;
-    private final List<TSEncoding> encodingList;
+    private final Integer floatPrecision = null;
+    private final List<TSEncoding> encodingList = null;
 
     List<Integer> columnIndexList;
 
@@ -1529,8 +1529,8 @@ public abstract class AlignedTVList extends TVList {
       this.columnIndexList = columnIndexList;
       this.ignoreAllNullRows = ignoreAllNullRows;
       this.allValueColDeletedMap = ignoreAllNullRows ? getAllValueColDeletedMap() : null;
-      this.floatPrecision = floatPrecision;
-      this.encodingList = encodingList;
+      //      this.floatPrecision = floatPrecision;
+      //      this.encodingList = encodingList;
       this.timeColumnDeletion = timeColumnDeletion;
       this.valueColumnsDeletionList = valueColumnsDeletionList;
       if (timeColumnDeletion != null) {
