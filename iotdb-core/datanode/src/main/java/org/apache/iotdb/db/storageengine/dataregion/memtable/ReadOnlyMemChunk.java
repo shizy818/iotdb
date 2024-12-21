@@ -50,6 +50,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMemChunk.MAX_NUMBER_OF_POINTS_IN_PAGE;
 import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 
 /**
@@ -81,9 +82,6 @@ public class ReadOnlyMemChunk {
 
   // tvlist rowCount during query
   private Map<TVList, Integer> tvListQueryMap;
-
-  protected static final int MAX_NUMBER_OF_POINTS_IN_PAGE =
-      TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
 
   protected ReadOnlyMemChunk(QueryContext context) {
     this.context = context;
