@@ -22,6 +22,7 @@ package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
 import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
+import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
 
 import org.apache.tsfile.common.conf.TSFileConfig;
 import org.apache.tsfile.enums.TSDataType;
@@ -59,7 +60,18 @@ public class MemAlignedChunkLoaderTest {
     AlignedReadOnlyMemChunk chunk = Mockito.mock(AlignedReadOnlyMemChunk.class);
     ChunkMetadata chunkMetadata = Mockito.mock(ChunkMetadata.class);
     QueryContext ctx = new QueryContext();
-    MemAlignedChunkLoader memAlignedChunkLoader = new MemAlignedChunkLoader(ctx, chunk);
+
+    Map<AlignedTVList, Integer> alignedTvListMap = buildAlignedTvListMap();
+    MergeSortAlignedTVListIterator timeValuePairIterator =
+        new MergeSortAlignedTVListIterator(
+            new ArrayList<>(alignedTvListMap.keySet()),
+            buildTsDataTypes(),
+            null,
+            null,
+            null,
+            false);
+    MemAlignedChunkLoader memAlignedChunkLoader =
+        new MemAlignedChunkLoader(ctx, chunk, timeValuePairIterator);
 
     try {
       memAlignedChunkLoader.loadChunk(chunkMetadata);
@@ -110,7 +122,7 @@ public class MemAlignedChunkLoaderTest {
     Mockito.when(chunk.getColumnIndexList()).thenReturn(null);
     Mockito.when(chunk.getTimeColumnDeletion()).thenReturn(null);
     Mockito.when(chunk.getValueColumnsDeletionList()).thenReturn(null);
-    Mockito.when(chunk.getAligendTvListQueryMap()).thenReturn(buildAlignedTvListMap());
+    Mockito.when(chunk.getAligendTvListQueryMap()).thenReturn(alignedTvListMap);
     Mockito.when(chunk.getContext()).thenReturn(ctx);
 
     AlignedChunkMetadata chunkMetadata1 = Mockito.mock(AlignedChunkMetadata.class);

@@ -401,7 +401,8 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
     }
     IChunkMetadata alignedChunkMetadata =
         new AlignedChunkMetadata(chunkTimeMetadata, chunkValueMetadataList);
-    alignedChunkMetadata.setChunkLoader(new MemAlignedChunkLoader(context, this));
+    alignedChunkMetadata.setChunkLoader(
+        new MemAlignedChunkLoader(context, this, timeValuePairIterator));
     alignedChunkMetadata.setVersion(Long.MAX_VALUE);
     cachedMetaData = alignedChunkMetadata;
   }

@@ -20,7 +20,6 @@
 package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
-import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
 import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
 import org.apache.iotdb.db.utils.datastructure.PageColumnAccessInfo;
 
@@ -52,18 +51,12 @@ public class MemAlignedChunkReader implements IChunkReader {
   private final Filter globalTimeFilter;
   private final List<IPageReader> pageReaderList;
 
-  public MemAlignedChunkReader(AlignedReadOnlyMemChunk readableChunk, Filter globalTimeFilter) {
+  public MemAlignedChunkReader(
+      AlignedReadOnlyMemChunk readableChunk,
+      Filter globalTimeFilter,
+      MergeSortAlignedTVListIterator timeValuePairIterator) {
     this.readableChunk = readableChunk;
-    List<AlignedTVList> alignedTVLists =
-        new ArrayList<>(readableChunk.getAligendTvListQueryMap().keySet());
-    timeValuePairIterator =
-        new MergeSortAlignedTVListIterator(
-            alignedTVLists,
-            readableChunk.getDataTypes(),
-            readableChunk.getColumnIndexList(),
-            readableChunk.getFloatPrecision(),
-            readableChunk.getEncodingList(),
-            readableChunk.getContext().isIgnoreAllNullRows());
+    this.timeValuePairIterator = timeValuePairIterator;
     this.globalTimeFilter = globalTimeFilter;
     this.pageReaderList = new ArrayList<>();
     initAllPageReaders(

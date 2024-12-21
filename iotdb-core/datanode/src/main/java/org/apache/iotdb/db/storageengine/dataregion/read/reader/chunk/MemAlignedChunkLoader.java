@@ -22,6 +22,7 @@ package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.queryengine.metric.SeriesScanCostMetricSet;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
+import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
 
 import org.apache.tsfile.file.metadata.ChunkMetadata;
 import org.apache.tsfile.file.metadata.IChunkMetadata;
@@ -36,13 +37,18 @@ import static org.apache.iotdb.db.queryengine.metric.SeriesScanCostMetricSet.INI
 public class MemAlignedChunkLoader implements IChunkLoader {
   private final QueryContext context;
   private final AlignedReadOnlyMemChunk chunk;
+  private final MergeSortAlignedTVListIterator timeValuePairIterator;
 
   private static final SeriesScanCostMetricSet SERIES_SCAN_COST_METRIC_SET =
       SeriesScanCostMetricSet.getInstance();
 
-  public MemAlignedChunkLoader(QueryContext context, AlignedReadOnlyMemChunk chunk) {
+  public MemAlignedChunkLoader(
+      QueryContext context,
+      AlignedReadOnlyMemChunk chunk,
+      MergeSortAlignedTVListIterator timeValuePairIterator) {
     this.context = context;
     this.chunk = chunk;
+    this.timeValuePairIterator = timeValuePairIterator;
   }
 
   @Override
@@ -59,12 +65,16 @@ public class MemAlignedChunkLoader implements IChunkLoader {
   public IChunkReader getChunkReader(IChunkMetadata chunkMetaData, Filter globalTimeFilter) {
     long startTime = System.nanoTime();
     try {
-      return new MemAlignedChunkReader(chunk, globalTimeFilter);
+      return new MemAlignedChunkReader(chunk, globalTimeFilter, timeValuePairIterator);
     } finally {
       long duration = System.nanoTime() - startTime;
       context.getQueryStatistics().getConstructAlignedChunkReadersMemCount().getAndAdd(1);
       context.getQueryStatistics().getConstructAlignedChunkReadersMemTime().getAndAdd(duration);
       SERIES_SCAN_COST_METRIC_SET.recordSeriesScanCost(INIT_CHUNK_READER_ALIGNED_MEM, duration);
     }
+  }
+
+  public AlignedReadOnlyMemChunk getChunk() {
+    return chunk;
   }
 }
