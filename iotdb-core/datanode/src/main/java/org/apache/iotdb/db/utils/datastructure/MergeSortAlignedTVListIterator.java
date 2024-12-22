@@ -184,4 +184,24 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
   public boolean[] getNullValues() {
     return nullValues;
   }
+
+  public int[] getAlignedTvListIndex() {
+    int[] ret = new int[alignedTvListIterators.length];
+    for (int i = 0; i < alignedTvListIterators.length; i++) {
+      ret[i] = alignedTvListIterators[i].getIndex();
+    }
+    return ret;
+  }
+
+  public int[] getLimits() {
+    int[] ret = new int[alignedTvListIterators.length];
+    for (int i = 0; i < alignedTvListIterators.length; i++) {
+      ret[i] = alignedTvListIterators[i].getRows();
+    }
+    return ret;
+  }
+
+  public void setWorkingTVListLimit(int limit) {
+    alignedTvListIterators[alignedTvListIterators.length - 1].setRows(limit);
+  }
 }

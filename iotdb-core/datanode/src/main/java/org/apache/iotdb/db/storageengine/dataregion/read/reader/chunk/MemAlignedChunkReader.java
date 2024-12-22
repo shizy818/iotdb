@@ -35,10 +35,13 @@ import org.apache.tsfile.read.filter.basic.Filter;
 import org.apache.tsfile.read.reader.IChunkReader;
 import org.apache.tsfile.read.reader.IPageReader;
 import org.apache.tsfile.utils.TsPrimitiveType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -47,6 +50,8 @@ import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 
 /** To read aligned chunk data in memory. */
 public class MemAlignedChunkReader implements IChunkReader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MemAlignedChunkReader.class);
+
   private final AlignedReadOnlyMemChunk readableChunk;
   private final MergeSortAlignedTVListIterator timeValuePairIterator;
   private final Filter globalTimeFilter;
@@ -64,6 +69,8 @@ public class MemAlignedChunkReader implements IChunkReader {
             readableChunk.getFloatPrecision(),
             readableChunk.getEncodingList(),
             readableChunk.getContext().isIgnoreAllNullRows());
+    timeValuePairIterator.setWorkingTVListLimit(readableChunk.getLimit());
+
     this.globalTimeFilter = globalTimeFilter;
     this.pageReaderList = new ArrayList<>();
     initAllPageReaders(
@@ -304,6 +311,14 @@ public class MemAlignedChunkReader implements IChunkReader {
         if (ignoreAllNullRows && isAllColumnNull(nullValues)) {
           timeValuePairIterator.step();
           continue;
+        }
+
+        if (pointsInPage >= MAX_NUMBER_OF_POINTS_IN_PAGE) {
+          LOGGER.error("pointsInPage {}", pointsInPage);
+          LOGGER.error("page end offset: {}", Arrays.toString(pageEndOffsets));
+          LOGGER.error(
+              "current index: {}", Arrays.toString(timeValuePairIterator.getAlignedTvListIndex()));
+          LOGGER.error("iterator limits: {}", Arrays.toString(readableChunk.getLimits()));
         }
 
         // prepare column access info for current page

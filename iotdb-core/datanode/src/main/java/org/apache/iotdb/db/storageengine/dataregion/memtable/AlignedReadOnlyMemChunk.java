@@ -76,6 +76,8 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
   private final List<Integer> columnIndexList;
 
+  private int[] limits;
+
   /**
    * The constructor for Aligned type.
    *
@@ -279,6 +281,8 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
             encodingList,
             context.isIgnoreAllNullRows());
     int[] alignedTvListOffsets = timeValuePairIterator.getAlignedTVListOffsets();
+
+    this.limits = timeValuePairIterator.getLimits();
 
     // iterate to build column access info and split pages
     int pointsInPage = 0;
@@ -568,5 +572,13 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
   public List<Statistics<? extends Serializable>[]> getValuesStatisticsList() {
     return valueStatisticsList;
+  }
+
+  public int[] getLimits() {
+    return limits;
+  }
+
+  public int getLimit() {
+    return limits[limits.length - 1];
   }
 }
