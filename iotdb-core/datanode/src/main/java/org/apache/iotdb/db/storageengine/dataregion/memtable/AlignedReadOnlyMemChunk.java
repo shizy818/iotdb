@@ -280,6 +280,8 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
             floatPrecision,
             encodingList,
             context.isIgnoreAllNullRows());
+    timeValuePairIterator.setTVListLimit(new ArrayList<>(alignedTvListQueryMap.values()));
+
     int[] alignedTvListOffsets = timeValuePairIterator.getAlignedTVListOffsets();
 
     this.limits = timeValuePairIterator.getLimits();
