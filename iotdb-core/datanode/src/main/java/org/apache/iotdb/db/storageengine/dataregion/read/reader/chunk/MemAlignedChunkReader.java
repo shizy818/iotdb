@@ -69,7 +69,8 @@ public class MemAlignedChunkReader implements IChunkReader {
             readableChunk.getFloatPrecision(),
             readableChunk.getEncodingList(),
             readableChunk.getContext().isIgnoreAllNullRows());
-    timeValuePairIterator.setTVListLimit(new ArrayList<>(readableChunk.getAligendTvListQueryMap().values()));
+    timeValuePairIterator.setTVListLimit(
+        new ArrayList<>(readableChunk.getAligendTvListQueryMap().values()));
 
     this.globalTimeFilter = globalTimeFilter;
     this.pageReaderList = new ArrayList<>();

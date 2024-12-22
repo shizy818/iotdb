@@ -193,21 +193,23 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
       boolean isWorkMemTable,
       Filter globalTimeFilter) {
     Map<AlignedTVList, Integer> alignedTvListQueryMap = new LinkedHashMap<>();
-    // immutable aligned TVList
-    for (AlignedTVList alignedTvList : alignedMemChunk.getSortedList()) {
-      if (globalTimeFilter != null
-          && !globalTimeFilter.satisfyStartEndTime(
-              alignedTvList.getMinTime(), alignedTvList.getMaxTime())) {
-        continue;
-      }
-      alignedTvList.lockQueryList();
-      try {
-        LOGGER.debug(
-            "Flushing/Working MemTable - add current query context to immutable AlignedTVList's query list");
-        alignedTvList.getQueryContextList().add(context);
-        alignedTvListQueryMap.put(alignedTvList, alignedTvList.rowCount());
-      } finally {
-        alignedTvList.unlockQueryList();
+    synchronized (alignedMemChunk.getSortedList()) {
+      // immutable aligned TVList
+      for (AlignedTVList alignedTvList : alignedMemChunk.getSortedList()) {
+        if (globalTimeFilter != null
+            && !globalTimeFilter.satisfyStartEndTime(
+                alignedTvList.getMinTime(), alignedTvList.getMaxTime())) {
+          continue;
+        }
+        alignedTvList.lockQueryList();
+        try {
+          LOGGER.debug(
+              "Flushing/Working MemTable - add current query context to immutable AlignedTVList's query list");
+          alignedTvList.getQueryContextList().add(context);
+          alignedTvListQueryMap.put(alignedTvList, alignedTvList.rowCount());
+        } finally {
+          alignedTvList.unlockQueryList();
+        }
       }
     }
 

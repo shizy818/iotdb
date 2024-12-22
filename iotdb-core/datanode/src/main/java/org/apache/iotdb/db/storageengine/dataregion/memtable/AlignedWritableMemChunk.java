@@ -189,35 +189,37 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
   }
 
   protected void handoverAlignedTvList() {
-    // ensure query contexts won't be removed from list during handover process.
-    list.lockQueryList();
-    try {
-      if (list.isSorted()) {
-        sortedList.add(list);
-        return;
-      }
-
-      if (list.getQueryContextList().isEmpty()) {
-        list.safelySort();
-        sortedList.add(list);
-      } else {
-        QueryContext firstQuery = list.getQueryContextList().get(0);
-        // reserve query memory
-        if (firstQuery instanceof FragmentInstanceContext) {
-          MemoryReservationManager memoryReservationManager =
-              ((FragmentInstanceContext) firstQuery).getMemoryReservationContext();
-          memoryReservationManager.reserveMemoryCumulatively(list.calculateRamSize());
+    synchronized (sortedList) {
+      // ensure query contexts won't be removed from list during handover process.
+      list.lockQueryList();
+      try {
+        if (list.isSorted()) {
+          sortedList.add(list);
+          return;
         }
-        // update current TVList owner to first query in the list
-        list.setOwnerQuery(firstQuery);
-        // clone tv list
-        AlignedTVList cloneList = list.clone();
-        sortedList.add(cloneList);
+
+        if (list.getQueryContextList().isEmpty()) {
+          list.safelySort();
+          sortedList.add(list);
+        } else {
+          QueryContext firstQuery = list.getQueryContextList().get(0);
+          // reserve query memory
+          if (firstQuery instanceof FragmentInstanceContext) {
+            MemoryReservationManager memoryReservationManager =
+                ((FragmentInstanceContext) firstQuery).getMemoryReservationContext();
+            memoryReservationManager.reserveMemoryCumulatively(list.calculateRamSize());
+          }
+          // update current TVList owner to first query in the list
+          list.setOwnerQuery(firstQuery);
+          // clone tv list
+          AlignedTVList cloneList = list.clone();
+          sortedList.add(cloneList);
+        }
+      } finally {
+        list.unlockQueryList();
       }
-    } finally {
-      list.unlockQueryList();
+      this.list = AlignedTVList.newAlignedList(dataTypes);
     }
-    this.list = AlignedTVList.newAlignedList(dataTypes);
   }
 
   @Override
