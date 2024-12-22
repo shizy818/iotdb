@@ -473,6 +473,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
       // skip deleted rows
       if (timeColumnDeletion != null
           && isPointDeleted(tvPair.getTimestamp(), timeColumnDeletion, timeDeleteCursor)) {
+        timeValuePairIterator.step();
         continue;
       }
 

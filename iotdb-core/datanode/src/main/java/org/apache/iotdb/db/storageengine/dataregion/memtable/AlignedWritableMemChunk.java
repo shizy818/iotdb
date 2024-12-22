@@ -682,12 +682,6 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
     }
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
-      if (pointsInPage == MAX_NUMBER_OF_POINTS_IN_PAGE) {
-        writePageValuesIntoWriter(chunkWriter, times, pageColumnAccessInfo, timeValuePairIterator);
-        alignedChunkWriter.write(times, pointsInPage, 0);
-        pointsInPage = 0;
-      }
-
       // prepare column access info for current page
       int[][] accessInfo = timeValuePairIterator.getColumnAccessInfo();
       for (int i = 0; i < dataTypes.size(); i++) {
@@ -696,6 +690,16 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
       }
       timeValuePairIterator.step();
       pointsInPage++;
+
+      if (pointsInPage == MAX_NUMBER_OF_POINTS_IN_PAGE) {
+        writePageValuesIntoWriter(chunkWriter, times, pageColumnAccessInfo, timeValuePairIterator);
+        alignedChunkWriter.write(times, pointsInPage, 0);
+
+        for (PageColumnAccessInfo columnAccessInfo : pageColumnAccessInfo) {
+          columnAccessInfo.reset();
+        }
+        pointsInPage = 0;
+      }
     }
 
     if (pointsInPage > 0) {
