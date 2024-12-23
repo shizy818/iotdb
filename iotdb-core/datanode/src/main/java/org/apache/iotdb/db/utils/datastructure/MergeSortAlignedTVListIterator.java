@@ -60,6 +60,9 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     this.alignedTvListOffsets = new int[alignedTvLists.size()];
     this.tsDataTypes = tsDataTypes;
     this.columnAccessInfo = new int[tsDataTypes.size()][];
+    for(int i = 0; i < tsDataTypes.size(); i++) {
+      columnAccessInfo[i] = new int[2];
+    }
     this.nullValues = new boolean[tsDataTypes.size()];
     Arrays.fill(nullValues, true);
   }
@@ -72,7 +75,8 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
         if (i == 0 || iterator.currentTime() < time) {
           for (int columnIndex = 0; columnIndex < tsDataTypes.size(); columnIndex++) {
             int validPosition = iterator.getValidPosition(columnIndex);
-            columnAccessInfo[columnIndex] = new int[] {i, validPosition};
+            columnAccessInfo[columnIndex][0] = i;
+            columnAccessInfo[columnIndex][1] = validPosition;
             nullValues[columnIndex] = iterator.isNull(validPosition, columnIndex);
           }
           time = iterator.currentTime();
@@ -179,6 +183,14 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     }
     AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
     return iterator.getPrimitiveObject(accessInfo[1], columnIndex);
+  }
+
+  public Object getObject(int[] accessInfo, int columnIndex) {
+    if (columnIndex >= columnAccessInfo.length) {
+      return null;
+    }
+    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
+    return iterator.getObject(accessInfo[1], columnIndex);
   }
 
   public boolean[] getNullValues() {

@@ -40,6 +40,7 @@ import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
@@ -165,13 +166,14 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case BOOLEAN:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+//            TsPrimitiveType value =
+//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+              Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
             if (value != null) {
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], value.getBoolean());
-              chunkValueStatistics[columnIndex].update(time[index], value.getBoolean());
+              pageValueStatistics[columnIndex].update(time[index], (boolean) value);
+              chunkValueStatistics[columnIndex].update(time[index], (boolean) value);
             }
           }
           break;
@@ -179,13 +181,14 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case DATE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+//            TsPrimitiveType value =
+//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+              Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
             if (value != null) {
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], value.getInt());
-              chunkValueStatistics[columnIndex].update(time[index], value.getInt());
+              pageValueStatistics[columnIndex].update(time[index], (int) value);
+              chunkValueStatistics[columnIndex].update(time[index],(int) value);
             }
           }
           break;
@@ -193,39 +196,42 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case TIMESTAMP:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+//            TsPrimitiveType value =
+//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+            Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
             if (value != null) {
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], value.getLong());
-              chunkValueStatistics[columnIndex].update(time[index], value.getLong());
+              pageValueStatistics[columnIndex].update(time[index], (long) value);
+              chunkValueStatistics[columnIndex].update(time[index], (long) value);
             }
           }
           break;
         case FLOAT:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+//            TsPrimitiveType value =
+//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+            Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
             if (value != null) {
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], value.getFloat());
-              chunkValueStatistics[columnIndex].update(time[index], value.getFloat());
+              pageValueStatistics[columnIndex].update(time[index], (float)value);
+              chunkValueStatistics[columnIndex].update(time[index], (float) value);
             }
           }
           break;
         case DOUBLE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+//            TsPrimitiveType value =
+//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+            Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
             if (value != null) {
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], value.getDouble());
-              chunkValueStatistics[columnIndex].update(time[index], value.getDouble());
+              pageValueStatistics[columnIndex].update(time[index], (double) value);
+              chunkValueStatistics[columnIndex].update(time[index], (double) value);
             }
           }
           break;
@@ -234,13 +240,14 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case STRING:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+//            TsPrimitiveType value =
+//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
+            Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
             if (value != null) {
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], value.getBinary());
-              chunkValueStatistics[columnIndex].update(time[index], value.getBinary());
+              pageValueStatistics[columnIndex].update(time[index], (Binary) value);
+              chunkValueStatistics[columnIndex].update(time[index], (Binary) value);
             }
           }
           break;

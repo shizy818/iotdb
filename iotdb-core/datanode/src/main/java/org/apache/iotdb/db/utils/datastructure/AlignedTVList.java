@@ -1553,8 +1553,8 @@ public abstract class AlignedTVList extends TVList {
             || !allValueColDeletedMap.isMarked(getValueIndex(index))) {
           for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
             // update currTvPair if the column is not null
-            TsPrimitiveType primitiveValue = getPrimitiveObject(index, columnIndex);
-            if (primitiveValue != null) {
+//            TsPrimitiveType primitiveValue = getPrimitiveObject(index, columnIndex);
+            if (!isNull(getValueIndex(index), columnIndex)) {
               validPosition[columnIndex] = index;
             }
           }
@@ -1614,6 +1614,58 @@ public abstract class AlignedTVList extends TVList {
         return true;
       }
       return isNullValue(getValueIndex(rowIndex), validColumnIndex);
+    }
+
+    public Object getObject(int index, int columIndex) {
+      if (index < 0 || index >= rows) {
+        return null;
+      }
+      int rowIndex = getValueIndex(index);
+      int validColumnIndex =
+              (columnIndexList == null) ? columIndex : columnIndexList.get(columIndex);
+      if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
+        return null;
+      }
+      if (isNullValue(rowIndex, validColumnIndex)) {
+        return null;
+      }
+      switch (dataTypeList.get(columIndex)) {
+        case BOOLEAN:
+          return getBooleanByValueIndex(rowIndex, validColumnIndex);
+        case INT32:
+        case DATE:
+          return getIntByValueIndex(rowIndex, validColumnIndex);
+        case INT64:
+        case TIMESTAMP:
+          return getLongByValueIndex(rowIndex, validColumnIndex);
+        case FLOAT:
+          float valueF = getFloatByValueIndex(rowIndex, validColumnIndex);
+          if (floatPrecision != null
+                  && encodingList != null
+                  && !Float.isNaN(valueF)
+                  && (encodingList.get(columIndex) == TSEncoding.RLE
+                  || encodingList.get(columIndex) == TSEncoding.TS_2DIFF)) {
+            valueF = MathUtils.roundWithGivenPrecision(valueF, floatPrecision);
+          }
+          return valueF;
+        case DOUBLE:
+          double valueD = getDoubleByValueIndex(rowIndex, validColumnIndex);
+          if (floatPrecision != null
+                  && encodingList != null
+                  && !Double.isNaN(valueD)
+                  && (encodingList.get(columIndex) == TSEncoding.RLE
+                  || encodingList.get(columIndex) == TSEncoding.TS_2DIFF)) {
+            valueD = MathUtils.roundWithGivenPrecision(valueD, floatPrecision);
+          }
+          return valueD;
+        case TEXT:
+        case BLOB:
+        case STRING:
+          return getBinaryByValueIndex(rowIndex, validColumnIndex);
+        default:
+          throw new UnSupportedDataTypeException(
+                  String.format("Data type %s is not supported.", dataTypeList.get(columIndex)));
+      }
     }
 
     public TsPrimitiveType getPrimitiveObject(int index, int columIndex) {
