@@ -153,12 +153,35 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
     }
   }
 
+  private int getValueIndexFromMap(
+      int[][] rowIndexMap,
+      int iteratorIndex,
+      int index,
+      MergeSortAlignedTVListIterator timeValuePairIterator) {
+    if (iteratorIndex >= rowIndexMap.length || index >= rowIndexMap[iteratorIndex].length) {
+      return -1;
+    }
+    if (rowIndexMap[iteratorIndex][index] < 0) {
+      rowIndexMap[iteratorIndex][index] = timeValuePairIterator.getValueIndex(iteratorIndex, index);
+    }
+    return rowIndexMap[iteratorIndex][index];
+  }
+
   private void updateValueStatistics(
       long[] time,
       PageColumnAccessInfo[] columnAccessInfo,
       Statistics<? extends Serializable>[] chunkValueStatistics,
       Statistics<? extends Serializable>[] pageValueStatistics,
       MergeSortAlignedTVListIterator timeValuePairIterator) {
+
+    // prepare getValueIndex
+    int iteratorSize = timeValuePairIterator.AlignedTVListSize();
+    int[][] rowIndexMap = new int[iteratorSize][];
+    for (int i = 0; i < iteratorSize; i++) {
+      rowIndexMap[i] = new int[timeValuePairIterator.AlignedTVListRowCount(i)];
+      Arrays.fill(rowIndexMap[i], -1);
+    }
+
     // update value statistics
     for (int columnIndex = 0; columnIndex < dataTypes.size(); columnIndex++) {
       PageColumnAccessInfo pageAccessInfo = columnAccessInfo[columnIndex];
@@ -166,9 +189,13 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case BOOLEAN:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            int rowIndex =
+                getValueIndexFromMap(
+                    rowIndexMap, accessInfo[0], accessInfo[1], timeValuePairIterator);
+            boolean isNull = timeValuePairIterator.isNull(accessInfo[0], rowIndex, columnIndex);
             if (!isNull) {
-              boolean value = timeValuePairIterator.getBoolean(accessInfo, columnIndex);
+              boolean value =
+                  timeValuePairIterator.getBoolean(accessInfo[0], rowIndex, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
               pageValueStatistics[columnIndex].update(time[index], value);
@@ -180,9 +207,12 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case DATE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            int rowIndex =
+                getValueIndexFromMap(
+                    rowIndexMap, accessInfo[0], accessInfo[1], timeValuePairIterator);
+            boolean isNull = timeValuePairIterator.isNull(accessInfo[0], rowIndex, columnIndex);
             if (!isNull) {
-              int value = timeValuePairIterator.getInt(accessInfo, columnIndex);
+              int value = timeValuePairIterator.getInt(accessInfo[0], rowIndex, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
               pageValueStatistics[columnIndex].update(time[index], value);
@@ -194,9 +224,12 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case TIMESTAMP:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            int rowIndex =
+                getValueIndexFromMap(
+                    rowIndexMap, accessInfo[0], accessInfo[1], timeValuePairIterator);
+            boolean isNull = timeValuePairIterator.isNull(accessInfo[0], rowIndex, columnIndex);
             if (!isNull) {
-              long value = timeValuePairIterator.getLong(accessInfo, columnIndex);
+              long value = timeValuePairIterator.getLong(accessInfo[0], rowIndex, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
               pageValueStatistics[columnIndex].update(time[index], value);
@@ -207,9 +240,12 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case FLOAT:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            int rowIndex =
+                getValueIndexFromMap(
+                    rowIndexMap, accessInfo[0], accessInfo[1], timeValuePairIterator);
+            boolean isNull = timeValuePairIterator.isNull(accessInfo[0], rowIndex, columnIndex);
             if (!isNull) {
-              float value = timeValuePairIterator.getFloat(accessInfo, columnIndex);
+              float value = timeValuePairIterator.getFloat(accessInfo[0], rowIndex, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
               pageValueStatistics[columnIndex].update(time[index], value);
@@ -220,9 +256,12 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case DOUBLE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            int rowIndex =
+                getValueIndexFromMap(
+                    rowIndexMap, accessInfo[0], accessInfo[1], timeValuePairIterator);
+            boolean isNull = timeValuePairIterator.isNull(accessInfo[0], rowIndex, columnIndex);
             if (!isNull) {
-              double value = timeValuePairIterator.getDouble(accessInfo, columnIndex);
+              double value = timeValuePairIterator.getDouble(accessInfo[0], rowIndex, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
               pageValueStatistics[columnIndex].update(time[index], value);
@@ -235,9 +274,12 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case STRING:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            int rowIndex =
+                getValueIndexFromMap(
+                    rowIndexMap, accessInfo[0], accessInfo[1], timeValuePairIterator);
+            boolean isNull = timeValuePairIterator.isNull(accessInfo[0], rowIndex, columnIndex);
             if (!isNull) {
-              Binary value = timeValuePairIterator.getBinary(accessInfo, columnIndex);
+              Binary value = timeValuePairIterator.getBinary(accessInfo[0], rowIndex, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
               pageValueStatistics[columnIndex].update(time[index], value);

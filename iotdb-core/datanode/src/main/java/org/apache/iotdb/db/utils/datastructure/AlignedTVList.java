@@ -83,6 +83,8 @@ public abstract class AlignedTVList extends TVList {
   // constructed after deletion
   BitMap timeColDeletedMap;
 
+  private final AlignedTVList outer = this;
+
   AlignedTVList(List<TSDataType> types) {
     super();
     indices = new ArrayList<>(types.size());
@@ -1607,37 +1609,41 @@ public abstract class AlignedTVList extends TVList {
       return new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
     }
 
+    public int getValueIndex(int index) {
+      return outer.getValueIndex(index);
+    }
+
     public boolean isNull(int rowIndex, int columnIndex) {
       int validColumnIndex =
           (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
       if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
         return true;
       }
-      return isNullValue(getValueIndex(rowIndex), validColumnIndex);
+      return isNullValue(rowIndex, validColumnIndex);
     }
 
     public boolean getBoolean(int rowIndex, int columnIndex) {
       int validColumnIndex =
           (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
-      return getBooleanByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+      return getBooleanByValueIndex(rowIndex, validColumnIndex);
     }
 
     public int getInt(int rowIndex, int columnIndex) {
       int validColumnIndex =
           (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
-      return getIntByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+      return getIntByValueIndex(rowIndex, validColumnIndex);
     }
 
     public long getLong(int rowIndex, int columnIndex) {
       int validColumnIndex =
           (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
-      return getLongByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+      return getLongByValueIndex(rowIndex, validColumnIndex);
     }
 
     public float getFloat(int rowIndex, int columnIndex) {
       int validColumnIndex =
           (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
-      float valueF = getFloatByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+      float valueF = getFloatByValueIndex(rowIndex, validColumnIndex);
       if (floatPrecision != null
           && encodingList != null
           && !Float.isNaN(valueF)
@@ -1651,7 +1657,7 @@ public abstract class AlignedTVList extends TVList {
     public double getDouble(int rowIndex, int columnIndex) {
       int validColumnIndex =
           (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
-      double valueD = getDoubleByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+      double valueD = getDoubleByValueIndex(rowIndex, validColumnIndex);
       if (floatPrecision != null
           && encodingList != null
           && !Double.isNaN(valueD)
@@ -1665,7 +1671,7 @@ public abstract class AlignedTVList extends TVList {
     public Binary getBinary(int rowIndex, int columnIndex) {
       int validColumnIndex =
           (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
-      return getBinaryByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+      return getBinaryByValueIndex(rowIndex, validColumnIndex);
     }
 
     public TsPrimitiveType getPrimitiveObject(int index, int columnIndex) {
