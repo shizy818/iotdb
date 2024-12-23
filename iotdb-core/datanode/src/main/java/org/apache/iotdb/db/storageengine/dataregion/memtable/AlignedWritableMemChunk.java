@@ -57,6 +57,7 @@ import java.util.Set;
 public class AlignedWritableMemChunk implements IWritableMemChunk {
 
   private final Map<String, Integer> measurementIndexMap;
+  private final List<TSDataType> dataTypes;
   private final List<IMeasurementSchema> schemaList;
   private AlignedTVList list;
   private List<AlignedTVList> sortedList;
@@ -69,13 +70,13 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
 
   public AlignedWritableMemChunk(List<IMeasurementSchema> schemaList, boolean isTableModel) {
     this.measurementIndexMap = new LinkedHashMap<>();
-    List<TSDataType> dataTypeList = new ArrayList<>();
+    this.dataTypes = new ArrayList<>();
     this.schemaList = schemaList;
     for (int i = 0; i < schemaList.size(); i++) {
       measurementIndexMap.put(schemaList.get(i).getMeasurementName(), i);
-      dataTypeList.add(schemaList.get(i).getType());
+      dataTypes.add(schemaList.get(i).getType());
     }
-    this.list = AlignedTVList.newAlignedList(dataTypeList);
+    this.list = AlignedTVList.newAlignedList(dataTypes);
     this.sortedList = new ArrayList<>();
     this.ignoreAllNullRows = !isTableModel;
   }
@@ -88,6 +89,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
       measurementIndexMap.put(schemaList.get(i).getMeasurementName(), i);
     }
     this.list = list;
+    this.dataTypes = list.getTsDataTypes();
     this.sortedList = new ArrayList<>();
     this.ignoreAllNullRows = !isTableModel;
   }
@@ -216,11 +218,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
     } finally {
       list.unlockQueryList();
     }
-    List<TSDataType> dataTypeList = new ArrayList<>();
-    for (IMeasurementSchema schema : schemaList) {
-      dataTypeList.add(schema.getType());
-    }
-    this.list = AlignedTVList.newAlignedList(dataTypeList);
+    this.list = AlignedTVList.newAlignedList(dataTypes);
   }
 
   @Override
@@ -602,7 +600,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
     alignedTvLists.add(list);
     MergeSortAlignedTVListIterator timeValuePairIterator =
         new MergeSortAlignedTVListIterator(
-            alignedTvLists, null, null, null, null, null, ignoreAllNullRows);
+            alignedTvLists, dataTypes, null, null, null, ignoreAllNullRows);
 
     int pointsInPage = 0;
     long[] times = new long[MAX_NUMBER_OF_POINTS_IN_PAGE];
@@ -642,7 +640,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
         }
       }
       pointsInPage++;
-      if (pointsInPage % MAX_NUMBER_OF_POINTS_IN_PAGE == 0) {
+      if (pointsInPage == MAX_NUMBER_OF_POINTS_IN_PAGE) {
         alignedChunkWriter.write(times, pointsInPage, 0);
         pointsInPage = 0;
       }

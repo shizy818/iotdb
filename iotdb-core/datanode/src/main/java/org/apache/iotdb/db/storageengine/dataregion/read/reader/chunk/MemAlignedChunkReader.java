@@ -28,12 +28,14 @@ import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
 import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.BatchData;
+import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.filter.basic.Filter;
 import org.apache.tsfile.read.reader.IChunkReader;
 import org.apache.tsfile.read.reader.IPageReader;
 import org.apache.tsfile.utils.TsPrimitiveType;
+import org.apache.tsfile.write.UnSupportedDataTypeException;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -42,6 +44,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import static org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMemChunk.MAX_NUMBER_OF_POINTS_IN_PAGE;
+import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 
 /** To read aligned chunk data in memory. */
 public class MemAlignedChunkReader implements IChunkReader {
@@ -57,11 +60,10 @@ public class MemAlignedChunkReader implements IChunkReader {
     timeValuePairIterator =
         new MergeSortAlignedTVListIterator(
             alignedTVLists,
+            readableChunk.getDataTypes(),
             readableChunk.getColumnIndexList(),
             readableChunk.getFloatPrecision(),
             readableChunk.getEncodingList(),
-            readableChunk.getTimeColumnDeletion(),
-            readableChunk.getValueColumnsDeletionList(),
             readableChunk.getContext().isIgnoreAllNullRows());
     timeValuePairIterator.setRowsForWorkingTVListIterator(readableChunk.workingTVListRows());
     this.globalTimeFilter = globalTimeFilter;
@@ -152,16 +154,60 @@ public class MemAlignedChunkReader implements IChunkReader {
       return true;
     }
 
+    private boolean isAllColumnsNull(TsPrimitiveType[] values) {
+      for (TsPrimitiveType v : values) {
+        if (v != null) {
+          return false;
+        }
+      }
+      return true;
+    }
+
     // read one page and write to tsblock
     private synchronized void writeValidValuesIntoTsBlock(TsBlockBuilder builder) {
       List<TSDataType> tsDataTypes = readableChunk.getDataTypes();
+      boolean ignoreAllNullRows = readableChunk.getContext().isIgnoreAllNullRows();
+      List<TimeRange> timeColumnDeletion = readableChunk.getTimeColumnDeletion();
+      List<List<TimeRange>> valueColumnsDeletionList = readableChunk.getValueColumnsDeletionList();
+
+      int[] timeDeleteCursor = new int[] {0};
+      List<int[]> valueColumnDeleteCursor = new ArrayList<>();
+      if (valueColumnsDeletionList != null) {
+        valueColumnsDeletionList.forEach(x -> valueColumnDeleteCursor.add(new int[] {0}));
+      }
+
       while (timeValuePairIterator.hasNextTimeValuePair()) {
         if (isOutOfMemPageBounds()) {
           break;
         }
-        TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-        builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
 
+        TimeValuePair tvPair = timeValuePairIterator.currentTimeValuePair();
+        TsPrimitiveType[] primitiveValues = tvPair.getValue().getVector();
+
+        long timestamp = tvPair.getTimestamp();
+        if (timeColumnDeletion != null
+            && isPointDeleted(timestamp, timeColumnDeletion, timeDeleteCursor)) {
+          timeValuePairIterator.step();
+          continue;
+        }
+
+        if (valueColumnsDeletionList != null) {
+          for (int columnIndex = 0; columnIndex < tsDataTypes.size(); columnIndex++) {
+            if (isPointDeleted(
+                timestamp,
+                valueColumnsDeletionList.get(columnIndex),
+                valueColumnDeleteCursor.get(columnIndex))) {
+              primitiveValues[columnIndex] = null;
+            }
+          }
+        }
+        if (ignoreAllNullRows && isAllColumnsNull(primitiveValues)) {
+          timeValuePairIterator.step();
+          continue;
+        }
+
+        // timestamp
+        builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
         // value columns
         TsPrimitiveType[] values = tvPair.getValue().getVector();
         for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
@@ -194,10 +240,12 @@ public class MemAlignedChunkReader implements IChunkReader {
               valueBuilder.writeBinary(values[columnIndex].getBinary());
               break;
             default:
-              break;
+              throw new UnSupportedDataTypeException(
+                  String.format("Data type %s is not supported.", tsDataTypes.get(columnIndex)));
           }
         }
         builder.declarePosition();
+        timeValuePairIterator.step();
       }
       if (builder.getPositionCount() > MAX_NUMBER_OF_POINTS_IN_PAGE) {
         throw new RuntimeException(
