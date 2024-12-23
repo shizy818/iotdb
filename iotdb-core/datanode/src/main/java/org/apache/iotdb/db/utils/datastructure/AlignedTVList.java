@@ -1553,7 +1553,7 @@ public abstract class AlignedTVList extends TVList {
             || !allValueColDeletedMap.isMarked(getValueIndex(index))) {
           for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
             // update currTvPair if the column is not null
-//            TsPrimitiveType primitiveValue = getPrimitiveObject(index, columnIndex);
+            //            TsPrimitiveType primitiveValue = getPrimitiveObject(index, columnIndex);
             if (!isNull(getValueIndex(index), columnIndex)) {
               validPosition[columnIndex] = index;
             }
@@ -1607,81 +1607,81 @@ public abstract class AlignedTVList extends TVList {
       return new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
     }
 
-    public boolean isNull(int rowIndex, int columIndex) {
+    public boolean isNull(int rowIndex, int columnIndex) {
       int validColumnIndex =
-          (columnIndexList == null) ? columIndex : columnIndexList.get(columIndex);
+          (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
       if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
         return true;
       }
       return isNullValue(getValueIndex(rowIndex), validColumnIndex);
     }
 
-    public Object getObject(int index, int columIndex) {
-      if (index < 0 || index >= rows) {
-        return null;
-      }
-      int rowIndex = getValueIndex(index);
+    public boolean getBoolean(int rowIndex, int columnIndex) {
       int validColumnIndex =
-              (columnIndexList == null) ? columIndex : columnIndexList.get(columIndex);
-      if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
-        return null;
-      }
-      if (isNullValue(rowIndex, validColumnIndex)) {
-        return null;
-      }
-      switch (dataTypeList.get(columIndex)) {
-        case BOOLEAN:
-          return getBooleanByValueIndex(rowIndex, validColumnIndex);
-        case INT32:
-        case DATE:
-          return getIntByValueIndex(rowIndex, validColumnIndex);
-        case INT64:
-        case TIMESTAMP:
-          return getLongByValueIndex(rowIndex, validColumnIndex);
-        case FLOAT:
-          float valueF = getFloatByValueIndex(rowIndex, validColumnIndex);
-          if (floatPrecision != null
-                  && encodingList != null
-                  && !Float.isNaN(valueF)
-                  && (encodingList.get(columIndex) == TSEncoding.RLE
-                  || encodingList.get(columIndex) == TSEncoding.TS_2DIFF)) {
-            valueF = MathUtils.roundWithGivenPrecision(valueF, floatPrecision);
-          }
-          return valueF;
-        case DOUBLE:
-          double valueD = getDoubleByValueIndex(rowIndex, validColumnIndex);
-          if (floatPrecision != null
-                  && encodingList != null
-                  && !Double.isNaN(valueD)
-                  && (encodingList.get(columIndex) == TSEncoding.RLE
-                  || encodingList.get(columIndex) == TSEncoding.TS_2DIFF)) {
-            valueD = MathUtils.roundWithGivenPrecision(valueD, floatPrecision);
-          }
-          return valueD;
-        case TEXT:
-        case BLOB:
-        case STRING:
-          return getBinaryByValueIndex(rowIndex, validColumnIndex);
-        default:
-          throw new UnSupportedDataTypeException(
-                  String.format("Data type %s is not supported.", dataTypeList.get(columIndex)));
-      }
+          (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
+      return getBooleanByValueIndex(getValueIndex(rowIndex), validColumnIndex);
     }
 
-    public TsPrimitiveType getPrimitiveObject(int index, int columIndex) {
+    public int getInt(int rowIndex, int columnIndex) {
+      int validColumnIndex =
+          (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
+      return getIntByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+    }
+
+    public long getLong(int rowIndex, int columnIndex) {
+      int validColumnIndex =
+          (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
+      return getLongByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+    }
+
+    public float getFloat(int rowIndex, int columnIndex) {
+      int validColumnIndex =
+          (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
+      float valueF = getFloatByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+      if (floatPrecision != null
+          && encodingList != null
+          && !Float.isNaN(valueF)
+          && (encodingList.get(columnIndex) == TSEncoding.RLE
+              || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
+        valueF = MathUtils.roundWithGivenPrecision(valueF, floatPrecision);
+      }
+      return valueF;
+    }
+
+    public double getDouble(int rowIndex, int columnIndex) {
+      int validColumnIndex =
+          (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
+      double valueD = getDoubleByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+      if (floatPrecision != null
+          && encodingList != null
+          && !Double.isNaN(valueD)
+          && (encodingList.get(columnIndex) == TSEncoding.RLE
+              || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
+        valueD = MathUtils.roundWithGivenPrecision(valueD, floatPrecision);
+      }
+      return valueD;
+    }
+
+    public Binary getBinary(int rowIndex, int columnIndex) {
+      int validColumnIndex =
+          (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
+      return getBinaryByValueIndex(getValueIndex(rowIndex), validColumnIndex);
+    }
+
+    public TsPrimitiveType getPrimitiveObject(int index, int columnIndex) {
       if (index < 0 || index >= rows) {
         return null;
       }
       int rowIndex = getValueIndex(index);
       int validColumnIndex =
-          (columnIndexList == null) ? columIndex : columnIndexList.get(columIndex);
+          (columnIndexList == null) ? columnIndex : columnIndexList.get(columnIndex);
       if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
         return null;
       }
       if (isNullValue(rowIndex, validColumnIndex)) {
         return null;
       }
-      switch (dataTypeList.get(columIndex)) {
+      switch (dataTypeList.get(columnIndex)) {
         case BOOLEAN:
           return TsPrimitiveType.getByType(
               TSDataType.BOOLEAN, getBooleanByValueIndex(rowIndex, validColumnIndex));
@@ -1698,8 +1698,8 @@ public abstract class AlignedTVList extends TVList {
           if (floatPrecision != null
               && encodingList != null
               && !Float.isNaN(valueF)
-              && (encodingList.get(columIndex) == TSEncoding.RLE
-                  || encodingList.get(columIndex) == TSEncoding.TS_2DIFF)) {
+              && (encodingList.get(columnIndex) == TSEncoding.RLE
+                  || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
             valueF = MathUtils.roundWithGivenPrecision(valueF, floatPrecision);
           }
           return TsPrimitiveType.getByType(TSDataType.FLOAT, valueF);
@@ -1708,8 +1708,8 @@ public abstract class AlignedTVList extends TVList {
           if (floatPrecision != null
               && encodingList != null
               && !Double.isNaN(valueD)
-              && (encodingList.get(columIndex) == TSEncoding.RLE
-                  || encodingList.get(columIndex) == TSEncoding.TS_2DIFF)) {
+              && (encodingList.get(columnIndex) == TSEncoding.RLE
+                  || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
             valueD = MathUtils.roundWithGivenPrecision(valueD, floatPrecision);
           }
           return TsPrimitiveType.getByType(TSDataType.DOUBLE, valueD);
@@ -1720,7 +1720,7 @@ public abstract class AlignedTVList extends TVList {
               TSDataType.TEXT, getBinaryByValueIndex(rowIndex, validColumnIndex));
         default:
           throw new UnSupportedDataTypeException(
-              String.format("Data type %s is not supported.", dataTypeList.get(columIndex)));
+              String.format("Data type %s is not supported.", dataTypeList.get(columnIndex)));
       }
     }
 

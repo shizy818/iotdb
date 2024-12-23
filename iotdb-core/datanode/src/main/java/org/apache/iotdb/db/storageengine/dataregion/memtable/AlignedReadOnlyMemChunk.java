@@ -166,14 +166,13 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case BOOLEAN:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-//            TsPrimitiveType value =
-//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-              Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
-            if (value != null) {
+            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            if (!isNull) {
+              boolean value = timeValuePairIterator.getBoolean(accessInfo, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], (boolean) value);
-              chunkValueStatistics[columnIndex].update(time[index], (boolean) value);
+              pageValueStatistics[columnIndex].update(time[index], value);
+              chunkValueStatistics[columnIndex].update(time[index], value);
             }
           }
           break;
@@ -181,14 +180,13 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case DATE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-//            TsPrimitiveType value =
-//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-              Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
-            if (value != null) {
+            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            if (!isNull) {
+              int value = timeValuePairIterator.getInt(accessInfo, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], (int) value);
-              chunkValueStatistics[columnIndex].update(time[index],(int) value);
+              pageValueStatistics[columnIndex].update(time[index], value);
+              chunkValueStatistics[columnIndex].update(time[index], value);
             }
           }
           break;
@@ -196,42 +194,39 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case TIMESTAMP:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-//            TsPrimitiveType value =
-//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
-            if (value != null) {
+            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            if (!isNull) {
+              long value = timeValuePairIterator.getLong(accessInfo, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], (long) value);
-              chunkValueStatistics[columnIndex].update(time[index], (long) value);
+              pageValueStatistics[columnIndex].update(time[index], value);
+              chunkValueStatistics[columnIndex].update(time[index], value);
             }
           }
           break;
         case FLOAT:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-//            TsPrimitiveType value =
-//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
-            if (value != null) {
+            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            if (!isNull) {
+              float value = timeValuePairIterator.getFloat(accessInfo, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], (float)value);
-              chunkValueStatistics[columnIndex].update(time[index], (float) value);
+              pageValueStatistics[columnIndex].update(time[index], value);
+              chunkValueStatistics[columnIndex].update(time[index], value);
             }
           }
           break;
         case DOUBLE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-//            TsPrimitiveType value =
-//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
-            if (value != null) {
+            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            if (!isNull) {
+              double value = timeValuePairIterator.getDouble(accessInfo, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], (double) value);
-              chunkValueStatistics[columnIndex].update(time[index], (double) value);
+              pageValueStatistics[columnIndex].update(time[index], value);
+              chunkValueStatistics[columnIndex].update(time[index], value);
             }
           }
           break;
@@ -240,14 +235,13 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case STRING:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
             int[] accessInfo = pageAccessInfo.get(index);
-//            TsPrimitiveType value =
-//                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            Object value = timeValuePairIterator.getObject(accessInfo, columnIndex);
-            if (value != null) {
+            boolean isNull = timeValuePairIterator.isNull(accessInfo, columnIndex);
+            if (!isNull) {
+              Binary value = timeValuePairIterator.getBinary(accessInfo, columnIndex);
               checkValueStatistics(
                   pageValueStatistics, chunkValueStatistics, dataTypes, columnIndex);
-              pageValueStatistics[columnIndex].update(time[index], (Binary) value);
-              chunkValueStatistics[columnIndex].update(time[index], (Binary) value);
+              pageValueStatistics[columnIndex].update(time[index], value);
+              chunkValueStatistics[columnIndex].update(time[index], value);
             }
           }
           break;

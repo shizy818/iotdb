@@ -23,6 +23,7 @@ import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.TsPrimitiveType;
 
 import java.io.IOException;
@@ -60,7 +61,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     this.alignedTvListOffsets = new int[alignedTvLists.size()];
     this.tsDataTypes = tsDataTypes;
     this.columnAccessInfo = new int[tsDataTypes.size()][];
-    for(int i = 0; i < tsDataTypes.size(); i++) {
+    for (int i = 0; i < tsDataTypes.size(); i++) {
       columnAccessInfo[i] = new int[2];
     }
     this.nullValues = new boolean[tsDataTypes.size()];
@@ -185,12 +186,60 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     return iterator.getPrimitiveObject(accessInfo[1], columnIndex);
   }
 
-  public Object getObject(int[] accessInfo, int columnIndex) {
+  public boolean isNull(int[] accessInfo, int columnIndex) {
     if (columnIndex >= columnAccessInfo.length) {
-      return null;
+      throw new ArrayIndexOutOfBoundsException("");
     }
     AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
-    return iterator.getObject(accessInfo[1], columnIndex);
+    return iterator.isNull(accessInfo[1], columnIndex);
+  }
+
+  public boolean getBoolean(int[] accessInfo, int columnIndex) {
+    if (columnIndex >= columnAccessInfo.length) {
+      throw new ArrayIndexOutOfBoundsException("");
+    }
+    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
+    return iterator.getBoolean(accessInfo[1], columnIndex);
+  }
+
+  public int getInt(int[] accessInfo, int columnIndex) {
+    if (columnIndex >= columnAccessInfo.length) {
+      throw new ArrayIndexOutOfBoundsException("");
+    }
+    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
+    return iterator.getInt(accessInfo[1], columnIndex);
+  }
+
+  public long getLong(int[] accessInfo, int columnIndex) {
+    if (columnIndex >= columnAccessInfo.length) {
+      throw new ArrayIndexOutOfBoundsException("");
+    }
+    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
+    return iterator.getLong(accessInfo[1], columnIndex);
+  }
+
+  public float getFloat(int[] accessInfo, int columnIndex) {
+    if (columnIndex >= columnAccessInfo.length) {
+      throw new ArrayIndexOutOfBoundsException("");
+    }
+    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
+    return iterator.getFloat(accessInfo[1], columnIndex);
+  }
+
+  public double getDouble(int[] accessInfo, int columnIndex) {
+    if (columnIndex >= columnAccessInfo.length) {
+      throw new ArrayIndexOutOfBoundsException("");
+    }
+    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
+    return iterator.getDouble(accessInfo[1], columnIndex);
+  }
+
+  public Binary getBinary(int[] accessInfo, int columnIndex) {
+    if (columnIndex >= columnAccessInfo.length) {
+      throw new ArrayIndexOutOfBoundsException("");
+    }
+    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
+    return iterator.getBinary(accessInfo[1], columnIndex);
   }
 
   public boolean[] getNullValues() {
