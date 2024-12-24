@@ -34,6 +34,7 @@ import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.filter.basic.Filter;
 import org.apache.tsfile.read.reader.IChunkReader;
 import org.apache.tsfile.read.reader.IPageReader;
+import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.TsPrimitiveType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,15 +155,6 @@ public class MemAlignedChunkReader implements IChunkReader {
       int[] currTvListOffsets = timeValuePairIterator.getAlignedTVListOffsets();
       for (int i = 0; i < pageEndOffsets.length; i++) {
         if (currTvListOffsets[i] < pageEndOffsets[i]) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    private boolean isAllColumnNull(boolean[] nullValues) {
-      for (boolean b : nullValues) {
-        if (!b) {
           return false;
         }
       }
@@ -298,18 +290,18 @@ public class MemAlignedChunkReader implements IChunkReader {
           continue;
         }
 
-        boolean[] nullValues = timeValuePairIterator.getNullValues();
+        BitMap bitMap = timeValuePairIterator.getBitmap();
         if (valueColumnsDeletionList != null) {
           for (int columnIndex = 0; columnIndex < tsDataTypes.size(); columnIndex++) {
             if (isPointDeleted(
                 timestamp,
                 valueColumnsDeletionList.get(columnIndex),
                 valueColumnDeleteCursor.get(columnIndex))) {
-              nullValues[columnIndex] = true;
+              bitMap.mark(columnIndex);
             }
           }
         }
-        if (ignoreAllNullRows && isAllColumnNull(nullValues)) {
+        if (ignoreAllNullRows && bitMap.isAllMarked()) {
           timeValuePairIterator.step();
           continue;
         }

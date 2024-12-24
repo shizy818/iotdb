@@ -40,6 +40,7 @@ import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPointReader;
+import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
@@ -251,15 +252,6 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
     }
   }
 
-  private boolean isAllColumnNull(boolean[] nullValues) {
-    for (boolean b : nullValues) {
-      if (!b) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   @Override
   public void initChunkMetaFromTvLists() {
     // init chunk meta
@@ -308,18 +300,18 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         continue;
       }
 
-      boolean[] nullValues = timeValuePairIterator.getNullValues();
+      BitMap bitMap = timeValuePairIterator.getBitmap();
       if (valueColumnsDeletionList != null) {
         for (int columnIndex = 0; columnIndex < dataTypes.size(); columnIndex++) {
           if (isPointDeleted(
               timestamp,
               valueColumnsDeletionList.get(columnIndex),
               valueColumnDeleteCursor.get(columnIndex))) {
-            nullValues[columnIndex] = true;
+            bitMap.mark(columnIndex);
           }
         }
       }
-      if (context.isIgnoreAllNullRows() && isAllColumnNull(nullValues)) {
+      if (context.isIgnoreAllNullRows() && bitMap.isAllMarked()) {
         timeValuePairIterator.step();
         continue;
       }
@@ -363,7 +355,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
             timeValuePairIterator);
 
         // reset
-        Arrays.fill(time, Long.MIN_VALUE);
+        //        Arrays.fill(time, Long.MIN_VALUE);
         for (PageColumnAccessInfo columnAccessInfo : pageColumnAccessInfo) {
           columnAccessInfo.reset();
         }

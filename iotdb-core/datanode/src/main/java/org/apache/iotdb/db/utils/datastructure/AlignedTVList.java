@@ -1435,7 +1435,11 @@ public abstract class AlignedTVList extends TVList {
    * @param rowIndex should be the sorted index.
    */
   public boolean isTimeDeleted(int rowIndex) {
-    int bitmapIndex = getValueIndex(rowIndex);
+    return isTimeDeleted(rowIndex, true);
+  }
+
+  public boolean isTimeDeleted(int index, boolean needConvertIndex) {
+    int bitmapIndex = needConvertIndex ? getValueIndex(index) : index;
     if (timeColDeletedMap == null || timeColDeletedMap.getSize() <= bitmapIndex) {
       return false;
     }
@@ -1507,7 +1511,7 @@ public abstract class AlignedTVList extends TVList {
     private final List<TSEncoding> encodingList;
 
     List<Integer> columnIndexList;
-    private final int[] validPosition;
+    private final int[] validRowIndex;
 
     public AlignedTVListIterator(
         List<TSDataType> dataTypeList,
@@ -1521,16 +1525,17 @@ public abstract class AlignedTVList extends TVList {
       this.allValueColDeletedMap = ignoreAllNullRows ? getAllValueColDeletedMap() : null;
       this.floatPrecision = floatPrecision;
       this.encodingList = encodingList;
-      this.validPosition = new int[dataTypeList.size()];
+      this.validRowIndex = new int[dataTypeList.size()];
     }
 
     private void prepareNext() {
       // find the first row that is neither deleted nor empty (all NULL values)
       boolean findValidRow = false;
       while (index < rows && !findValidRow) {
+        int rowIndex = getValueIndex(index);
         // all columns values are deleted
-        if (allValueColDeletedMap != null && allValueColDeletedMap.isMarked(getValueIndex(index))
-            || isTimeDeleted(index)) {
+        if ((allValueColDeletedMap != null && allValueColDeletedMap.isMarked(rowIndex))
+            || isTimeDeleted(rowIndex, false)) {
           index++;
           currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
           continue;
@@ -1541,7 +1546,7 @@ public abstract class AlignedTVList extends TVList {
           probeNext = true;
           return;
         }
-        Arrays.fill(validPosition, index);
+        Arrays.fill(validRowIndex, rowIndex);
         findValidRow = true;
       }
 
@@ -1549,13 +1554,12 @@ public abstract class AlignedTVList extends TVList {
       while (index + 1 < rows && getTime(index + 1) == currentTime) {
         index++;
         // skip all-Null rows if allValueColDeletedMap exits
-        if (allValueColDeletedMap == null
-            || !allValueColDeletedMap.isMarked(getValueIndex(index))) {
+        int rowIndex = getValueIndex(index);
+        if (allValueColDeletedMap == null || !allValueColDeletedMap.isMarked(rowIndex)) {
           for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
             // update currTvPair if the column is not null
-            TsPrimitiveType primitiveValue = getPrimitiveObject(index, columnIndex);
-            if (primitiveValue != null) {
-              validPosition[columnIndex] = index;
+            if (!isNull(rowIndex, columnIndex)) {
+              validRowIndex[columnIndex] = rowIndex;
             }
           }
         }
@@ -1585,7 +1589,7 @@ public abstract class AlignedTVList extends TVList {
       TsPrimitiveType[] vector = new TsPrimitiveType[dataTypeList.size()];
       for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
         // update currTvPair if the column is not null
-        vector[columnIndex] = getPrimitiveObject(validPosition[columnIndex], columnIndex);
+        vector[columnIndex] = getPrimitiveObject(validRowIndex[columnIndex], columnIndex);
       }
       TimeValuePair tvPair =
           new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
@@ -1602,7 +1606,7 @@ public abstract class AlignedTVList extends TVList {
       TsPrimitiveType[] vector = new TsPrimitiveType[dataTypeList.size()];
       for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
         // update currTvPair if the column is not null
-        vector[columnIndex] = getPrimitiveObject(validPosition[columnIndex], columnIndex);
+        vector[columnIndex] = getPrimitiveObject(validRowIndex[columnIndex], columnIndex);
       }
       return new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
     }
@@ -1613,14 +1617,13 @@ public abstract class AlignedTVList extends TVList {
       if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
         return true;
       }
-      return isNullValue(getValueIndex(rowIndex), validColumnIndex);
+      return isNullValue(rowIndex, validColumnIndex);
     }
 
-    public TsPrimitiveType getPrimitiveObject(int index, int columIndex) {
-      if (index < 0 || index >= rows) {
+    public TsPrimitiveType getPrimitiveObject(int rowIndex, int columIndex) {
+      if (rowIndex < 0 || rowIndex >= rows) {
         return null;
       }
-      int rowIndex = getValueIndex(index);
       int validColumnIndex =
           (columnIndexList == null) ? columIndex : columnIndexList.get(columIndex);
       if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
@@ -1672,8 +1675,8 @@ public abstract class AlignedTVList extends TVList {
       }
     }
 
-    public int getValidPosition(int columnIndex) {
-      return validPosition[columnIndex];
+    public int getValidRowIndex(int columnIndex) {
+      return validRowIndex[columnIndex];
     }
   }
 }
