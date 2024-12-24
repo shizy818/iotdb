@@ -47,7 +47,6 @@ import org.apache.tsfile.write.UnSupportedDataTypeException;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -1546,7 +1545,14 @@ public abstract class AlignedTVList extends TVList {
           probeNext = true;
           return;
         }
-        Arrays.fill(validRowIndex, rowIndex);
+
+        for (int columnIndex = 0; columnIndex < validRowIndex.length; columnIndex++) {
+          if (!isNull(rowIndex, columnIndex)) {
+            validRowIndex[columnIndex] = rowIndex;
+          } else {
+            validRowIndex[columnIndex] = -1;
+          }
+        }
         findValidRow = true;
       }
 
@@ -1627,9 +1633,6 @@ public abstract class AlignedTVList extends TVList {
       int validColumnIndex =
           (columnIndexList == null) ? columIndex : columnIndexList.get(columIndex);
       if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
-        return null;
-      }
-      if (isNullValue(rowIndex, validColumnIndex)) {
         return null;
       }
       switch (dataTypeList.get(columIndex)) {
