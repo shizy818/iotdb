@@ -81,7 +81,7 @@ public abstract class FloatTVList extends TVList {
   }
 
   @Override
-  public void putFloat(long timestamp, float value) {
+  public synchronized void putFloat(long timestamp, float value) {
     checkExpansion();
     int arrayIndex = rowCount / ARRAY_SIZE;
     int elementIndex = rowCount % ARRAY_SIZE;

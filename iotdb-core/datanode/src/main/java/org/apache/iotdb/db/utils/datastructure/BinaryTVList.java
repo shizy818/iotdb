@@ -87,7 +87,7 @@ public abstract class BinaryTVList extends TVList {
   }
 
   @Override
-  public void putBinary(long timestamp, Binary value) {
+  public synchronized void putBinary(long timestamp, Binary value) {
     checkExpansion();
     int arrayIndex = rowCount / ARRAY_SIZE;
     int elementIndex = rowCount % ARRAY_SIZE;

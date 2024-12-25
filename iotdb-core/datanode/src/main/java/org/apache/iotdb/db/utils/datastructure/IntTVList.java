@@ -80,7 +80,7 @@ public abstract class IntTVList extends TVList {
   }
 
   @Override
-  public void putInt(long timestamp, int value) {
+  public synchronized void putInt(long timestamp, int value) {
     checkExpansion();
     int arrayIndex = rowCount / ARRAY_SIZE;
     int elementIndex = rowCount % ARRAY_SIZE;

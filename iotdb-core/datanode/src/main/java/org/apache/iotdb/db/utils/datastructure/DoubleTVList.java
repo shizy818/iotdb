@@ -81,7 +81,7 @@ public abstract class DoubleTVList extends TVList {
   }
 
   @Override
-  public void putDouble(long timestamp, double value) {
+  public synchronized void putDouble(long timestamp, double value) {
     checkExpansion();
     int arrayIndex = rowCount / ARRAY_SIZE;
     int elementIndex = rowCount % ARRAY_SIZE;
