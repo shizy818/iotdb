@@ -27,18 +27,16 @@ import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferVie
 import org.apache.iotdb.db.storageengine.dataregion.wal.utils.WALWriteUtils;
 import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
 import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
-import org.apache.iotdb.db.utils.datastructure.PageColumnAccessInfo;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.Pair;
-import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 import org.apache.tsfile.write.chunk.AlignedChunkWriterImpl;
 import org.apache.tsfile.write.chunk.IChunkWriter;
-import org.apache.tsfile.write.chunk.ValueChunkWriter;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
 import org.apache.tsfile.write.schema.MeasurementSchema;
 
@@ -578,78 +576,6 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
     }
   }
 
-  private void writePageValuesIntoWriter(
-      IChunkWriter chunkWriter,
-      long[] times,
-      PageColumnAccessInfo[] pageColumnAccessInfo,
-      MergeSortAlignedTVListIterator timeValuePairIterator) {
-    AlignedChunkWriterImpl alignedChunkWriter = (AlignedChunkWriterImpl) chunkWriter;
-
-    // update value statistics
-    for (int columnIndex = 0; columnIndex < dataTypes.size(); columnIndex++) {
-      ValueChunkWriter valueChunkWriter =
-          alignedChunkWriter.getValueChunkWriterByIndex(columnIndex);
-      PageColumnAccessInfo pageAccessInfo = pageColumnAccessInfo[columnIndex];
-      switch (dataTypes.get(columnIndex)) {
-        case BOOLEAN:
-          for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            valueChunkWriter.write(times[index], value.getBoolean(), value.getValue() == null);
-          }
-          break;
-        case INT32:
-        case DATE:
-          for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            valueChunkWriter.write(times[index], value.getInt(), value.getValue() == null);
-          }
-          break;
-        case INT64:
-        case TIMESTAMP:
-          for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            valueChunkWriter.write(times[index], value.getLong(), value.getValue() == null);
-          }
-          break;
-        case FLOAT:
-          for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            valueChunkWriter.write(times[index], value.getFloat(), value.getValue() == null);
-          }
-          break;
-        case DOUBLE:
-          for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            valueChunkWriter.write(times[index], value.getDouble(), value.getValue() == null);
-          }
-          break;
-        case TEXT:
-        case BLOB:
-        case STRING:
-          for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
-            TsPrimitiveType value =
-                timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
-            valueChunkWriter.write(times[index], value.getBinary(), value.getValue() == null);
-          }
-          break;
-        default:
-          throw new UnSupportedDataTypeException(
-              String.format("Data type %s is not supported.", dataTypes.get(columnIndex)));
-      }
-    }
-  }
-
   @SuppressWarnings({"squid:S6541", "squid:S3776"})
   @Override
   public void encode(IChunkWriter chunkWriter) {
@@ -668,35 +594,17 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
 
     int pointsInPage = 0;
     long[] times = new long[MAX_NUMBER_OF_POINTS_IN_PAGE];
-
-    PageColumnAccessInfo[] pageColumnAccessInfo = new PageColumnAccessInfo[dataTypes.size()];
-    for (int i = 0; i < pageColumnAccessInfo.length; i++) {
-      pageColumnAccessInfo[i] = new PageColumnAccessInfo();
-    }
-
     while (timeValuePairIterator.hasNextTimeValuePair()) {
-      // prepare column access info for current page
-      int[][] accessInfo = timeValuePairIterator.getColumnAccessInfo();
-      for (int i = 0; i < dataTypes.size(); i++) {
-        times[pointsInPage] = timeValuePairIterator.getTime();
-        pageColumnAccessInfo[i].add(accessInfo[i]);
-      }
-      timeValuePairIterator.step();
+      TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
+      times[pointsInPage] = tvPair.getTimestamp();
+      alignedChunkWriter.write(tvPair.getTimestamp(), tvPair.getValue().getVector());
       pointsInPage++;
-
       if (pointsInPage == MAX_NUMBER_OF_POINTS_IN_PAGE) {
-        writePageValuesIntoWriter(chunkWriter, times, pageColumnAccessInfo, timeValuePairIterator);
         alignedChunkWriter.write(times, pointsInPage, 0);
-
-        for (PageColumnAccessInfo columnAccessInfo : pageColumnAccessInfo) {
-          columnAccessInfo.reset();
-        }
         pointsInPage = 0;
       }
     }
-
     if (pointsInPage > 0) {
-      writePageValuesIntoWriter(chunkWriter, times, pageColumnAccessInfo, timeValuePairIterator);
       alignedChunkWriter.write(times, pointsInPage, 0);
     }
   }
