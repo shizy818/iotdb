@@ -165,7 +165,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
       switch (dataTypes.get(columnIndex)) {
         case BOOLEAN:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             if (value != null) {
@@ -179,7 +179,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case INT32:
         case DATE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             if (value != null) {
@@ -193,7 +193,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case INT64:
         case TIMESTAMP:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             if (value != null) {
@@ -206,7 +206,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
           break;
         case FLOAT:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             if (value != null) {
@@ -219,7 +219,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
           break;
         case DOUBLE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             if (value != null) {
@@ -234,7 +234,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         case BLOB:
         case STRING:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             if (value != null) {
@@ -327,7 +327,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
       }
 
       // prepare column access info for current page
-      int[][] accessInfo = timeValuePairIterator.getColumnAccessInfo();
+      int[] accessInfo = timeValuePairIterator.getColumnAccessInfo();
       for (int i = 0; i < dataTypes.size(); i++) {
         time[pointsInPage] = timeValuePairIterator.getTime();
         pageColumnAccessInfo[i].add(accessInfo[i]);

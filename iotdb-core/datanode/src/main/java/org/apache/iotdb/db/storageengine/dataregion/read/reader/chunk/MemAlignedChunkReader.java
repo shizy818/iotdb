@@ -170,7 +170,7 @@ public class MemAlignedChunkReader implements IChunkReader {
         switch (tsDataTypes.get(columnIndex)) {
           case BOOLEAN:
             for (int index = 0; index < pageAccessInfo.count(); index++) {
-              int[] accessInfo = pageAccessInfo.get(index);
+              int accessInfo = pageAccessInfo.get(index);
               TsPrimitiveType value =
                   timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
               if (value == null) {
@@ -183,7 +183,7 @@ public class MemAlignedChunkReader implements IChunkReader {
           case INT32:
           case DATE:
             for (int index = 0; index < pageAccessInfo.count(); index++) {
-              int[] accessInfo = pageAccessInfo.get(index);
+              int accessInfo = pageAccessInfo.get(index);
               TsPrimitiveType value =
                   timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
               if (value == null) {
@@ -196,7 +196,7 @@ public class MemAlignedChunkReader implements IChunkReader {
           case INT64:
           case TIMESTAMP:
             for (int index = 0; index < pageAccessInfo.count(); index++) {
-              int[] accessInfo = pageAccessInfo.get(index);
+              int accessInfo = pageAccessInfo.get(index);
               TsPrimitiveType value =
                   timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
               if (value == null) {
@@ -208,7 +208,7 @@ public class MemAlignedChunkReader implements IChunkReader {
             break;
           case FLOAT:
             for (int index = 0; index < pageAccessInfo.count(); index++) {
-              int[] accessInfo = pageAccessInfo.get(index);
+              int accessInfo = pageAccessInfo.get(index);
               TsPrimitiveType value =
                   timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
               if (value == null) {
@@ -220,7 +220,7 @@ public class MemAlignedChunkReader implements IChunkReader {
             break;
           case DOUBLE:
             for (int index = 0; index < pageAccessInfo.count(); index++) {
-              int[] accessInfo = pageAccessInfo.get(index);
+              int accessInfo = pageAccessInfo.get(index);
               TsPrimitiveType value =
                   timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
               if (value == null) {
@@ -234,7 +234,7 @@ public class MemAlignedChunkReader implements IChunkReader {
           case BLOB:
           case STRING:
             for (int index = 0; index < pageAccessInfo.count(); index++) {
-              int[] accessInfo = pageAccessInfo.get(index);
+              int accessInfo = pageAccessInfo.get(index);
               TsPrimitiveType value =
                   timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
               if (value == null) {
@@ -300,7 +300,7 @@ public class MemAlignedChunkReader implements IChunkReader {
         }
 
         // prepare column access info for current page
-        int[][] accessInfo = timeValuePairIterator.getColumnAccessInfo();
+        int[] accessInfo = timeValuePairIterator.getColumnAccessInfo();
         for (int i = 0; i < tsDataTypes.size(); i++) {
           time[pointsInPage] = timeValuePairIterator.getTime();
           pageColumnAccessInfo[i].add(accessInfo[i]);

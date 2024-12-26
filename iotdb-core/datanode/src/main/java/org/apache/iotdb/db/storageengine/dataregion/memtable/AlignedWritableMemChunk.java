@@ -593,7 +593,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
       switch (dataTypes.get(columnIndex)) {
         case BOOLEAN:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             valueChunkWriter.write(times[index], value.getBoolean(), value.getValue() == null);
@@ -602,7 +602,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
         case INT32:
         case DATE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             valueChunkWriter.write(times[index], value.getInt(), value.getValue() == null);
@@ -611,7 +611,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
         case INT64:
         case TIMESTAMP:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             valueChunkWriter.write(times[index], value.getLong(), value.getValue() == null);
@@ -619,7 +619,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
           break;
         case FLOAT:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             valueChunkWriter.write(times[index], value.getFloat(), value.getValue() == null);
@@ -627,7 +627,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
           break;
         case DOUBLE:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             valueChunkWriter.write(times[index], value.getDouble(), value.getValue() == null);
@@ -637,7 +637,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
         case BLOB:
         case STRING:
           for (int index = 0; index < pageAccessInfo.count(); index++) {
-            int[] accessInfo = pageAccessInfo.get(index);
+            int accessInfo = pageAccessInfo.get(index);
             TsPrimitiveType value =
                 timeValuePairIterator.getPrimitiveObject(accessInfo, columnIndex);
             valueChunkWriter.write(times[index], value.getBinary(), value.getValue() == null);
@@ -676,7 +676,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       // prepare column access info for current page
-      int[][] accessInfo = timeValuePairIterator.getColumnAccessInfo();
+      int[] accessInfo = timeValuePairIterator.getColumnAccessInfo();
       for (int i = 0; i < dataTypes.size(); i++) {
         times[pointsInPage] = timeValuePairIterator.getTime();
         pageColumnAccessInfo[i].add(accessInfo[i]);

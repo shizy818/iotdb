@@ -23,24 +23,23 @@ import static org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMem
 
 public class PageColumnAccessInfo {
   // time -> (selectedTVList, rowIndex)
-  private final int[][] indices;
+  private final int[] indices;
   private int count;
 
   public PageColumnAccessInfo() {
-    this.indices = new int[MAX_NUMBER_OF_POINTS_IN_PAGE][];
-    for (int i = 0; i < MAX_NUMBER_OF_POINTS_IN_PAGE; i++) {
-      indices[i] = new int[2];
-    }
+    this.indices = new int[MAX_NUMBER_OF_POINTS_IN_PAGE];
+    //    for (int i = 0; i < MAX_NUMBER_OF_POINTS_IN_PAGE; i++) {
+    //      indices[i] = new int[2];
+    //    }
     this.count = 0;
   }
 
-  public int[] get(int index) {
+  public int get(int index) {
     return indices[index];
   }
 
-  public void add(int[] columnAccess) {
-    indices[count][0] = columnAccess[0];
-    indices[count][1] = columnAccess[1];
+  public void add(int columnAccess) {
+    indices[count] = columnAccess;
     count++;
   }
 

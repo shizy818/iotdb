@@ -38,7 +38,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
 
   private final int[] alignedTvListOffsets;
 
-  private final int[][] columnAccessInfo;
+  private final int[] columnAccessInfo;
   private long time;
   private final BitMap bitMap;
 
@@ -59,10 +59,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     }
     this.alignedTvListOffsets = new int[alignedTvLists.size()];
     this.columnNum = tsDataTypes.size();
-    this.columnAccessInfo = new int[columnNum][];
-    for (int i = 0; i < columnAccessInfo.length; i++) {
-      columnAccessInfo[i] = new int[2];
-    }
+    this.columnAccessInfo = new int[columnNum];
     this.bitMap = new BitMap(columnNum);
   }
 
@@ -74,8 +71,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
         if (i == 0 || iterator.currentTime() < time) {
           for (int columnIndex = 0; columnIndex < columnNum; columnIndex++) {
             int rowIndex = iterator.getValidRowIndex(columnIndex);
-            columnAccessInfo[columnIndex][0] = i;
-            columnAccessInfo[columnIndex][1] = rowIndex;
+            columnAccessInfo[columnIndex] = rowIndex;
             if (iterator.isNull(rowIndex, columnIndex)) {
               bitMap.mark(columnIndex);
             }
@@ -86,8 +82,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
             int rowIndex = iterator.getValidRowIndex(columnIndex);
             // update if the column is not null
             if (!iterator.isNull(rowIndex, columnIndex)) {
-              columnAccessInfo[columnIndex][0] = i;
-              columnAccessInfo[columnIndex][1] = rowIndex;
+              columnAccessInfo[columnIndex] = rowIndex;
               bitMap.unmark(columnIndex);
             }
           }
@@ -127,9 +122,9 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
   private TimeValuePair buildTimeValuePair() {
     TsPrimitiveType[] vector = new TsPrimitiveType[columnNum];
     for (int columnIndex = 0; columnIndex < vector.length; columnIndex++) {
-      int[] accessInfo = columnAccessInfo[columnIndex];
-      AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
-      vector[columnIndex] = iterator.getPrimitiveObject(accessInfo[1], columnIndex);
+      int accessInfo = columnAccessInfo[columnIndex];
+      AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[0];
+      vector[columnIndex] = iterator.getPrimitiveObject(accessInfo, columnIndex);
     }
     return new TimeValuePair(time, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
   }
@@ -170,7 +165,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     bitMap.reset();
   }
 
-  public int[][] getColumnAccessInfo() {
+  public int[] getColumnAccessInfo() {
     return columnAccessInfo;
   }
 
@@ -178,12 +173,12 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     return time;
   }
 
-  public TsPrimitiveType getPrimitiveObject(int[] accessInfo, int columnIndex) {
+  public TsPrimitiveType getPrimitiveObject(int accessInfo, int columnIndex) {
     if (columnIndex >= columnAccessInfo.length) {
       return null;
     }
-    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[accessInfo[0]];
-    return iterator.getPrimitiveObject(accessInfo[1], columnIndex);
+    AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators[0];
+    return iterator.getPrimitiveObject(accessInfo, columnIndex);
   }
 
   public BitMap getBitmap() {
