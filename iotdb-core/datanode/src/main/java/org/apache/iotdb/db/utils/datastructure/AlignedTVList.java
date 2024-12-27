@@ -84,6 +84,8 @@ public abstract class AlignedTVList extends TVList {
   // constructed after deletion
   BitMap timeColDeletedMap;
 
+  private final AlignedTVList outer = this;
+
   AlignedTVList(List<TSDataType> types) {
     super();
     dataTypes = types;
@@ -1659,6 +1661,10 @@ public abstract class AlignedTVList extends TVList {
 
     public int getValidRowIndex(int columnIndex) {
       return validRowIndex[columnIndex];
+    }
+
+    public AlignedTVList getAlignedTVList() {
+      return outer;
     }
 
     public void reset() {
