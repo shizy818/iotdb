@@ -41,6 +41,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
   private final int[][] columnAccessInfo;
   private long time;
   private final BitMap bitMap;
+  private String debugInfo;
 
   public MergeSortAlignedTVListIterator(
       List<AlignedTVList> alignedTvLists,
@@ -64,6 +65,15 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
       columnAccessInfo[i] = new int[2];
     }
     this.bitMap = new BitMap(columnNum);
+
+    StringBuilder sb = new StringBuilder();
+    for (AlignedTVList.AlignedTVListIterator iterator : alignedTvListIterators) {
+      sb.append("rowCount: ").append(iterator.getRowCount());
+      sb.append(", rows: ").append(iterator.getRows());
+      sb.append(", isSorted").append(iterator.getSorted());
+      sb.append("\n");
+    }
+    debugInfo = sb.toString();
   }
 
   private void prepareNextRow() {
@@ -199,13 +209,6 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
   }
 
   public String AlignedTVListsInfo() {
-    StringBuilder sb = new StringBuilder();
-    for (AlignedTVList.AlignedTVListIterator iterator : alignedTvListIterators) {
-      sb.append("rowCount: ").append(iterator.getRowCount());
-      sb.append(", rows: ").append(iterator.getRows());
-      sb.append(", isSorted").append(iterator.getSorted());
-      sb.append("\n");
-    }
-    return sb.toString();
+    return debugInfo;
   }
 }
