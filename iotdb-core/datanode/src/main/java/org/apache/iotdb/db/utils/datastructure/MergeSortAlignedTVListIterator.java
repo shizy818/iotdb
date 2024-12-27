@@ -43,7 +43,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
   private long time;
   private final BitMap bitMap;
 
-  private String debugInfo;
+  private final String debugInfo;
 
   public MergeSortAlignedTVListIterator(
       List<AlignedTVList> alignedTvLists,
@@ -72,11 +72,12 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
         alignedTvListIterators[alignedTvListIterators.length - 1];
     debugInfo =
         String.format(
-            "AlignedTVList %s, rowCount %d, rows %d, isSorted %b",
+            "AlignedTVList %s, rowCount %d, rows %d, isSorted %b, seqRowCount %d",
             workingIterator.getAlignedTVList(),
             workingIterator.getRowCount(),
             workingIterator.getRows(),
-            workingIterator.getSorted());
+            workingIterator.getSorted(),
+            workingIterator.getSeqRowCount());
   }
 
   private void prepareNextRow() {
@@ -221,7 +222,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     return debugInfo;
   }
 
-  public AlignedTVList getWorkingTVList() {
-    return alignedTvListIterators[alignedTvListIterators.length - 1].getAlignedTVList();
+  public AlignedTVList.AlignedTVListIterator getWorkingTVListIterator() {
+    return alignedTvListIterators[alignedTvListIterators.length - 1];
   }
 }

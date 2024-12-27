@@ -710,5 +710,9 @@ public abstract class TVList implements WALEntryValue {
     public boolean getSorted() {
       return isSorted();
     }
+
+    public int getSeqRowCount() {
+      return seqRowCount;
+    }
   }
 }

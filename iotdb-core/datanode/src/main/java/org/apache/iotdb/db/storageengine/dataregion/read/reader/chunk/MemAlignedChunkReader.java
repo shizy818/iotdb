@@ -20,6 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
+import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
 import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
 import org.apache.iotdb.db.utils.datastructure.PageColumnAccessInfo;
 
@@ -303,10 +304,20 @@ public class MemAlignedChunkReader implements IChunkReader {
                   .collect(Collectors.toList());
           LOGGER.error("PageOffset: {}", Joiner.on(",").join(pageOffsets));
           LOGGER.error(
-              "Current MergeSortAlignedTVListIterator offset: {}",
+              "MergeSortAlignedTVListIterator offset: {}",
               Arrays.toString(timeValuePairIterator.getAlignedTVListOffsets()));
-          LOGGER.error("Current AlignedTVList: {}", timeValuePairIterator.getWorkingTVList());
+          LOGGER.error("*** When create timeValuePairIterator ***");
           LOGGER.error(timeValuePairIterator.getDebugInfo());
+          LOGGER.error("*** Read one page ***");
+          AlignedTVList.AlignedTVListIterator workingIterator =
+              timeValuePairIterator.getWorkingTVListIterator();
+          LOGGER.error(
+              "Current AlignedTVList {}, rowCount {}, rows {}, isSorted {}, seqRowCount {}",
+              workingIterator.getAlignedTVList(),
+              workingIterator.getRowCount(),
+              workingIterator.getRows(),
+              workingIterator.getSorted(),
+              workingIterator.getSeqRowCount());
         }
 
         // prepare column access info for current page
