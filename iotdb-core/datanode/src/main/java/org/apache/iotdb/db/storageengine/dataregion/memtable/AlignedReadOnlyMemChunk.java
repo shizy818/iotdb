@@ -77,6 +77,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
   private final List<Integer> columnIndexList;
 
+  private MergeSortAlignedTVListIterator timeValuePairIterator;
   private int workingTVListRows;
 
   /**
@@ -264,7 +265,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
     // create MergeSortAlignedTVListIterator
     List<AlignedTVList> alignedTvLists = new ArrayList<>(alignedTvListQueryMap.keySet());
-    MergeSortAlignedTVListIterator timeValuePairIterator =
+    timeValuePairIterator =
         new MergeSortAlignedTVListIterator(
             alignedTvLists,
             dataTypes,
@@ -563,6 +564,10 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
 
   public List<Statistics<? extends Serializable>[]> getValuesStatisticsList() {
     return valueStatisticsList;
+  }
+
+  public MergeSortAlignedTVListIterator getTimeValuePairIterator() {
+    return timeValuePairIterator;
   }
 
   public int workingTVListRows() {

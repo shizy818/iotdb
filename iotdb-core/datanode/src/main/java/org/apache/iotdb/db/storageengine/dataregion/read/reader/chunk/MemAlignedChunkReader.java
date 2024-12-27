@@ -24,6 +24,7 @@ import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
 import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
 import org.apache.iotdb.db.utils.datastructure.PageColumnAccessInfo;
 
+import com.google.common.base.Joiner;
 import org.apache.tsfile.block.column.ColumnBuilder;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
@@ -36,18 +37,24 @@ import org.apache.tsfile.read.reader.IChunkReader;
 import org.apache.tsfile.read.reader.IPageReader;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.TsPrimitiveType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMemChunk.MAX_NUMBER_OF_POINTS_IN_PAGE;
 import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 
 /** To read aligned chunk data in memory. */
 public class MemAlignedChunkReader implements IChunkReader {
+  private Logger LOGGER = LoggerFactory.getLogger(MemAlignedChunkReader.class);
+
   private final AlignedReadOnlyMemChunk readableChunk;
   private final MergeSortAlignedTVListIterator timeValuePairIterator;
   private final Filter globalTimeFilter;
@@ -297,6 +304,21 @@ public class MemAlignedChunkReader implements IChunkReader {
         if (ignoreAllNullRows && bitMap.isAllMarked()) {
           timeValuePairIterator.step();
           continue;
+        }
+
+        if (pointsInPage >= MAX_NUMBER_OF_POINTS_IN_PAGE) {
+          List<String> pageOffsets =
+              readableChunk.getPageOffsetsList().stream()
+                  .map(Arrays::toString)
+                  .collect(Collectors.toList());
+          LOGGER.error("PageOffset: {}", Joiner.on(",").join(pageOffsets));
+          LOGGER.error(
+              "Current MergeSortAlignedTVListIterator offset: {}",
+              Arrays.toString(timeValuePairIterator.getAlignedTVListOffsets()));
+          LOGGER.error("MemAlignedChunkReader MergeSortAlignedTVListIterator Info:");
+          LOGGER.error(timeValuePairIterator.AlignedTVListsInfo());
+          LOGGER.error("AlignedReadOnlyMemChunk MergeSortAlignedTVListIterator Info");
+          LOGGER.error(readableChunk.getTimeValuePairIterator().AlignedTVListsInfo());
         }
 
         // prepare column access info for current page
