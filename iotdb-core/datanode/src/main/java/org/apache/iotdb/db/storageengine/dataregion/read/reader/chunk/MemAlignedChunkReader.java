@@ -312,12 +312,13 @@ public class MemAlignedChunkReader implements IChunkReader {
           AlignedTVList.AlignedTVListIterator workingIterator =
               timeValuePairIterator.getWorkingTVListIterator();
           LOGGER.error(
-              "Current AlignedTVList {}, rowCount {}, rows {}, isSorted {}, seqRowCount {}",
+              "Current AlignedTVList {}, rowCount {}, rows {}, isSorted {}, seqRowCount {}, queryCount {}",
               workingIterator.getAlignedTVList(),
               workingIterator.getRowCount(),
               workingIterator.getRows(),
               workingIterator.getSorted(),
-              workingIterator.getSeqRowCount());
+              workingIterator.getSeqRowCount(),
+              workingIterator.getQueryCount());
         }
 
         // prepare column access info for current page

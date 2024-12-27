@@ -160,7 +160,7 @@ public abstract class TVList implements WALEntryValue {
     return rowCount;
   }
 
-  public int seqRowCount() {
+  public synchronized int seqRowCount() {
     return seqRowCount;
   }
 
@@ -713,6 +713,14 @@ public abstract class TVList implements WALEntryValue {
 
     public int getSeqRowCount() {
       return seqRowCount;
+    }
+
+    public int getQueryCount() {
+      return queryContextList.size();
+    }
+
+    public List<long[]> getTimestamps() {
+      return timestamps;
     }
   }
 }

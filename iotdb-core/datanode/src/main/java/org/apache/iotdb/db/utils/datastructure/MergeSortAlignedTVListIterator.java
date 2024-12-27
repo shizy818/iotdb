@@ -72,12 +72,13 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
         alignedTvListIterators[alignedTvListIterators.length - 1];
     debugInfo =
         String.format(
-            "AlignedTVList %s, rowCount %d, rows %d, isSorted %b, seqRowCount %d",
+            "AlignedTVList %s, rowCount %d, rows %d, isSorted %b, seqRowCount %d queryCount %d",
             workingIterator.getAlignedTVList(),
             workingIterator.getRowCount(),
             workingIterator.getRows(),
             workingIterator.getSorted(),
-            workingIterator.getSeqRowCount());
+            workingIterator.getSeqRowCount(),
+            workingIterator.getQueryCount());
   }
 
   private void prepareNextRow() {
