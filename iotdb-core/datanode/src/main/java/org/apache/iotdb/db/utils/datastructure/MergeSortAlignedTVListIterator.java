@@ -27,6 +27,7 @@ import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.TsPrimitiveType;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 public class MergeSortAlignedTVListIterator implements IPointReader {
@@ -190,11 +191,17 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     return bitMap;
   }
 
-  public int getRowsForWorkingTVListIterator() {
-    return alignedTvListIterators[alignedTvListIterators.length - 1].getRows();
-  }
-
-  public void setRowsForWorkingTVListIterator(int rows) {
-    alignedTvListIterators[alignedTvListIterators.length - 1].setRows(rows);
+  public void reset() {
+    probeNext = false;
+    hasNext = false;
+    time = Long.MIN_VALUE;
+    bitMap.reset();
+    Arrays.fill(alignedTvListOffsets, 0);
+    for (int[] columnAccess : columnAccessInfo) {
+      Arrays.fill(columnAccess, 0);
+    }
+    for (AlignedTVList.AlignedTVListIterator iterator : alignedTvListIterators) {
+      iterator.reset();
+    }
   }
 }

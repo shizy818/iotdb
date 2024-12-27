@@ -24,6 +24,7 @@ import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.reader.IPointReader;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 public class MergeSortTvListIterator implements IPointReader {
@@ -126,11 +127,12 @@ public class MergeSortTvListIterator implements IPointReader {
     selectedTVListIndex = -1;
   }
 
-  public int getRowsForWorkingTVListIterator() {
-    return tvListIterators[tvListIterators.length - 1].getRows();
-  }
-
-  public void setRowsForWorkingTVListIterator(int rows) {
-    tvListIterators[tvListIterators.length - 1].setRows(rows);
+  public void reset() {
+    selectedTVListIndex = -1;
+    currentTvPair = null;
+    Arrays.fill(tvListOffsets, 0);
+    for (TVList.TVListIterator iterator : tvListIterators) {
+      iterator.reset();
+    }
   }
 }

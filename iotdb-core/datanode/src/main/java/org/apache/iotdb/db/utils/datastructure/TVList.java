@@ -694,12 +694,8 @@ public abstract class TVList implements WALEntryValue {
       currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
     }
 
-    public int getRows() {
-      return rows;
-    }
-
-    public void setRows(int rows) {
-      this.rows = rows;
+    public void reset() {
+      this.index = 0;
       this.currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
     }
   }

@@ -1660,5 +1660,10 @@ public abstract class AlignedTVList extends TVList {
     public int getValidRowIndex(int columnIndex) {
       return validRowIndex[columnIndex];
     }
+
+    public void reset() {
+      super.reset();
+      Arrays.fill(validRowIndex, 0);
+    }
   }
 }
