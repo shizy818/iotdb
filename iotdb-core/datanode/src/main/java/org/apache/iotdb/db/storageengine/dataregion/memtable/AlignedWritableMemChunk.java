@@ -31,6 +31,7 @@ import org.apache.iotdb.db.utils.datastructure.PageColumnAccessInfo;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.Pair;
@@ -47,11 +48,15 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
+
+import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 
 public class AlignedWritableMemChunk implements IWritableMemChunk {
 
@@ -341,6 +346,86 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
       minTime = Math.min(minTime, alignedTvList.getMinTime());
     }
     return minTime;
+  }
+
+  private void filterTimeStamp(
+      AlignedTVList alignedTVList,
+      List<List<TimeRange>> valueColumnsDeletionList,
+      boolean ignoreAllNullRows,
+      Map<Long, BitMap> timestampWithBitmap) {
+    BitMap allValueColDeletedMap = alignedTVList.getAllValueColDeletedMap();
+
+    int rowCount = alignedTVList.rowCount();
+    List<int[]> valueColumnDeleteCursor = new ArrayList<>();
+    if (valueColumnsDeletionList != null) {
+      valueColumnsDeletionList.forEach(x -> valueColumnDeleteCursor.add(new int[] {0}));
+    }
+
+    for (int row = 0; row < rowCount; row++) {
+      // the row is deleted
+      if (allValueColDeletedMap != null && allValueColDeletedMap.isMarked(row)) {
+        continue;
+      }
+      Long timestamp = alignedTVList.getTime(row);
+
+      BitMap bitMap;
+      if (timestampWithBitmap.containsKey(timestamp)) {
+        bitMap = timestampWithBitmap.get(timestamp);
+      } else {
+        bitMap = new BitMap(schemaList.size());
+        bitMap.markAll();
+      }
+      for (int column = 0; column < schemaList.size(); column++) {
+        if (!alignedTVList.isNullValue(alignedTVList.getValueIndex(row), column)) {
+          bitMap.unmark(column);
+        }
+
+        List<TimeRange> deletion =
+            valueColumnsDeletionList == null || valueColumnsDeletionList.isEmpty()
+                ? Collections.emptyList()
+                : valueColumnsDeletionList.get(column);
+        if (isPointDeleted(timestamp, deletion, valueColumnDeleteCursor.get(column))) {
+          bitMap.mark(column);
+        }
+
+        if (ignoreAllNullRows && bitMap.isAllMarked()) {
+          continue;
+        }
+
+        if (!timestampWithBitmap.containsKey(timestamp)) {
+          timestampWithBitmap.put(timestamp, bitMap);
+        }
+      }
+    }
+  }
+
+  public long[] getFilteredTimestamp(
+      List<List<TimeRange>> deletionList, List<BitMap> bitMaps, boolean ignoreAllNullRows) {
+    Map<Long, BitMap> timestampWithBitmap = new TreeMap<>();
+
+    filterTimeStamp(list, deletionList, ignoreAllNullRows, timestampWithBitmap);
+    for (AlignedTVList alignedTVList : sortedList) {
+      filterTimeStamp(alignedTVList, deletionList, ignoreAllNullRows, timestampWithBitmap);
+    }
+
+    for (int i = 0; i < bitMaps.size(); i++) {
+      bitMaps.add(new BitMap(timestampWithBitmap.size()));
+    }
+
+    long[] filteredTimestamps = new long[timestampWithBitmap.size()];
+    int i = 0;
+    for (Long ts : timestampWithBitmap.keySet()) {
+      filteredTimestamps[i] = ts;
+      BitMap rowBit = timestampWithBitmap.get(ts);
+      for (int j = 0; j < bitMaps.size(); j++) {
+        if (rowBit.isMarked(j)) {
+          bitMaps.get(j).mark(i);
+        }
+      }
+      i++;
+    }
+
+    return filteredTimestamps;
   }
 
   @Override

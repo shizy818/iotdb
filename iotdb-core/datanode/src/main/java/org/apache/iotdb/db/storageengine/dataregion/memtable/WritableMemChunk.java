@@ -23,11 +23,13 @@ import org.apache.iotdb.db.queryengine.execution.fragment.FragmentInstanceContex
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.queryengine.plan.planner.memory.MemoryReservationManager;
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
+import org.apache.iotdb.db.utils.ModificationUtils;
 import org.apache.iotdb.db.utils.datastructure.MergeSortTvListIterator;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.read.TimeValuePair;
+import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
@@ -42,7 +44,10 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 public class WritableMemChunk implements IWritableMemChunk {
 
@@ -344,6 +349,41 @@ public class WritableMemChunk implements IWritableMemChunk {
     if (!list.isSorted()) {
       list.sort();
     }
+  }
+
+  private void filterTimeStamp(
+      TVList tvlist, List<TimeRange> deletionList, List<Long> timestampList) {
+    if (tvlist.getBitMap() == null && deletionList.isEmpty()) {
+      tvlist.getTimestamps().stream().flatMapToLong(LongStream::of).forEach(timestampList::add);
+    }
+
+    long lastTime = -1;
+    int[] deletionCursor = {0};
+    int rowCount = tvlist.rowCount();
+    for (int i = 0; i < rowCount; i++) {
+      long curTime = tvlist.getTime(i);
+      if (!tvlist.isNullValue(i)
+          && !ModificationUtils.isPointDeleted(curTime, deletionList, deletionCursor)
+          && (i == rowCount - 1 || curTime != lastTime)) {
+        timestampList.add(curTime);
+      }
+      lastTime = curTime;
+    }
+  }
+
+  public long[] getFilteredTimestamp(List<TimeRange> deletionList) {
+    List<Long> timestampList = new ArrayList<>();
+    filterTimeStamp(list, deletionList, timestampList);
+    for (TVList tvList : sortedList) {
+      filterTimeStamp(tvList, deletionList, timestampList);
+    }
+
+    // remove duplicated time
+    List<Long> distinctTimestamps = timestampList.stream().distinct().collect(Collectors.toList());
+    // sort timestamps
+    long[] filteredTimestamps = distinctTimestamps.stream().mapToLong(Long::longValue).toArray();
+    Arrays.sort(filteredTimestamps);
+    return filteredTimestamps;
   }
 
   @Override

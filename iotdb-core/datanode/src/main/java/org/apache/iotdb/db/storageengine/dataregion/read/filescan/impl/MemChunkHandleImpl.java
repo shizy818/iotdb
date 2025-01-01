@@ -25,10 +25,15 @@ import org.apache.tsfile.file.metadata.IDeviceID;
 
 import java.io.IOException;
 
+import static org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMemChunk.MAX_NUMBER_OF_POINTS_IN_PAGE;
+
 public class MemChunkHandleImpl implements IChunkHandle {
   protected final long[] dataOfTimestamp;
   protected final String measurement;
-  protected boolean hasRead = false;
+  protected int pageNum;
+  protected int pageStart;
+  protected int pageEnd;
+  protected int pageIndex = 0;
 
   protected IDeviceID deviceID;
 
@@ -36,33 +41,47 @@ public class MemChunkHandleImpl implements IChunkHandle {
     this.deviceID = deviceID;
     this.measurement = measurement;
     this.dataOfTimestamp = dataOfTimestamp;
+    this.pageNum = dataOfTimestamp.length / MAX_NUMBER_OF_POINTS_IN_PAGE;
+    this.pageStart = 0;
+    this.pageEnd = (pageNum == 1) ? dataOfTimestamp.length : MAX_NUMBER_OF_POINTS_IN_PAGE;
   }
 
   @Override
   public boolean hasNextPage() throws IOException {
-    return !hasRead;
+    return pageIndex < pageNum;
   }
 
   @Override
   public void nextPage() throws IOException {
-    // do nothing, there is only one page in MemChunk
+    pageIndex++;
+    pageStart += MAX_NUMBER_OF_POINTS_IN_PAGE;
+    pageEnd =
+        (pageIndex == pageNum - 1)
+            ? dataOfTimestamp.length
+            : (pageIndex + 1) * MAX_NUMBER_OF_POINTS_IN_PAGE;
   }
 
   // MemChunk only has one page in handle
   @Override
   public void skipCurrentPage() {
-    hasRead = true;
+    pageIndex++;
+    pageStart += MAX_NUMBER_OF_POINTS_IN_PAGE;
+    pageEnd =
+        (pageIndex == pageNum - 1)
+            ? dataOfTimestamp.length
+            : (pageIndex + 1) * MAX_NUMBER_OF_POINTS_IN_PAGE;
   }
 
   @Override
   public long[] getPageStatisticsTime() {
-    return new long[] {dataOfTimestamp[0], dataOfTimestamp[dataOfTimestamp.length - 1]};
+    return new long[] {dataOfTimestamp[pageStart], dataOfTimestamp[pageEnd - 1]};
   }
 
   @Override
   public long[] getDataTime() throws IOException {
-    hasRead = true;
-    return dataOfTimestamp;
+    long[] dataTime = new long[pageEnd - pageStart];
+    System.arraycopy(dataOfTimestamp, pageStart, dataTime, 0, pageEnd - pageStart);
+    return dataTime;
   }
 
   @Override

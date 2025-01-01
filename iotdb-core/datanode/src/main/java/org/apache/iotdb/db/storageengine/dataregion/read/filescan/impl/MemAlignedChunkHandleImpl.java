@@ -19,61 +19,58 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.read.filescan.impl;
 
-import org.apache.iotdb.db.utils.ModificationUtils;
-
 import org.apache.tsfile.file.metadata.IDeviceID;
-import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.utils.BitMap;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager.ARRAY_SIZE;
-
 public class MemAlignedChunkHandleImpl extends MemChunkHandleImpl {
-
-  private final List<BitMap> bitMapOfValue;
-  private final List<TimeRange> deletionList;
-  // start time and end time of the chunk according to bitMap
-  private final long[] startEndTime;
+  private final BitMap bitMapOfValue;
 
   public MemAlignedChunkHandleImpl(
-      IDeviceID deviceID,
-      String measurement,
-      long[] dataOfTimestamp,
-      List<BitMap> bitMapOfValue,
-      List<TimeRange> deletionList,
-      long[] startEndTime) {
+      IDeviceID deviceID, String measurement, long[] dataOfTimestamp, BitMap bitMapOfValue) {
     super(deviceID, measurement, dataOfTimestamp);
     this.bitMapOfValue = bitMapOfValue;
-    this.deletionList = deletionList;
-    this.startEndTime = startEndTime;
   }
 
   @Override
   public long[] getPageStatisticsTime() {
-    return startEndTime;
+    if (bitMapOfValue == null) {
+      return new long[] {dataOfTimestamp[pageStart], dataOfTimestamp[pageEnd - 1]};
+    }
+    long startTime = -1, endTime = -1;
+    for (int i = pageStart; i < pageEnd; i++) {
+      if (!bitMapOfValue.isMarked(i)) {
+        startTime = dataOfTimestamp[i];
+        break;
+      }
+    }
+
+    for (int i = pageEnd - 1; i >= pageStart; i--) {
+      if (!bitMapOfValue.isMarked(i)) {
+        endTime = dataOfTimestamp[i];
+        break;
+      }
+    }
+    return new long[] {startTime, endTime};
   }
 
   @Override
-  public long[] getDataTime() throws IOException {
+  public long[] getDataTime() {
     List<Long> timeList = new ArrayList<>();
-    int[] deletionCursor = {0};
-    for (int i = 0; i < dataOfTimestamp.length; i++) {
-      if (!bitMapOfValue.isEmpty()) {
-        int arrayIndex = i / ARRAY_SIZE;
-        int elementIndex = i % ARRAY_SIZE;
-        if (bitMapOfValue.get(arrayIndex).isMarked(elementIndex)) {
-          continue;
-        }
+    for (int i = pageStart; i < pageEnd; i++) {
+      if (bitMapOfValue != null && bitMapOfValue.isMarked(i)) {
+        continue;
       }
-      if (!ModificationUtils.isPointDeleted(dataOfTimestamp[i], deletionList, deletionCursor)
-          && (i == dataOfTimestamp.length - 1 || dataOfTimestamp[i] != dataOfTimestamp[i + 1])) {
-        timeList.add(dataOfTimestamp[i]);
-      }
+      timeList.add(dataOfTimestamp[i]);
+      //      if (!ModificationUtils.isPointDeleted(dataOfTimestamp[i], deletionList,
+      // deletionCursor)
+      //          && (i == dataOfTimestamp.length - 1 || dataOfTimestamp[i] != dataOfTimestamp[i +
+      // 1])) {
+      //        timeList.add(dataOfTimestamp[i]);
+      //      }
     }
-    hasRead = true;
     return timeList.stream().mapToLong(Long::longValue).toArray();
   }
 }
