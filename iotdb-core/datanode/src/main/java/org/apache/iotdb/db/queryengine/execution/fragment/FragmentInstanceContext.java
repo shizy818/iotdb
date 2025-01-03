@@ -659,7 +659,7 @@ public class FragmentInstanceContext extends QueryContext {
   private void releaseTVListOwnedByQuery() {
     for (TVList tvList : tvListSet) {
       tvList.lockQueryList();
-      List<QueryContext> queryContextList = tvList.getQueryContextList();
+      List<QueryContext> queryContextList = new ArrayList<>(tvList.getQueryContextList().keySet());
       try {
         queryContextList.remove(this);
         if (tvList.getOwnerQuery() == this) {

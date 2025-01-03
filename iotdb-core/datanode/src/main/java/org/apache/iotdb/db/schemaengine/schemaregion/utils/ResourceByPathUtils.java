@@ -363,7 +363,7 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
       try {
         LOGGER.debug(
             "Flushing/Working MemTable - add current query context to immutable AlignedTVList's query list");
-        alignedTvList.getQueryContextList().add(context);
+        alignedTvList.getQueryContextList().put(context, alignedTvList.rowCount());
         alignedTvListQueryMap.put(alignedTvList, alignedTvList.rowCount());
       } finally {
         alignedTvList.unlockQueryList();
@@ -383,18 +383,18 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
       if (!isWorkMemTable) {
         LOGGER.debug(
             "Flushing MemTable - add current query context to mutable AlignedTVList's query list");
-        list.getQueryContextList().add(context);
+        list.getQueryContextList().put(context, list.rowCount());
         alignedTvListQueryMap.put(list, list.rowCount());
       } else {
         if (list.isSorted() || list.getQueryContextList().isEmpty()) {
           LOGGER.debug(
               "Working MemTable - add current query context to mutable AlignedTVList's query list when it's sorted or no other query on it");
-          list.getQueryContextList().add(context);
+          list.getQueryContextList().put(context, list.rowCount());
           alignedTvListQueryMap.put(list, list.rowCount());
         } else {
           LOGGER.debug(
               "Working MemTable - clone mutable AlignedTVList and replace old AlignedTVList in working MemTable");
-          QueryContext firstQuery = list.getQueryContextList().get(0);
+          QueryContext firstQuery = list.getQueryContextList().keySet().iterator().next();
           // reserve query memory
           if (firstQuery instanceof FragmentInstanceContext) {
             MemoryReservationManager memoryReservationManager =
@@ -403,9 +403,13 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
           }
           list.setOwnerQuery(firstQuery);
 
+          if (list.getQueryContextList().get(firstQuery) == list.rowCount()) {
+            LOGGER.info("******* SAME LENGTH ******");
+          }
+
           // clone TVList
           cloneList = list.clone();
-          cloneList.getQueryContextList().add(context);
+          cloneList.getQueryContextList().put(context, cloneList.rowCount());
           alignedTvListQueryMap.put(cloneList, cloneList.rowCount());
         }
       }
@@ -554,7 +558,7 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
       try {
         LOGGER.debug(
             "Flushing/Working MemTable - add current query context to immutable TVList's query list");
-        tvList.getQueryContextList().add(context);
+        tvList.getQueryContextList().put(context, tvList.rowCount());
         tvListQueryMap.put(tvList, tvList.rowCount());
       } finally {
         tvList.unlockQueryList();
@@ -574,13 +578,13 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
       if (!isWorkMemTable) {
         LOGGER.debug(
             "Flushing MemTable - add current query context to mutable TVList's query list");
-        list.getQueryContextList().add(context);
+        list.getQueryContextList().put(context, list.rowCount());
         tvListQueryMap.put(list, list.rowCount());
       } else {
         if (list.isSorted() || list.getQueryContextList().isEmpty()) {
           LOGGER.debug(
               "Working MemTable - add current query context to mutable TVList's query list when it's sorted or no other query on it");
-          list.getQueryContextList().add(context);
+          list.getQueryContextList().put(context, list.rowCount());
           tvListQueryMap.put(list, list.rowCount());
         } else {
           /*
@@ -599,7 +603,7 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
            */
           LOGGER.debug(
               "Working MemTable - clone mutable TVList and replace old TVList in working MemTable");
-          QueryContext firstQuery = list.getQueryContextList().get(0);
+          QueryContext firstQuery = list.getQueryContextList().keySet().iterator().next();
           // reserve query memory
           if (firstQuery instanceof FragmentInstanceContext) {
             MemoryReservationManager memoryReservationManager =
@@ -610,7 +614,7 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
 
           // clone TVList
           cloneList = list.clone();
-          cloneList.getQueryContextList().add(context);
+          cloneList.getQueryContextList().put(context, cloneList.rowCount());
           tvListQueryMap.put(cloneList, cloneList.rowCount());
         }
       }

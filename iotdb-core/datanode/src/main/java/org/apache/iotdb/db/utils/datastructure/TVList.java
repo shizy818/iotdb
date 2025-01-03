@@ -41,7 +41,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -70,7 +72,7 @@ public abstract class TVList implements WALEntryValue {
   // lock to provide synchronization for query list
   private final ReentrantLock queryListLock = new ReentrantLock();
   // list of query that this TVList is used
-  protected final List<QueryContext> queryContextList;
+  protected final Map<QueryContext, Integer> queryContextList;
 
   // the owner query which is obligated to release the TVList.
   // When it is null, the TVList is owned by insert thread and released after flush.
@@ -91,7 +93,7 @@ public abstract class TVList implements WALEntryValue {
     seqRowCount = 0;
     maxTime = Long.MIN_VALUE;
     minTime = Long.MAX_VALUE;
-    queryContextList = new ArrayList<>();
+    queryContextList = new HashMap<>();
     referenceCount = new AtomicInteger();
   }
 
@@ -580,7 +582,7 @@ public abstract class TVList implements WALEntryValue {
     return ownerQuery;
   }
 
-  public List<QueryContext> getQueryContextList() {
+  public Map<QueryContext, Integer> getQueryContextList() {
     return queryContextList;
   }
 

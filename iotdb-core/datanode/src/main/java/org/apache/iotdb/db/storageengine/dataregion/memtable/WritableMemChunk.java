@@ -84,7 +84,7 @@ public class WritableMemChunk implements IWritableMemChunk {
          *      |   TVList   | <---------+
          *      +------------+
          */
-        QueryContext firstQuery = list.getQueryContextList().get(0);
+        QueryContext firstQuery = list.getQueryContextList().keySet().iterator().next();
         // reserve query memory
         if (firstQuery instanceof FragmentInstanceContext) {
           MemoryReservationManager memoryReservationManager =
@@ -324,7 +324,7 @@ public class WritableMemChunk implements IWritableMemChunk {
       // During flush, if the working TVList is not sorted and referenced by some query, we need to
       // clone it. The query still refer to original unsorted TVList.
       if (!list.isSorted() && !list.getQueryContextList().isEmpty()) {
-        QueryContext firstQuery = list.getQueryContextList().get(0);
+        QueryContext firstQuery = list.getQueryContextList().keySet().iterator().next();
         // reserve query memory
         if (firstQuery instanceof FragmentInstanceContext) {
           MemoryReservationManager memoryReservationManager =
@@ -602,7 +602,7 @@ public class WritableMemChunk implements IWritableMemChunk {
       if (tvList.getQueryContextList().isEmpty()) {
         tvList.clear();
       } else {
-        QueryContext firstQuery = tvList.getQueryContextList().get(0);
+        QueryContext firstQuery = tvList.getQueryContextList().keySet().iterator().next();
         // transfer memory from write process to read process. Here it reserves read memory and
         // releaseFlushedMemTable will release write memory correspondingly.
         if (firstQuery instanceof FragmentInstanceContext) {

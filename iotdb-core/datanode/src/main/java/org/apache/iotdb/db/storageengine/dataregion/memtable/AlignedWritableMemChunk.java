@@ -194,7 +194,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
         list.sort();
         sortedList.add(list);
       } else {
-        QueryContext firstQuery = list.getQueryContextList().get(0);
+        QueryContext firstQuery = list.getQueryContextList().keySet().iterator().next();
         // reserve query memory
         if (firstQuery instanceof FragmentInstanceContext) {
           MemoryReservationManager memoryReservationManager =
@@ -384,7 +384,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
     list.lockQueryList();
     try {
       if (!list.isSorted() && !list.getQueryContextList().isEmpty()) {
-        QueryContext firstQuery = list.getQueryContextList().get(0);
+        QueryContext firstQuery = list.getQueryContextList().keySet().iterator().next();
         // reserve query memory
         if (firstQuery instanceof FragmentInstanceContext) {
           MemoryReservationManager memoryReservationManager =
@@ -729,7 +729,7 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
       if (alignedTvList.getQueryContextList().isEmpty()) {
         alignedTvList.clear();
       } else {
-        QueryContext firstQuery = alignedTvList.getQueryContextList().get(0);
+        QueryContext firstQuery = alignedTvList.getQueryContextList().keySet().iterator().next();
         // transfer memory from write process to read process. Here it reserves read memory and
         // releaseFlushedMemTable will release write memory.
         if (firstQuery instanceof FragmentInstanceContext) {
