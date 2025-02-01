@@ -44,6 +44,10 @@ public class DeltaIndexTree implements WALEntryValue {
     this.root = this.firstLeaf;
   }
 
+  public DeltaIndexTreeLeafNode getFirstLeaf() {
+    return firstLeaf;
+  }
+
   @Override
   public int serializedSize() {
     return Integer.BYTES + root.serializedSize();
@@ -171,11 +175,12 @@ public class DeltaIndexTree implements WALEntryValue {
       DeltaIndexTreeInternalNode newInternal = new DeltaIndexTreeInternalNode();
       newNode = newInternal;
       int mid = degree - 1;
+      long midTime = internal.keys.get(mid);
       newInternal.keys.addAll(internal.keys.subList(mid + 1, internal.keys.size()));
       internal.keys.subList(mid, internal.keys.size()).clear();
       newInternal.children.addAll(internal.children.subList(mid + 1, internal.children.size()));
       internal.children.subList(mid + 1, internal.children.size()).clear();
-      parent.keys.add(index, internal.keys.get(mid));
+      parent.keys.add(index, midTime);
     }
     parent.children.add(index + 1, newNode);
   }
@@ -297,130 +302,130 @@ public class DeltaIndexTree implements WALEntryValue {
   private boolean isLendable(DeltaIndexTreeNode node) {
     return node.keys.size() > degree - 1;
   }
-}
 
-abstract class DeltaIndexTreeNode implements WALEntryValue {
-  protected List<Long> keys;
-  protected boolean isLeaf;
+  public abstract static class DeltaIndexTreeNode implements WALEntryValue {
+    protected List<Long> keys;
+    protected boolean isLeaf;
 
-  public boolean isLeaf() {
-    return isLeaf;
-  }
-}
-
-class DeltaIndexTreeInternalNode extends DeltaIndexTreeNode {
-  protected List<DeltaIndexTreeNode> children;
-
-  public DeltaIndexTreeInternalNode() {
-    this.isLeaf = false;
-    this.keys = new ArrayList<>();
-    this.children = new ArrayList<>();
-  }
-
-  public int findChildIndex(long ts) {
-    int i = keys.size() - 1;
-    while (i >= 0 && ts < keys.get(i)) {
-      i--;
-    }
-    return i + 1;
-  }
-
-  public DeltaIndexTreeNode getChild(int index) {
-    if (index < 0 || index > children.size()) {
-      return null;
-    }
-    return children.get(index);
-  }
-
-  @Override
-  public int serializedSize() {
-    // isLeaf
-    int size = Byte.BYTES;
-    // length & values for keys
-    size += Integer.BYTES + keys.size() * Long.BYTES;
-    // length & values for entries
-    size += Integer.BYTES;
-    for (DeltaIndexTreeNode node : children) {
-      size += node.serializedSize();
-    }
-    return size;
-  }
-
-  @Override
-  public void serializeToWAL(IWALByteBufferView buffer) {
-    buffer.put(BytesUtils.boolToByte(isLeaf));
-    buffer.putInt(keys.size());
-    for (Long key : keys) {
-      buffer.putLong(key);
-    }
-    buffer.putInt(children.size());
-    for (DeltaIndexTreeNode node : children) {
-      node.serializeToWAL(buffer);
-    }
-  }
-}
-
-class DeltaIndexTreeLeafNode extends DeltaIndexTreeNode {
-  protected List<DeltaIndexEntry> entries;
-  protected DeltaIndexTreeLeafNode next;
-
-  public DeltaIndexTreeLeafNode() {
-    this.isLeaf = true;
-    this.keys = new ArrayList<>();
-    this.entries = new ArrayList<>();
-    this.next = null;
-  }
-
-  public void delete(long ts) {
-    int entryIndex = findRightBoundIndex(ts);
-    while (entryIndex >= 0 && keys.get(entryIndex) == ts) {
-      keys.remove(entryIndex);
-      entries.remove(entryIndex);
-      entryIndex--;
+    public boolean isLeaf() {
+      return isLeaf;
     }
   }
 
-  public void insert(long ts, int stableId, int deltaId) {
-    int entryIndex = findRightBoundIndex(ts) + 1;
-    keys.add(entryIndex, ts);
-    entries.add(entryIndex, new DeltaIndexEntry(stableId, deltaId));
-  }
+  public static class DeltaIndexTreeInternalNode extends DeltaIndexTreeNode {
+    protected List<DeltaIndexTreeNode> children;
 
-  public int findRightBoundIndex(long ts) {
-    int left = 0;
-    int right = keys.size();
-    while (left < right) {
-      int mid = left + (right - left) / 2;
-      if (keys.get(mid) <= ts) {
-        left = mid + 1;
-      } else {
-        right = mid;
+    public DeltaIndexTreeInternalNode() {
+      this.isLeaf = false;
+      this.keys = new ArrayList<>();
+      this.children = new ArrayList<>();
+    }
+
+    public int findChildIndex(long ts) {
+      int i = keys.size() - 1;
+      while (i >= 0 && ts < keys.get(i)) {
+        i--;
+      }
+      return i + 1;
+    }
+
+    public DeltaIndexTreeNode getChild(int index) {
+      if (index < 0 || index > children.size()) {
+        return null;
+      }
+      return children.get(index);
+    }
+
+    @Override
+    public int serializedSize() {
+      // isLeaf
+      int size = Byte.BYTES;
+      // length & values for keys
+      size += Integer.BYTES + keys.size() * Long.BYTES;
+      // length & values for entries
+      size += Integer.BYTES;
+      for (DeltaIndexTreeNode node : children) {
+        size += node.serializedSize();
+      }
+      return size;
+    }
+
+    @Override
+    public void serializeToWAL(IWALByteBufferView buffer) {
+      buffer.put(BytesUtils.boolToByte(isLeaf));
+      buffer.putInt(keys.size());
+      for (Long key : keys) {
+        buffer.putLong(key);
+      }
+      buffer.putInt(children.size());
+      for (DeltaIndexTreeNode node : children) {
+        node.serializeToWAL(buffer);
       }
     }
-    return right - 1;
   }
 
-  @Override
-  public int serializedSize() {
-    // isLeaf
-    int size = Byte.BYTES;
-    // length & values for keys
-    size += Integer.BYTES + keys.size() * Long.BYTES;
-    // length & values for entries
-    size += Integer.BYTES + entries.size() * DeltaIndexEntry.serializedSize();
-    return size;
-  }
+  public static class DeltaIndexTreeLeafNode extends DeltaIndexTreeNode {
+    protected List<DeltaIndexEntry> entries;
+    protected DeltaIndexTreeLeafNode next;
 
-  @Override
-  public void serializeToWAL(IWALByteBufferView buffer) {
-    buffer.put(BytesUtils.boolToByte(isLeaf));
-    buffer.putInt(keys.size());
-    for (Long key : keys) {
-      buffer.putLong(key);
+    public DeltaIndexTreeLeafNode() {
+      this.isLeaf = true;
+      this.keys = new ArrayList<>();
+      this.entries = new ArrayList<>();
+      this.next = null;
     }
-    buffer.putInt(entries.size());
-    for (DeltaIndexEntry e : entries) {
-      e.serializeToWAL(buffer);
+
+    public void delete(long ts) {
+      int entryIndex = findRightBoundIndex(ts);
+      while (entryIndex >= 0 && keys.get(entryIndex) == ts) {
+        keys.remove(entryIndex);
+        entries.remove(entryIndex);
+        entryIndex--;
+      }
+    }
+
+    public void insert(long ts, int stableId, int deltaId) {
+      int entryIndex = findRightBoundIndex(ts) + 1;
+      keys.add(entryIndex, ts);
+      entries.add(entryIndex, new DeltaIndexEntry(stableId, deltaId));
+    }
+
+    public int findRightBoundIndex(long ts) {
+      int left = 0;
+      int right = keys.size();
+      while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (keys.get(mid) <= ts) {
+          left = mid + 1;
+        } else {
+          right = mid;
+        }
+      }
+      return right - 1;
+    }
+
+    @Override
+    public int serializedSize() {
+      // isLeaf
+      int size = Byte.BYTES;
+      // length & values for keys
+      size += Integer.BYTES + keys.size() * Long.BYTES;
+      // length & values for entries
+      size += Integer.BYTES + entries.size() * DeltaIndexEntry.serializedSize();
+      return size;
+    }
+
+    @Override
+    public void serializeToWAL(IWALByteBufferView buffer) {
+      buffer.put(BytesUtils.boolToByte(isLeaf));
+      buffer.putInt(keys.size());
+      for (Long key : keys) {
+        buffer.putLong(key);
+      }
+      buffer.putInt(entries.size());
+      for (DeltaIndexEntry e : entries) {
+        e.serializeToWAL(buffer);
+      }
     }
   }
 }

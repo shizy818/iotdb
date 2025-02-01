@@ -4,10 +4,15 @@ import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
+import org.apache.iotdb.db.utils.MathUtils;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.TimeValuePair;
+import org.apache.tsfile.read.common.TimeRange;
+import org.apache.tsfile.read.common.block.TsBlock;
+import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
@@ -21,8 +26,12 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+
+import static org.apache.iotdb.db.utils.MemUtils.getBinarySize;
+import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 
 public class DeltaWritableMemChunk implements IWritableMemChunk {
   private long maxTime;
@@ -396,9 +405,98 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
         + System.lineSeparator();
   }
 
+  private long writeData(
+      ChunkWriterImpl chunkWriterImpl,
+      TSDataType tsDataType,
+      TimeValuePair tvPair,
+      long dataSizeInCurrentChunk) {
+    long time = tvPair.getTimestamp();
+    switch (tsDataType) {
+      case BOOLEAN:
+        chunkWriterImpl.write(time, tvPair.getValue().getBoolean());
+        dataSizeInCurrentChunk += 8L + 1L;
+        break;
+      case INT32:
+      case DATE:
+        chunkWriterImpl.write(time, tvPair.getValue().getInt());
+        dataSizeInCurrentChunk += 8L + 4L;
+        break;
+      case INT64:
+      case TIMESTAMP:
+        chunkWriterImpl.write(time, tvPair.getValue().getLong());
+        dataSizeInCurrentChunk += 8L + 8L;
+        break;
+      case FLOAT:
+        chunkWriterImpl.write(time, tvPair.getValue().getFloat());
+        dataSizeInCurrentChunk += 8L + 4L;
+        break;
+      case DOUBLE:
+        chunkWriterImpl.write(time, tvPair.getValue().getDouble());
+        dataSizeInCurrentChunk += 8L + 8L;
+        break;
+      case TEXT:
+      case BLOB:
+      case STRING:
+        Binary value = tvPair.getValue().getBinary();
+        chunkWriterImpl.write(time, value);
+        dataSizeInCurrentChunk += 8L + getBinarySize(value);
+        break;
+      default:
+        LOGGER.error("WritableMemChunk does not support data type: {}", tsDataType);
+        break;
+    }
+    return dataSizeInCurrentChunk;
+  }
+
   @Override
   public void encode(BlockingQueue<Object> ioTaskQueue) {
-    // todo
+    TSDataType tsDataType = schema.getType();
+    ChunkWriterImpl chunkWriterImpl = createIChunkWriter();
+    long dataSizeInCurrentChunk = 0;
+    int pointNumInCurrentChunk = 0;
+
+    DeltaMemChunkIterator iterator = iterator();
+    TimeValuePair prevTvPair = null;
+    while (iterator.hasNext()) {
+      TimeValuePair tvPair = iterator.next();
+      if (prevTvPair == null) {
+        prevTvPair = tvPair;
+        continue;
+      }
+
+      prevTvPair = tvPair;
+      dataSizeInCurrentChunk =
+          writeData(chunkWriterImpl, tsDataType, prevTvPair, dataSizeInCurrentChunk);
+      pointNumInCurrentChunk++;
+      if (pointNumInCurrentChunk > MAX_NUMBER_OF_POINTS_IN_CHUNK
+          || dataSizeInCurrentChunk > TARGET_CHUNK_SIZE) {
+        chunkWriterImpl.sealCurrentPage();
+        chunkWriterImpl.clearPageWriter();
+        try {
+          ioTaskQueue.put(chunkWriterImpl);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+        chunkWriterImpl = createIChunkWriter();
+        dataSizeInCurrentChunk = 0;
+        pointNumInCurrentChunk = 0;
+      }
+    }
+
+    // last point for SDT
+    if (prevTvPair != null) {
+      writeData(chunkWriterImpl, tsDataType, prevTvPair, dataSizeInCurrentChunk);
+      pointNumInCurrentChunk++;
+    }
+    if (pointNumInCurrentChunk != 0) {
+      chunkWriterImpl.sealCurrentPage();
+      chunkWriterImpl.clearPageWriter();
+      try {
+        ioTaskQueue.put(chunkWriterImpl);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   @Override
@@ -426,6 +524,60 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
     deltaTree.serializeToWAL(buffer);
   }
 
+  public TsBlock buildTsBlock(
+      int floatPrecision, TSEncoding encoding, List<TimeRange> deletionList) {
+    TSDataType tsDataType = schema.getType();
+    TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(tsDataType));
+    DeltaMemChunkIterator iterator = iterator();
+    int[] deleteCursor = {0};
+    while (iterator.hasNext()) {
+      TimeValuePair tvPair = iterator.next();
+      long time = tvPair.getTimestamp();
+      if (!isPointDeleted(time, deletionList, deleteCursor)) {
+        builder.getTimeColumnBuilder().writeLong(time);
+        switch (tsDataType) {
+          case BOOLEAN:
+            builder.getColumnBuilder(0).writeBoolean(tvPair.getValue().getBoolean());
+            break;
+          case INT32:
+          case DATE:
+            builder.getColumnBuilder(0).writeInt(tvPair.getValue().getInt());
+            break;
+          case INT64:
+          case TIMESTAMP:
+            builder.getColumnBuilder(0).writeLong(tvPair.getValue().getLong());
+            break;
+          case FLOAT:
+            float fv = tvPair.getValue().getFloat();
+            if (!Float.isNaN(fv)
+                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+              fv = MathUtils.roundWithGivenPrecision(fv, floatPrecision);
+            }
+            builder.getColumnBuilder(0).writeFloat(fv);
+            break;
+          case DOUBLE:
+            double dv = tvPair.getValue().getDouble();
+            if (!Double.isNaN(dv)
+                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+              dv = MathUtils.roundWithGivenPrecision(dv, floatPrecision);
+            }
+            builder.getColumnBuilder(0).writeDouble(dv);
+            break;
+          case TEXT:
+          case BLOB:
+          case STRING:
+            builder.getColumnBuilder(0).writeBinary(tvPair.getValue().getBinary());
+            break;
+          default:
+            LOGGER.error("buildTsBlock does not support data type: {}", tsDataType);
+            break;
+        }
+        builder.declarePosition();
+      }
+    }
+    return builder.build();
+  }
+
   public static DeltaWritableMemChunk deserialize(DataInputStream stream) throws IOException {
     DeltaWritableMemChunk memChunk = new DeltaWritableMemChunk();
     memChunk.schema = MeasurementSchema.deserializeFrom(stream);
@@ -433,5 +585,126 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
     memChunk.deltaList = TVList.deserialize(stream);
     memChunk.deltaTree = DeltaIndexTree.deserialize(stream);
     return memChunk;
+  }
+
+  public DeltaMemChunkIterator iterator() {
+    return new DeltaMemChunkIterator();
+  }
+
+  public class DeltaMemChunkIterator {
+    private DeltaIndexTree.DeltaIndexTreeLeafNode current;
+    private int entryIndex = 0;
+    private int stableIndex = 0;
+
+    private boolean probeNext = false;
+    private TimeValuePair currentTvPair = null;
+
+    public DeltaMemChunkIterator() {
+      this.current = deltaTree.getFirstLeaf();
+    }
+
+    private void nextDeltaEntry() {
+      entryIndex++;
+      // next leaf page
+      if (entryIndex >= current.entries.size()) {
+        current = current.next;
+        entryIndex = 0;
+      }
+    }
+
+    private void prepareNext() {
+      currentTvPair = null;
+      // available entry
+      DeltaIndexEntry currentEntry = null;
+
+      // skip deleted entry
+      while (current != null && entryIndex < current.entries.size()) {
+        currentEntry = current.entries.get(entryIndex);
+        if (deltaList.isNullValue(currentEntry.getDeltaId())) {
+          currentEntry = null;
+          nextDeltaEntry();
+        } else {
+          break;
+        }
+      }
+      // skip duplicated timestamp
+      while (current != null && entryIndex < current.entries.size()) {
+        long currentTime = current.keys.get(entryIndex);
+        if ((entryIndex + 1 < current.entries.size()
+                && currentTime == current.keys.get(entryIndex + 1))
+            || (current.next != null
+                && !current.next.keys.isEmpty()
+                && currentTime == current.next.keys.get(0))) {
+          nextDeltaEntry();
+        } else {
+          break;
+        }
+      }
+
+      int stableRowCount = stableList.rowCount();
+      if (currentEntry != null) {
+        int deltaId = currentEntry.getDeltaId();
+        int stableId = currentEntry.getStableId();
+        // skip deleted rows
+        while (stableIndex <= stableId && stableList.isNullValue(stableIndex)) {
+          stableIndex++;
+        }
+        // skip duplicated timestamp
+        while (stableIndex + 1 <= stableId
+            && stableList.getTime(stableIndex) == stableList.getTime(stableIndex + 1)) {
+          stableIndex++;
+        }
+
+        if (stableIndex > stableId) {
+          currentTvPair = deltaList.getTimeValuePair(deltaId);
+        } else if (stableIndex == stableId
+            && stableList.getTime(stableIndex) == deltaList.getTime(deltaId)) {
+          currentTvPair = deltaList.getTimeValuePair(deltaId);
+          stableIndex++;
+        } else {
+          currentTvPair = stableList.getTimeValuePair(stableIndex);
+        }
+      } else {
+        // skip deleted rows
+        while (stableIndex < stableRowCount && stableList.isNullValue(stableIndex)) {
+          stableIndex++;
+        }
+        // skip duplicated timestamp
+        while (stableIndex + 1 < stableRowCount
+            && stableList.getTime(stableIndex) == stableList.getTime(stableIndex + 1)) {
+          stableIndex++;
+        }
+        if (stableIndex < stableRowCount) {
+          currentTvPair = stableList.getTimeValuePair(stableIndex);
+        }
+      }
+      probeNext = true;
+    }
+
+    public boolean hasNext() {
+      if (!probeNext) {
+        prepareNext();
+      }
+      return currentTvPair != null;
+    }
+
+    public TimeValuePair next() {
+      if (!hasNext()) {
+        return null;
+      }
+      if (current == null || current.entries.isEmpty()) {
+        stableIndex++;
+      } else {
+        DeltaIndexEntry currentEntry = current.entries.get(entryIndex);
+        int stableId = currentEntry.getStableId();
+        if (stableIndex <= stableId) {
+          stableIndex++;
+        } else {
+          nextDeltaEntry();
+        }
+      }
+      probeNext = false;
+      return currentTvPair;
+    }
   }
 }

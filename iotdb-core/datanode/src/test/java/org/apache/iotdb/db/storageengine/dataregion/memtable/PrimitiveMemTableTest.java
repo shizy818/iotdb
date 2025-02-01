@@ -115,6 +115,52 @@ public class PrimitiveMemTableTest {
   }
 
   @Test
+  public void deltaMemSeriesSortIteratorTest1() throws IOException {
+    TSDataType dataType = TSDataType.INT32;
+    DeltaWritableMemChunk series =
+        new DeltaWritableMemChunk(new MeasurementSchema("s1", dataType, TSEncoding.PLAIN));
+    int count = 500;
+    for (int i = 0; i < count; i++) {
+      series.writeNonAlignedPoint(i, i);
+    }
+    for (int i = count * 2 - 1; i >= count; i--) {
+      series.writeNonAlignedPoint(i, i);
+    }
+
+    IPointReader it = series.buildTsBlock(-1, null, null).getTsBlockSingleColumnIterator();
+    int i = 0;
+    while (it.hasNextTimeValuePair()) {
+      long ts = it.nextTimeValuePair().getTimestamp();
+      Assert.assertEquals(i, ts);
+      i++;
+    }
+    Assert.assertEquals(count * 2, i);
+  }
+
+  @Test
+  public void deltaMemSeriesSortIteratorTest2() throws IOException {
+    TSDataType dataType = TSDataType.INT32;
+    DeltaWritableMemChunk series =
+        new DeltaWritableMemChunk(new MeasurementSchema("s1", dataType, TSEncoding.PLAIN));
+    int count = 3;
+    for (int i = 0; i < count; i++) {
+      series.writeNonAlignedPoint(i, i);
+    }
+    for (int i = count - 1; i >= 0; i--) {
+      series.writeNonAlignedPoint(i, i + count);
+    }
+
+    IPointReader it = series.buildTsBlock(-1, null, null).getTsBlockSingleColumnIterator();
+    int i = 0;
+    while (it.hasNextTimeValuePair()) {
+      long ts = it.nextTimeValuePair().getTimestamp();
+      Assert.assertEquals(i, ts);
+      i++;
+    }
+    Assert.assertEquals(count, i);
+  }
+
+  @Test
   public void memSeriesToStringTest() throws IOException {
     TSDataType dataType = TSDataType.INT32;
     WritableMemChunk series =
@@ -128,6 +174,31 @@ public class PrimitiveMemTableTest {
     series.writeNonAlignedPoint(20, 21);
     String str = series.toString();
     Assert.assertFalse(series.getTVList().isSorted());
+    Assert.assertEquals(
+        "MemChunk Size: 103"
+            + System.lineSeparator()
+            + "Data type:INT32"
+            + System.lineSeparator()
+            + "First point:0 : 0"
+            + System.lineSeparator()
+            + "Last point:99 : 20"
+            + System.lineSeparator(),
+        str);
+  }
+
+  @Test
+  public void deltaMemSeriesToStringTest() throws IOException {
+    TSDataType dataType = TSDataType.INT32;
+    DeltaWritableMemChunk series =
+        new DeltaWritableMemChunk(new MeasurementSchema("s1", dataType, TSEncoding.PLAIN));
+    int count = 100;
+    for (int i = 0; i < count; i++) {
+      series.writeNonAlignedPoint(i, i);
+    }
+    series.writeNonAlignedPoint(0, 21);
+    series.writeNonAlignedPoint(99, 20);
+    series.writeNonAlignedPoint(20, 21);
+    String str = series.toString();
     Assert.assertEquals(
         "MemChunk Size: 103"
             + System.lineSeparator()

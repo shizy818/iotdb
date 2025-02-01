@@ -44,6 +44,14 @@ public class DeltaIndexEntry {
     return Integer.BYTES * 2;
   }
 
+  public int getStableId() {
+    return stableId;
+  }
+
+  public int getDeltaId() {
+    return deltaId;
+  }
+
   public void serializeToWAL(IWALByteBufferView buffer) {
     buffer.putInt(stableId);
     buffer.putInt(deltaId);
