@@ -65,6 +65,7 @@ public abstract class FloatTVList extends TVList {
   public FloatTVList clone() {
     FloatTVList cloneList = FloatTVList.newList();
     cloneAs(cloneList);
+    cloneBitMap(cloneList);
     for (float[] valueArray : values) {
       cloneList.values.add(cloneValue(valueArray));
     }
@@ -124,6 +125,9 @@ public abstract class FloatTVList extends TVList {
   @Override
   protected void expandValues() {
     values.add((float[]) getPrimitiveArraysByType(TSDataType.FLOAT));
+    if (bitMap != null) {
+      bitMap.add(null);
+    }
   }
 
   @Override

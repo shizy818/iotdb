@@ -65,6 +65,7 @@ public abstract class DoubleTVList extends TVList {
   public DoubleTVList clone() {
     DoubleTVList cloneList = DoubleTVList.newList();
     cloneAs(cloneList);
+    cloneBitMap(cloneList);
     for (double[] valueArray : values) {
       cloneList.values.add(cloneValue(valueArray));
     }
@@ -124,6 +125,9 @@ public abstract class DoubleTVList extends TVList {
   @Override
   protected void expandValues() {
     values.add((double[]) getPrimitiveArraysByType(TSDataType.DOUBLE));
+    if (bitMap != null) {
+      bitMap.add(null);
+    }
   }
 
   @Override

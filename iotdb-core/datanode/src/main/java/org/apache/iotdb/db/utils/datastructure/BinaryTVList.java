@@ -66,6 +66,7 @@ public abstract class BinaryTVList extends TVList {
   public TimBinaryTVList clone() {
     TimBinaryTVList cloneList = new TimBinaryTVList();
     cloneAs(cloneList);
+    cloneBitMap(cloneList);
     for (Binary[] valueArray : values) {
       cloneList.values.add(cloneValue(valueArray));
     }
@@ -151,6 +152,9 @@ public abstract class BinaryTVList extends TVList {
   @Override
   protected void expandValues() {
     values.add((Binary[]) getPrimitiveArraysByType(TSDataType.TEXT));
+    if (bitMap != null) {
+      bitMap.add(null);
+    }
   }
 
   @Override

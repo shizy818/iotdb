@@ -64,6 +64,7 @@ public abstract class IntTVList extends TVList {
   public IntTVList clone() {
     IntTVList cloneList = IntTVList.newList();
     cloneAs(cloneList);
+    cloneBitMap(cloneList);
     for (int[] valueArray : values) {
       cloneList.values.add(cloneValue(valueArray));
     }
@@ -123,6 +124,9 @@ public abstract class IntTVList extends TVList {
   @Override
   protected void expandValues() {
     values.add((int[]) getPrimitiveArraysByType(TSDataType.INT32));
+    if (bitMap != null) {
+      bitMap.add(null);
+    }
   }
 
   @Override

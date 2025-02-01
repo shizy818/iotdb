@@ -53,6 +53,10 @@ public abstract class TVList implements WALEntryValue {
   protected List<long[]> timestamps;
   protected int rowCount;
 
+  // used by non-aligned TVList
+  // Index relation: arrayIndex -> elementIndex
+  protected List<BitMap> bitMap;
+
   protected boolean sorted = true;
   protected long maxTime;
   // record reference count of this tv list
@@ -120,6 +124,19 @@ public abstract class TVList implements WALEntryValue {
 
   public int rowCount() {
     return rowCount;
+  }
+
+  public int count() {
+    if (bitMap == null) {
+      return rowCount;
+    }
+    int count = 0;
+    for (int row = 0; row < rowCount; row++) {
+      if (!isNullValue(row)) {
+        count++;
+      }
+    }
+    return count;
   }
 
   public long getTime(int index) {
@@ -251,27 +268,23 @@ public abstract class TVList implements WALEntryValue {
     PrimitiveArrayManager.release(timestamps.remove(timestamps.size() - 1));
   }
 
+  // todo: binary search
   public int delete(long lowerBound, long upperBound) {
-    int newSize = 0;
-    maxTime = Long.MIN_VALUE;
+    int deletedNumber = 0;
+    long maxTime = Long.MIN_VALUE;
     for (int i = 0; i < rowCount; i++) {
       long time = getTime(i);
-      if (time < lowerBound || time > upperBound) {
-        set(i, newSize++);
+      if (time >= lowerBound && time <= upperBound) {
+        int originRowIndex = getValueIndex(i);
+        if (!isNullValue(originRowIndex)) {
+          int arrayIndex = originRowIndex / ARRAY_SIZE;
+          int elementIndex = originRowIndex % ARRAY_SIZE;
+          markNullValue(arrayIndex, elementIndex);
+          deletedNumber++;
+        }
+      } else {
         maxTime = Math.max(time, maxTime);
       }
-    }
-    int deletedNumber = rowCount - newSize;
-    rowCount = newSize;
-    // release primitive arrays that are empty
-    int newArrayNum = newSize / ARRAY_SIZE;
-    if (newSize % ARRAY_SIZE != 0) {
-      newArrayNum++;
-    }
-    int oldArrayNum = timestamps.size();
-    for (int releaseIdx = newArrayNum; releaseIdx < oldArrayNum; releaseIdx++) {
-      releaseLastTimeArray();
-      releaseLastValueArray();
     }
     return deletedNumber;
   }
@@ -291,6 +304,7 @@ public abstract class TVList implements WALEntryValue {
     maxTime = Long.MIN_VALUE;
     clearTime();
     clearValue();
+    clearBitMap();
   }
 
   protected void clearTime() {
@@ -423,5 +437,49 @@ public abstract class TVList implements WALEntryValue {
       }
     }
     return right - 1;
+  }
+
+  public boolean isNullValue(int unsortedRowIndex) {
+    if (unsortedRowIndex >= rowCount) {
+      throw new IndexOutOfBoundsException("Index out of bound error!");
+    }
+    if (bitMap == null || bitMap.get(unsortedRowIndex / ARRAY_SIZE) == null) {
+      return false;
+    }
+    int arrayIndex = unsortedRowIndex / ARRAY_SIZE;
+    int elementIndex = unsortedRowIndex % ARRAY_SIZE;
+    return bitMap.get(arrayIndex).isMarked(elementIndex);
+  }
+
+  public void markNullValue(int arrayIndex, int elementIndex) {
+    // init bitMap if doesn't have
+    if (bitMap == null) {
+      bitMap = new ArrayList<>();
+      for (int i = 0; i < timestamps.size(); i++) {
+        bitMap.add(new BitMap(ARRAY_SIZE));
+      }
+    }
+    // if the bitmap in arrayIndex is null, init the bitmap
+    if (bitMap.get(arrayIndex) == null) {
+      bitMap.set(arrayIndex, new BitMap(ARRAY_SIZE));
+    }
+
+    // mark the null value in the current bitmap
+    bitMap.get(arrayIndex).mark(elementIndex);
+  }
+
+  protected void cloneBitMap(TVList cloneList) {
+    if (bitMap != null) {
+      cloneList.bitMap = new ArrayList<>();
+      for (BitMap bm : bitMap) {
+        cloneList.bitMap.add(bm == null ? null : bm.clone());
+      }
+    }
+  }
+
+  protected void clearBitMap() {
+    if (bitMap != null) {
+      bitMap.clear();
+    }
   }
 }
