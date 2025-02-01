@@ -407,4 +407,21 @@ public abstract class TVList implements WALEntryValue {
   public List<long[]> getTimestamps() {
     return timestamps;
   }
+
+  public int binarySearch(long ts) {
+    if (!sorted) {
+      return -1;
+    }
+    int left = 0;
+    int right = rowCount;
+    while (left < right) {
+      int mid = left + (right - left) / 2;
+      if (getTime(mid) <= ts) {
+        left = mid + 1;
+      } else {
+        right = mid;
+      }
+    }
+    return right - 1;
+  }
 }
