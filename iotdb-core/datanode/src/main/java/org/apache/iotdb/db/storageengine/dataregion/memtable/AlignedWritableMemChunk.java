@@ -249,9 +249,14 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
   @Override
   public long count() {
     if (!ignoreAllNullRows && measurementIndexMap.isEmpty()) {
-      return list.rowCount();
+      return rowCount();
     }
-    return (long) list.rowCount() * measurementIndexMap.size();
+    return rowCount() * measurementIndexMap.size();
+  }
+
+  @Override
+  public long rowCount() {
+    return alignedListSize();
   }
 
   public int alignedListSize() {

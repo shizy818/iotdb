@@ -255,6 +255,11 @@ public class WritableMemChunk implements IWritableMemChunk {
 
   @Override
   public long count() {
+    return list.count();
+  }
+
+  @Override
+  public long rowCount() {
     return list.rowCount();
   }
 

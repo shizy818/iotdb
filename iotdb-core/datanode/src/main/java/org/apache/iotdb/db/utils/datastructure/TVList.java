@@ -275,10 +275,9 @@ public abstract class TVList implements WALEntryValue {
     for (int i = 0; i < rowCount; i++) {
       long time = getTime(i);
       if (time >= lowerBound && time <= upperBound) {
-        int originRowIndex = getValueIndex(i);
-        if (!isNullValue(originRowIndex)) {
-          int arrayIndex = originRowIndex / ARRAY_SIZE;
-          int elementIndex = originRowIndex % ARRAY_SIZE;
+        if (!isNullValue(i)) {
+          int arrayIndex = i / ARRAY_SIZE;
+          int elementIndex = i % ARRAY_SIZE;
           markNullValue(arrayIndex, elementIndex);
           deletedNumber++;
         }

@@ -27,8 +27,8 @@ import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedWritableMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedWritableMemChunkGroup;
+import org.apache.iotdb.db.storageengine.dataregion.memtable.DeltaWritableMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.IMemTable;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.IWritableMemChunkGroup;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.modification.ModEntry;
@@ -36,6 +36,8 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.utils.ModificationUtils;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
+import org.apache.tsfile.common.conf.TSFileDescriptor;
+import org.apache.tsfile.encoding.encoder.Encoder;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.AlignedChunkMetadata;
 import org.apache.tsfile.file.metadata.AlignedTimeSeriesMetadata;
@@ -48,6 +50,7 @@ import org.apache.tsfile.file.metadata.enums.CompressionType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
 import org.apache.tsfile.read.common.TimeRange;
+import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
 import org.apache.tsfile.write.schema.VectorMeasurementSchema;
@@ -374,10 +377,10 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
         || !memTableMap.get(deviceID).contains(fullPath.getMeasurement())) {
       return null;
     }
-    IWritableMemChunk memChunk =
-        memTableMap.get(deviceID).getMemChunkMap().get(fullPath.getMeasurement());
-    // get sorted tv list is synchronized so different query can get right sorted list reference
-    TVList chunkCopy = memChunk.getSortedTvListForQuery();
+    DeltaWritableMemChunk memChunk =
+        (DeltaWritableMemChunk)
+            memTableMap.get(deviceID).getMemChunkMap().get(fullPath.getMeasurement());
+
     List<TimeRange> deletionList = null;
     if (modsToMemtable != null) {
       deletionList =
@@ -388,14 +391,15 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
               modsToMemtable,
               timeLowerBound);
     }
+    int floatPrecision = TSFileDescriptor.getInstance().getConfig().getFloatPrecision();
+    TSEncoding encoding = fullPath.getMeasurementSchema().getEncodingType();
+    Map<String, String> props = fullPath.getMeasurementSchema().getProps();
+    if (props != null && props.containsKey(Encoder.MAX_POINT_NUMBER)) {
+      floatPrecision = Integer.parseInt(props.get(Encoder.MAX_POINT_NUMBER));
+    }
+    TsBlock tsBlock = memChunk.buildTsBlock(floatPrecision, encoding, deletionList);
     return new ReadOnlyMemChunk(
-        context,
-        fullPath.getMeasurement(),
-        fullPath.getMeasurementSchema().getType(),
-        fullPath.getMeasurementSchema().getEncodingType(),
-        chunkCopy,
-        fullPath.getMeasurementSchema().getProps(),
-        deletionList);
+        context, fullPath.getMeasurement(), fullPath.getMeasurementSchema().getType(), tsBlock);
   }
 
   @Override

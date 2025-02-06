@@ -228,11 +228,17 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   }
 
   private List<Integer> splitStableAndDelta(long[] t, BitMap bitMap, int start, int end) {
+    if (bitMap == null) {
+      bitMap = new BitMap(t.length);
+    }
     List<Integer> deltaIndices = new ArrayList<>();
     for (int i = start; i < end; i++) {
+      if (bitMap.isMarked(i)) {
+        continue;
+      }
       if (t[i] >= maxTime) {
         maxTime = t[i];
-      } else if (!bitMap.isMarked(i)) {
+      } else {
         deltaIndices.add(i);
         bitMap.mark(i);
       }
@@ -325,6 +331,11 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
 
   @Override
   public long count() {
+    return stableList.count() + deltaList.count();
+  }
+
+  @Override
+  public long rowCount() {
     return stableList.rowCount() + deltaList.rowCount();
   }
 
@@ -367,7 +378,9 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
 
   @Override
   public int delete(long lowerBound, long upperBound) {
-    return stableList.delete(lowerBound, upperBound) + deltaList.delete(lowerBound, upperBound);
+    int delete1 = stableList.delete(lowerBound, upperBound);
+    int delete2 = deltaList.delete(lowerBound, upperBound);
+    return delete1 + delete2;
   }
 
   @Override
@@ -464,10 +477,11 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
         continue;
       }
 
-      prevTvPair = tvPair;
       dataSizeInCurrentChunk =
           writeData(chunkWriterImpl, tsDataType, prevTvPair, dataSizeInCurrentChunk);
       pointNumInCurrentChunk++;
+      prevTvPair = tvPair;
+
       if (pointNumInCurrentChunk > MAX_NUMBER_OF_POINTS_IN_CHUNK
           || dataSizeInCurrentChunk > TARGET_CHUNK_SIZE) {
         chunkWriterImpl.sealCurrentPage();
@@ -485,6 +499,7 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
 
     // last point for SDT
     if (prevTvPair != null) {
+      chunkWriterImpl.setLastPoint(true);
       writeData(chunkWriterImpl, tsDataType, prevTvPair, dataSizeInCurrentChunk);
       pointNumInCurrentChunk++;
     }
@@ -629,13 +644,15 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
       }
       // skip duplicated timestamp
       while (current != null && entryIndex < current.entries.size()) {
-        long currentTime = current.keys.get(entryIndex);
         if ((entryIndex + 1 < current.entries.size()
-                && currentTime == current.keys.get(entryIndex + 1))
+                && current.keys.get(entryIndex).longValue()
+                    == current.keys.get(entryIndex + 1).longValue())
             || (current.next != null
                 && !current.next.keys.isEmpty()
-                && currentTime == current.next.keys.get(0))) {
+                && current.keys.get(entryIndex).longValue()
+                    == current.next.keys.get(0).longValue())) {
           nextDeltaEntry();
+          currentEntry = current.entries.get(entryIndex);
         } else {
           break;
         }

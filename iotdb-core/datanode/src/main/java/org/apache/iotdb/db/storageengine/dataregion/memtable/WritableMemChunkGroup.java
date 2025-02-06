@@ -70,7 +70,7 @@ public class WritableMemChunkGroup implements IWritableMemChunkGroup {
 
   private IWritableMemChunk createMemChunkIfNotExistAndGet(IMeasurementSchema schema) {
     return memChunkMap.computeIfAbsent(
-        schema.getMeasurementName(), k -> new WritableMemChunk(schema));
+        schema.getMeasurementName(), k -> new DeltaWritableMemChunk(schema));
   }
 
   @Override
@@ -146,11 +146,11 @@ public class WritableMemChunkGroup implements IWritableMemChunkGroup {
   }
 
   @Override
-  public long getCurrentTVListSize(String measurement) {
+  public long getMeasurementSize(String measurement) {
     if (!memChunkMap.containsKey(measurement)) {
       return 0;
     }
-    return memChunkMap.get(measurement).getTVList().rowCount();
+    return memChunkMap.get(measurement).rowCount();
   }
 
   @Override

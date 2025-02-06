@@ -96,6 +96,16 @@ public class ReadOnlyMemChunk {
     initChunkMetaFromTsBlock();
   }
 
+  public ReadOnlyMemChunk(
+      QueryContext context, String measurementUid, TSDataType dataType, TsBlock tsBlock)
+      throws IOException, QueryProcessException {
+    this.context = context;
+    this.measurementUid = measurementUid;
+    this.dataType = dataType;
+    this.tsBlock = tsBlock;
+    initChunkMetaFromTsBlock();
+  }
+
   private void initChunkMetaFromTsBlock() throws QueryProcessException {
     Statistics statsByType = Statistics.getStatsByType(dataType);
     IChunkMetadata metaData =

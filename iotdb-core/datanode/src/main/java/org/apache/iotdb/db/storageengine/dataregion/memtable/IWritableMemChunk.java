@@ -85,6 +85,8 @@ public interface IWritableMemChunk extends WALEntryValue {
 
   long count();
 
+  long rowCount();
+
   IMeasurementSchema getSchema();
 
   /**
