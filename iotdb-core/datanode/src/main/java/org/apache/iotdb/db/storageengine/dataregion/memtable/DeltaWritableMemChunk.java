@@ -345,14 +345,14 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   }
 
   @Override
-  public TVList getSortedTvListForQuery() {
-    return null;
+  public synchronized TVList getSortedTvListForQuery() {
+    throw new UnSupportedDataTypeException(UNSUPPORTED_TYPE + schema.getType().name());
   }
 
   @Override
-  public TVList getSortedTvListForQuery(
+  public synchronized TVList getSortedTvListForQuery(
       List<IMeasurementSchema> schemaList, boolean ignoreAllNullRows) {
-    return null;
+    throw new UnSupportedDataTypeException(UNSUPPORTED_TYPE + schema.getType().name());
   }
 
   @Override
@@ -518,6 +518,7 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   public void release() {
     stableList.clear();
     deltaList.clear();
+    deltaTree.clear();
   }
 
   @Override

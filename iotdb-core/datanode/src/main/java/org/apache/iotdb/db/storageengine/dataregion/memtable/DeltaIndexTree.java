@@ -21,6 +21,7 @@ package org.apache.iotdb.db.storageengine.dataregion.memtable;
 
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.WALEntryValue;
+import org.apache.iotdb.db.storageengine.rescon.memory.DeltaIndexTreeNodeManager;
 
 import org.apache.tsfile.utils.BytesUtils;
 import org.apache.tsfile.utils.Pair;
@@ -40,8 +41,12 @@ public class DeltaIndexTree implements WALEntryValue {
   /** Constructor */
   public DeltaIndexTree(int degree) {
     this.degree = degree;
-    this.firstLeaf = new DeltaIndexTreeLeafNode();
+    this.firstLeaf = (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true);
     this.root = this.firstLeaf;
+  }
+
+  public void clear() {
+    root.clear();
   }
 
   public DeltaIndexTreeLeafNode getFirstLeaf() {
@@ -70,7 +75,8 @@ public class DeltaIndexTree implements WALEntryValue {
       DataInputStream stream, DeltaIndexTreeLeafNode leftSibling) throws IOException {
     boolean isLeaf = ReadWriteIOUtils.readBool(stream);
     if (isLeaf) {
-      DeltaIndexTreeLeafNode leafNode = new DeltaIndexTreeLeafNode();
+      DeltaIndexTreeLeafNode leafNode =
+          (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true);
       int keySize = ReadWriteIOUtils.readInt(stream);
       for (int i = 0; i < keySize; i++) {
         leafNode.keys.add(ReadWriteIOUtils.readLong(stream));
@@ -85,7 +91,8 @@ public class DeltaIndexTree implements WALEntryValue {
       }
       return new Pair<>(leafNode, leafNode);
     } else {
-      DeltaIndexTreeInternalNode internalNode = new DeltaIndexTreeInternalNode();
+      DeltaIndexTreeInternalNode internalNode =
+          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false);
       DeltaIndexTreeLeafNode leftNode = leftSibling;
       int keySize = ReadWriteIOUtils.readInt(stream);
       for (int i = 0; i < keySize; i++) {
@@ -128,7 +135,8 @@ public class DeltaIndexTree implements WALEntryValue {
   public void insert(long ts, int stableId, int deltaId) {
     DeltaIndexTreeNode root = this.root;
     if (isFull(root)) {
-      DeltaIndexTreeInternalNode newRoot = new DeltaIndexTreeInternalNode();
+      DeltaIndexTreeInternalNode newRoot =
+          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false);
       newRoot.children.add(root);
       this.root = newRoot;
       splitChild(newRoot, 0, root);
@@ -160,7 +168,8 @@ public class DeltaIndexTree implements WALEntryValue {
     DeltaIndexTreeNode newNode;
     if (child.isLeaf()) {
       DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) child;
-      DeltaIndexTreeLeafNode newLeaf = new DeltaIndexTreeLeafNode();
+      DeltaIndexTreeLeafNode newLeaf =
+          (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true);
       newNode = newLeaf;
       int mid = degree;
       newLeaf.keys.addAll(leaf.keys.subList(mid, leaf.keys.size()));
@@ -172,7 +181,8 @@ public class DeltaIndexTree implements WALEntryValue {
       parent.keys.add(index, newLeaf.keys.get(0));
     } else {
       DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) child;
-      DeltaIndexTreeInternalNode newInternal = new DeltaIndexTreeInternalNode();
+      DeltaIndexTreeInternalNode newInternal =
+          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false);
       newNode = newInternal;
       int mid = degree - 1;
       long midTime = internal.keys.get(mid);
@@ -310,6 +320,8 @@ public class DeltaIndexTree implements WALEntryValue {
     public boolean isLeaf() {
       return isLeaf;
     }
+
+    public abstract void clear();
   }
 
   public static class DeltaIndexTreeInternalNode extends DeltaIndexTreeNode {
@@ -361,6 +373,16 @@ public class DeltaIndexTree implements WALEntryValue {
       for (DeltaIndexTreeNode node : children) {
         node.serializeToWAL(buffer);
       }
+    }
+
+    @Override
+    public void clear() {
+      for (DeltaIndexTreeNode node : children) {
+        node.clear();
+      }
+      this.keys.clear();
+      this.children.clear();
+      DeltaIndexTreeNodeManager.release(this);
     }
   }
 
@@ -426,6 +448,14 @@ public class DeltaIndexTree implements WALEntryValue {
       for (DeltaIndexEntry e : entries) {
         e.serializeToWAL(buffer);
       }
+    }
+
+    @Override
+    public void clear() {
+      this.keys.clear();
+      this.entries.clear();
+      this.next = null;
+      DeltaIndexTreeNodeManager.release(this);
     }
   }
 }
