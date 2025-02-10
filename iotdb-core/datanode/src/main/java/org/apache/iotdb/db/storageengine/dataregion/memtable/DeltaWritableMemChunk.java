@@ -622,7 +622,7 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
     private void nextDeltaEntry() {
       entryIndex++;
       // next leaf page
-      if (entryIndex >= current.entries.size()) {
+      if (entryIndex >= current.count) {
         current = current.next;
         entryIndex = 0;
       }
@@ -634,8 +634,8 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
       DeltaIndexEntry currentEntry = null;
 
       // skip deleted entry
-      while (current != null && entryIndex < current.entries.size()) {
-        currentEntry = current.entries.get(entryIndex);
+      while (current != null && entryIndex < current.count) {
+        currentEntry = current.entries[entryIndex];
         if (deltaList.isNullValue(currentEntry.getDeltaId())) {
           currentEntry = null;
           nextDeltaEntry();
@@ -644,16 +644,14 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
         }
       }
       // skip duplicated timestamp
-      while (current != null && entryIndex < current.entries.size()) {
-        if ((entryIndex + 1 < current.entries.size()
-                && current.keys.get(entryIndex).longValue()
-                    == current.keys.get(entryIndex + 1).longValue())
+      while (current != null && entryIndex < current.count) {
+        if ((entryIndex + 1 < current.count
+                && current.keys[entryIndex] == current.keys[entryIndex + 1])
             || (current.next != null
-                && !current.next.keys.isEmpty()
-                && current.keys.get(entryIndex).longValue()
-                    == current.next.keys.get(0).longValue())) {
+                && !current.next.isEmpty()
+                && current.keys[entryIndex] == current.next.keys[0])) {
           nextDeltaEntry();
-          currentEntry = current.entries.get(entryIndex);
+          currentEntry = current.entries[entryIndex];
         } else {
           break;
         }
@@ -710,10 +708,10 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
       if (!hasNext()) {
         return null;
       }
-      if (current == null || current.entries.isEmpty()) {
+      if (current == null || current.isEmpty()) {
         stableIndex++;
       } else {
-        DeltaIndexEntry currentEntry = current.entries.get(entryIndex);
+        DeltaIndexEntry currentEntry = current.entries[entryIndex];
         int stableId = currentEntry.getStableId();
         if (stableIndex <= stableId) {
           stableIndex++;

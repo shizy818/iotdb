@@ -21,16 +21,11 @@ package org.apache.iotdb.db.storageengine.dataregion.memtable;
 
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
 
-import org.apache.tsfile.utils.ReadWriteIOUtils;
-
-import java.io.DataInputStream;
-import java.io.IOException;
-
 public class DeltaIndexEntry {
   // records to read in stable table before this entry
-  private final int stableId;
+  private int stableId;
   // index of delta table of this entry
-  private final int deltaId;
+  private int deltaId;
 
   // records to read in delta index before this entry
   // private int count;
@@ -52,14 +47,18 @@ public class DeltaIndexEntry {
     return deltaId;
   }
 
+  public void setId(int stableId, int deltaId) {
+    this.stableId = stableId;
+    this.deltaId = deltaId;
+  }
+
+  public void reset() {
+    this.stableId = 0;
+    this.deltaId = 0;
+  }
+
   public void serializeToWAL(IWALByteBufferView buffer) {
     buffer.putInt(stableId);
     buffer.putInt(deltaId);
-  }
-
-  public static DeltaIndexEntry deserialize(DataInputStream stream) throws IOException {
-    int sId = ReadWriteIOUtils.readInt(stream);
-    int dId = ReadWriteIOUtils.readInt(stream);
-    return new DeltaIndexEntry(sId, dId);
   }
 }
