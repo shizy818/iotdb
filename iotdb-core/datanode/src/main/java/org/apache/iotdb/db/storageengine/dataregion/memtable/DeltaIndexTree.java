@@ -47,6 +47,7 @@ public class DeltaIndexTree implements WALEntryValue {
 
   public void clear() {
     root.clear();
+    root = null;
   }
 
   public DeltaIndexTreeLeafNode getFirstLeaf() {
@@ -378,7 +379,9 @@ public class DeltaIndexTree implements WALEntryValue {
     @Override
     public void clear() {
       for (DeltaIndexTreeNode node : children) {
-        node.clear();
+        if (node != null) {
+          node.clear();
+        }
       }
       this.keys.clear();
       this.children.clear();
