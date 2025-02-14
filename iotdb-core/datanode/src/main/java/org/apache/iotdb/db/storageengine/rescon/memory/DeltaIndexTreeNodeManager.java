@@ -13,8 +13,8 @@ public class DeltaIndexTreeNodeManager {
   }
 
   private static void init() {
-    LIMITS[0] = 10000;
-    LIMITS[1] = 100000;
+    LIMITS[0] = 1000 * 50;
+    LIMITS[1] = 1000 * 1000;
     POOLED_DELTA_TREE_NODE[0] = new ArrayDeque<>(LIMITS[0]);
     POOLED_DELTA_TREE_NODE[1] = new ArrayDeque<>(LIMITS[1]);
   }
@@ -23,7 +23,7 @@ public class DeltaIndexTreeNodeManager {
     // Empty constructor
   }
 
-  public static Object allocate(boolean isLeaf) {
+  public static Object allocate(boolean isLeaf, int degree) {
     Object node;
     int order = isLeaf ? 1 : 0;
     synchronized (POOLED_DELTA_TREE_NODE[order]) {
@@ -32,8 +32,8 @@ public class DeltaIndexTreeNodeManager {
     if (node == null) {
       node =
           isLeaf
-              ? new DeltaIndexTree.DeltaIndexTreeLeafNode()
-              : new DeltaIndexTree.DeltaIndexTreeInternalNode();
+              ? new DeltaIndexTree.DeltaIndexTreeLeafNode(degree)
+              : new DeltaIndexTree.DeltaIndexTreeInternalNode(degree);
     }
     return node;
   }

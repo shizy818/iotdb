@@ -28,9 +28,9 @@ import java.io.IOException;
 
 public class DeltaIndexEntry {
   // records to read in stable table before this entry
-  private final int stableId;
+  private int stableId;
   // index of delta table of this entry
-  private final int deltaId;
+  private int deltaId;
 
   // records to read in delta index before this entry
   // private int count;
@@ -50,6 +50,16 @@ public class DeltaIndexEntry {
 
   public int getDeltaId() {
     return deltaId;
+  }
+
+  public void reset() {
+    this.stableId = -1;
+    this.deltaId = -1;
+  }
+
+  public void set(int stableId, int deltaId) {
+    this.stableId = stableId;
+    this.deltaId = deltaId;
   }
 
   public void serializeToWAL(IWALByteBufferView buffer) {

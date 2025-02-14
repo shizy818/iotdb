@@ -29,8 +29,7 @@ import org.apache.tsfile.utils.ReadWriteIOUtils;
 
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 
 public class DeltaIndexTree implements WALEntryValue {
   private final int degree;
@@ -41,7 +40,7 @@ public class DeltaIndexTree implements WALEntryValue {
   /** Constructor */
   public DeltaIndexTree(int degree) {
     this.degree = degree;
-    this.firstLeaf = (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true);
+    this.firstLeaf = (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true, degree);
     this.root = this.firstLeaf;
   }
 
@@ -68,23 +67,23 @@ public class DeltaIndexTree implements WALEntryValue {
   public static DeltaIndexTree deserialize(DataInputStream stream) throws IOException {
     int degree = ReadWriteIOUtils.readInt(stream);
     DeltaIndexTree deltaIndexTree = new DeltaIndexTree(degree);
-    deltaIndexTree.root = deserialize(stream, null).left;
+    deltaIndexTree.root = deserialize(stream, null, degree).left;
     return deltaIndexTree;
   }
 
   private static Pair<DeltaIndexTreeNode, DeltaIndexTreeLeafNode> deserialize(
-      DataInputStream stream, DeltaIndexTreeLeafNode leftSibling) throws IOException {
+      DataInputStream stream, DeltaIndexTreeLeafNode leftSibling, int degree) throws IOException {
     boolean isLeaf = ReadWriteIOUtils.readBool(stream);
     if (isLeaf) {
       DeltaIndexTreeLeafNode leafNode =
-          (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true);
+          (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true, degree);
       int keySize = ReadWriteIOUtils.readInt(stream);
       for (int i = 0; i < keySize; i++) {
-        leafNode.keys.add(ReadWriteIOUtils.readLong(stream));
+        leafNode.keys[i] = ReadWriteIOUtils.readLong(stream);
       }
       int entrySize = ReadWriteIOUtils.readInt(stream);
       for (int i = 0; i < entrySize; i++) {
-        leafNode.entries.add(DeltaIndexEntry.deserialize(stream));
+        leafNode.entries[i] = DeltaIndexEntry.deserialize(stream);
       }
 
       if (leftSibling != null) {
@@ -93,15 +92,15 @@ public class DeltaIndexTree implements WALEntryValue {
       return new Pair<>(leafNode, leafNode);
     } else {
       DeltaIndexTreeInternalNode internalNode =
-          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false);
+          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false, degree);
       DeltaIndexTreeLeafNode leftNode = leftSibling;
       int keySize = ReadWriteIOUtils.readInt(stream);
       for (int i = 0; i < keySize; i++) {
-        internalNode.keys.add(ReadWriteIOUtils.readLong(stream));
+        internalNode.keys[i] = ReadWriteIOUtils.readLong(stream);
       }
       int childrenSize = ReadWriteIOUtils.readInt(stream);
       for (int i = 0; i < childrenSize; i++) {
-        Pair<DeltaIndexTreeNode, DeltaIndexTreeLeafNode> p = deserialize(stream, leftNode);
+        Pair<DeltaIndexTreeNode, DeltaIndexTreeLeafNode> p = deserialize(stream, leftNode, degree);
         leftNode = p.right;
       }
       return new Pair<>(internalNode, leftSibling);
@@ -109,36 +108,36 @@ public class DeltaIndexTree implements WALEntryValue {
   }
 
   public long getMinTime() {
-    return firstLeaf.keys.isEmpty() ? Long.MAX_VALUE : firstLeaf.keys.get(0);
+    return firstLeaf.isEmpty() ? Long.MAX_VALUE : firstLeaf.keys[0];
   }
 
-  /** Search API */
-  public DeltaIndexEntry search(long ts) {
-    return search(root, ts);
-  }
-
-  private DeltaIndexEntry search(DeltaIndexTreeNode node, long ts) {
-    if (node.isLeaf()) {
-      DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) node;
-      int entryIndex = leaf.findRightBoundIndex(ts);
-      if (leaf.keys.get(entryIndex) == ts) {
-        return leaf.entries.get(entryIndex);
-      }
-      return null;
-    } else {
-      DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) node;
-      int childIndex = internal.findChildIndex(ts);
-      return search(internal.children.get(childIndex), ts);
-    }
-  }
+  //  /** Search API */
+  //  public DeltaIndexEntry search(long ts) {
+  //    return search(root, ts);
+  //  }
+  //
+  //  private DeltaIndexEntry search(DeltaIndexTreeNode node, long ts) {
+  //    if (node.isLeaf()) {
+  //      DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) node;
+  //      int entryIndex = leaf.findRightBoundIndex(ts);
+  //      if (leaf.keys.get(entryIndex) == ts) {
+  //        return leaf.entries.get(entryIndex);
+  //      }
+  //      return null;
+  //    } else {
+  //      DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) node;
+  //      int childIndex = internal.findChildIndex(ts);
+  //      return search(internal.children.get(childIndex), ts);
+  //    }
+  //  }
 
   /** Insert API */
   public void insert(long ts, int stableId, int deltaId) {
     DeltaIndexTreeNode root = this.root;
     if (isFull(root)) {
       DeltaIndexTreeInternalNode newRoot =
-          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false);
-      newRoot.children.add(root);
+          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false, degree);
+      newRoot.children[0] = root;
       this.root = newRoot;
       splitChild(newRoot, 0, root);
       insertNonFull(newRoot, ts, stableId, deltaId);
@@ -154,199 +153,203 @@ public class DeltaIndexTree implements WALEntryValue {
     } else {
       DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) node;
       int childIndex = internal.findChildIndex(ts);
-      DeltaIndexTreeNode child = internal.children.get(childIndex);
+      DeltaIndexTreeNode child = internal.children[childIndex];
       if (isFull(child)) {
         splitChild(internal, childIndex, child);
-        if (ts > internal.keys.get(childIndex)) {
+        if (ts > internal.keys[childIndex]) {
           childIndex++;
         }
       }
-      insertNonFull(internal.children.get(childIndex), ts, stableId, deltaId);
+      insertNonFull(internal.children[childIndex], ts, stableId, deltaId);
     }
   }
 
   private void splitChild(DeltaIndexTreeInternalNode parent, int index, DeltaIndexTreeNode child) {
-    DeltaIndexTreeNode newNode;
     if (child.isLeaf()) {
       DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) child;
       DeltaIndexTreeLeafNode newLeaf =
-          (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true);
-      newNode = newLeaf;
-      int mid = degree;
-      newLeaf.keys.addAll(leaf.keys.subList(mid, leaf.keys.size()));
-      newLeaf.entries.addAll(leaf.entries.subList(mid, leaf.entries.size()));
-      leaf.keys.subList(mid, leaf.keys.size()).clear();
-      leaf.entries.subList(mid, leaf.entries.size()).clear();
+          (DeltaIndexTreeLeafNode) DeltaIndexTreeNodeManager.allocate(true, degree);
+      leaf.moveTo(newLeaf, degree, leaf.count);
       newLeaf.next = leaf.next;
       leaf.next = newLeaf;
-      parent.keys.add(index, newLeaf.keys.get(0));
+      parent.add(index, newLeaf.keys[0], newLeaf);
     } else {
       DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) child;
       DeltaIndexTreeInternalNode newInternal =
-          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false);
-      newNode = newInternal;
-      int mid = degree - 1;
-      long midTime = internal.keys.get(mid);
-      newInternal.keys.addAll(internal.keys.subList(mid + 1, internal.keys.size()));
-      internal.keys.subList(mid, internal.keys.size()).clear();
-      newInternal.children.addAll(internal.children.subList(mid + 1, internal.children.size()));
-      internal.children.subList(mid + 1, internal.children.size()).clear();
-      parent.keys.add(index, midTime);
-    }
-    parent.children.add(index + 1, newNode);
-  }
-
-  /** Delete API */
-  public void delete(long ts) {
-    if (root.keys.isEmpty()) {
-      return;
-    }
-    delete(root, ts);
-    if (root.keys.isEmpty() && !root.isLeaf()) {
-      root = ((DeltaIndexTreeInternalNode) root).children.get(0);
+          (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false, degree);
+      long midTime = internal.moveTo(newInternal, degree, internal.count);
+      parent.add(index, midTime, newInternal);
     }
   }
 
-  private void delete(DeltaIndexTreeNode node, long ts) {
-    if (node.isLeaf()) {
-      DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) node;
-      leaf.delete(ts);
-    } else {
-      DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) node;
-      int childIndex = internal.findChildIndex(ts);
-      DeltaIndexTreeNode child = internal.children.get(childIndex);
-      delete(child, ts);
-      if (isDeficient(child)) {
-        fixShortage(internal, childIndex);
-      }
-    }
-  }
-
-  private void fixShortage(DeltaIndexTreeInternalNode parent, int index) {
-    DeltaIndexTreeNode leftSibling = index > 0 ? parent.children.get(index - 1) : null;
-    DeltaIndexTreeNode rightSibling =
-        index < parent.children.size() - 1 ? parent.children.get(index + 1) : null;
-
-    if (leftSibling != null && isLendable(leftSibling)) {
-      borrowFromLeft(parent, index);
-    } else if (rightSibling != null && isLendable(rightSibling)) {
-      borrowFromRight(parent, index);
-    } else {
-      if (leftSibling != null) {
-        mergeNodes(parent, index - 1);
-      } else {
-        mergeNodes(parent, index);
-      }
-    }
-  }
-
-  private void borrowFromLeft(DeltaIndexTreeInternalNode parent, int index) {
-    DeltaIndexTreeNode leftSibling = parent.children.get(index - 1);
-    DeltaIndexTreeNode child = parent.children.get(index);
-
-    if (child.isLeaf()) {
-      DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) child;
-      DeltaIndexTreeLeafNode leftLeaf = (DeltaIndexTreeLeafNode) leftSibling;
-      long lastKey = leftLeaf.keys.remove(leftLeaf.keys.size() - 1);
-      leaf.keys.add(0, lastKey);
-      parent.keys.set(index - 1, leaf.keys.get(0));
-    } else {
-      DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) child;
-      DeltaIndexTreeInternalNode leftInternal = (DeltaIndexTreeInternalNode) leftSibling;
-      long lastKey = leftInternal.keys.remove(leftInternal.keys.size() - 1);
-      DeltaIndexTreeNode lastChild = leftInternal.children.remove(leftInternal.children.size() - 1);
-      internal.keys.add(0, parent.keys.get(index - 1));
-      internal.children.add(0, lastChild);
-      parent.keys.set(index - 1, lastKey);
-    }
-  }
-
-  private void borrowFromRight(DeltaIndexTreeInternalNode parent, int index) {
-    DeltaIndexTreeNode rightSibling = parent.children.get(index + 1);
-    DeltaIndexTreeNode child = parent.children.get(index);
-
-    if (child.isLeaf()) {
-      DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) child;
-      DeltaIndexTreeLeafNode rightLeaf = (DeltaIndexTreeLeafNode) rightSibling;
-      long firstKey = rightLeaf.keys.remove(0);
-      leaf.keys.add(firstKey);
-      parent.keys.set(index, rightLeaf.keys.get(0));
-    } else {
-      DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) child;
-      DeltaIndexTreeInternalNode rightInternal = (DeltaIndexTreeInternalNode) rightSibling;
-      long firstKey = rightInternal.keys.remove(0);
-      DeltaIndexTreeNode firstChild = rightInternal.children.remove(0);
-      internal.keys.add(parent.keys.get(index));
-      internal.children.add(firstChild);
-      parent.keys.set(index, firstKey);
-    }
-  }
-
-  private void mergeNodes(DeltaIndexTreeInternalNode parent, int index) {
-    DeltaIndexTreeNode leftChild = parent.children.get(index);
-    DeltaIndexTreeNode rightChild = parent.children.get(index + 1);
-
-    if (leftChild.isLeaf()) {
-      DeltaIndexTreeLeafNode leftLeaf = (DeltaIndexTreeLeafNode) leftChild;
-      DeltaIndexTreeLeafNode rightLeaf = (DeltaIndexTreeLeafNode) rightChild;
-      leftLeaf.keys.addAll(rightLeaf.keys);
-      leftLeaf.next = rightLeaf.next;
-    } else {
-      DeltaIndexTreeInternalNode leftInternal = (DeltaIndexTreeInternalNode) leftChild;
-      DeltaIndexTreeInternalNode rightInternal = (DeltaIndexTreeInternalNode) rightChild;
-      leftInternal.keys.add(parent.keys.get(index));
-      leftInternal.keys.addAll(rightInternal.keys);
-      leftInternal.children.addAll(rightInternal.children);
-    }
-    parent.keys.remove(index);
-    parent.children.remove(index + 1);
-  }
+  //  /** Delete API */
+  //  public void delete(long ts) {
+  //    if (root.keys.isEmpty()) {
+  //      return;
+  //    }
+  //    delete(root, ts);
+  //    if (root.keys.isEmpty() && !root.isLeaf()) {
+  //      root = ((DeltaIndexTreeInternalNode) root).children.get(0);
+  //    }
+  //  }
+  //
+  //  private void delete(DeltaIndexTreeNode node, long ts) {
+  //    if (node.isLeaf()) {
+  //      DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) node;
+  //      leaf.delete(ts);
+  //    } else {
+  //      DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) node;
+  //      int childIndex = internal.findChildIndex(ts);
+  //      DeltaIndexTreeNode child = internal.children.get(childIndex);
+  //      delete(child, ts);
+  //      if (isDeficient(child)) {
+  //        fixShortage(internal, childIndex);
+  //      }
+  //    }
+  //  }
+  //
+  //  private void fixShortage(DeltaIndexTreeInternalNode parent, int index) {
+  //    DeltaIndexTreeNode leftSibling = index > 0 ? parent.children.get(index - 1) : null;
+  //    DeltaIndexTreeNode rightSibling =
+  //        index < parent.children.size() - 1 ? parent.children.get(index + 1) : null;
+  //
+  //    if (leftSibling != null && isLendable(leftSibling)) {
+  //      borrowFromLeft(parent, index);
+  //    } else if (rightSibling != null && isLendable(rightSibling)) {
+  //      borrowFromRight(parent, index);
+  //    } else {
+  //      if (leftSibling != null) {
+  //        mergeNodes(parent, index - 1);
+  //      } else {
+  //        mergeNodes(parent, index);
+  //      }
+  //    }
+  //  }
+  //
+  //  private void borrowFromLeft(DeltaIndexTreeInternalNode parent, int index) {
+  //    DeltaIndexTreeNode leftSibling = parent.children.get(index - 1);
+  //    DeltaIndexTreeNode child = parent.children.get(index);
+  //
+  //    if (child.isLeaf()) {
+  //      DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) child;
+  //      DeltaIndexTreeLeafNode leftLeaf = (DeltaIndexTreeLeafNode) leftSibling;
+  //      long lastKey = leftLeaf.keys.remove(leftLeaf.keys.size() - 1);
+  //      leaf.keys.add(0, lastKey);
+  //      parent.keys.set(index - 1, leaf.keys.get(0));
+  //    } else {
+  //      DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) child;
+  //      DeltaIndexTreeInternalNode leftInternal = (DeltaIndexTreeInternalNode) leftSibling;
+  //      long lastKey = leftInternal.keys.remove(leftInternal.keys.size() - 1);
+  //      DeltaIndexTreeNode lastChild = leftInternal.children.remove(leftInternal.children.size() -
+  // 1);
+  //      internal.keys.add(0, parent.keys.get(index - 1));
+  //      internal.children.add(0, lastChild);
+  //      parent.keys.set(index - 1, lastKey);
+  //    }
+  //  }
+  //
+  //  private void borrowFromRight(DeltaIndexTreeInternalNode parent, int index) {
+  //    DeltaIndexTreeNode rightSibling = parent.children.get(index + 1);
+  //    DeltaIndexTreeNode child = parent.children.get(index);
+  //
+  //    if (child.isLeaf()) {
+  //      DeltaIndexTreeLeafNode leaf = (DeltaIndexTreeLeafNode) child;
+  //      DeltaIndexTreeLeafNode rightLeaf = (DeltaIndexTreeLeafNode) rightSibling;
+  //      long firstKey = rightLeaf.keys.remove(0);
+  //      leaf.keys.add(firstKey);
+  //      parent.keys.set(index, rightLeaf.keys.get(0));
+  //    } else {
+  //      DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) child;
+  //      DeltaIndexTreeInternalNode rightInternal = (DeltaIndexTreeInternalNode) rightSibling;
+  //      long firstKey = rightInternal.keys.remove(0);
+  //      DeltaIndexTreeNode firstChild = rightInternal.children.remove(0);
+  //      internal.keys.add(parent.keys.get(index));
+  //      internal.children.add(firstChild);
+  //      parent.keys.set(index, firstKey);
+  //    }
+  //  }
+  //
+  //  private void mergeNodes(DeltaIndexTreeInternalNode parent, int index) {
+  //    DeltaIndexTreeNode leftChild = parent.children.get(index);
+  //    DeltaIndexTreeNode rightChild = parent.children.get(index + 1);
+  //
+  //    if (leftChild.isLeaf()) {
+  //      DeltaIndexTreeLeafNode leftLeaf = (DeltaIndexTreeLeafNode) leftChild;
+  //      DeltaIndexTreeLeafNode rightLeaf = (DeltaIndexTreeLeafNode) rightChild;
+  //      leftLeaf.keys.addAll(rightLeaf.keys);
+  //      leftLeaf.next = rightLeaf.next;
+  //    } else {
+  //      DeltaIndexTreeInternalNode leftInternal = (DeltaIndexTreeInternalNode) leftChild;
+  //      DeltaIndexTreeInternalNode rightInternal = (DeltaIndexTreeInternalNode) rightChild;
+  //      leftInternal.keys.add(parent.keys.get(index));
+  //      leftInternal.keys.addAll(rightInternal.keys);
+  //      leftInternal.children.addAll(rightInternal.children);
+  //    }
+  //    parent.keys.remove(index);
+  //    parent.children.remove(index + 1);
+  //  }
 
   private boolean isFull(DeltaIndexTreeNode node) {
-    return node.keys.size() == 2 * degree - 1;
+    return node.count == 2 * degree - 1;
   }
 
   private boolean isDeficient(DeltaIndexTreeNode node) {
-    return node.keys.size() < degree - 1;
+    return node.count < degree - 1;
   }
 
   private boolean isLendable(DeltaIndexTreeNode node) {
-    return node.keys.size() > degree - 1;
+    return node.count > degree - 1;
   }
 
   public abstract static class DeltaIndexTreeNode implements WALEntryValue {
-    protected List<Long> keys;
+    protected long[] keys;
+    protected int count;
     protected boolean isLeaf;
 
     public boolean isLeaf() {
       return isLeaf;
     }
 
+    public boolean isEmpty() {
+      return count == 0;
+    }
+
     public abstract void clear();
   }
 
   public static class DeltaIndexTreeInternalNode extends DeltaIndexTreeNode {
-    protected List<DeltaIndexTreeNode> children;
+    protected DeltaIndexTreeNode[] children;
 
-    public DeltaIndexTreeInternalNode() {
+    public DeltaIndexTreeInternalNode(int degree) {
       this.isLeaf = false;
-      this.keys = new ArrayList<>();
-      this.children = new ArrayList<>();
+      this.keys = new long[2 * degree - 1];
+      this.count = 0;
+      this.children = new DeltaIndexTreeNode[2 * degree];
     }
 
     public int findChildIndex(long ts) {
-      int i = keys.size() - 1;
-      while (i >= 0 && ts < keys.get(i)) {
+      int i = count - 1;
+      while (i >= 0 && ts < keys[i]) {
         i--;
       }
       return i + 1;
     }
 
     public DeltaIndexTreeNode getChild(int index) {
-      if (index < 0 || index > children.size()) {
+      if (index < 0 || index >= count + 1) {
         return null;
       }
-      return children.get(index);
+      return children[index];
+    }
+
+    public void add(int index, long ts, DeltaIndexTreeNode node) {
+      if (index < count) {
+        System.arraycopy(keys, index, keys, index + 1, count - index);
+        System.arraycopy(children, index + 1, children, index + 2, count - index);
+      }
+      keys[index] = ts;
+      children[index + 1] = node;
+      count++;
     }
 
     @Override
@@ -354,11 +357,11 @@ public class DeltaIndexTree implements WALEntryValue {
       // isLeaf
       int size = Byte.BYTES;
       // length & values for keys
-      size += Integer.BYTES + keys.size() * Long.BYTES;
+      size += Integer.BYTES + count * Long.BYTES;
       // length & values for entries
       size += Integer.BYTES;
-      for (DeltaIndexTreeNode node : children) {
-        size += node.serializedSize();
+      for (int i = 0; i < count + 1; i++) {
+        size += children[i].serializedSize();
       }
       return size;
     }
@@ -366,61 +369,77 @@ public class DeltaIndexTree implements WALEntryValue {
     @Override
     public void serializeToWAL(IWALByteBufferView buffer) {
       buffer.put(BytesUtils.boolToByte(isLeaf));
-      buffer.putInt(keys.size());
-      for (Long key : keys) {
-        buffer.putLong(key);
+      buffer.putInt(count);
+      for (int i = 0; i < count; i++) {
+        buffer.putLong(keys[i]);
       }
-      buffer.putInt(children.size());
-      for (DeltaIndexTreeNode node : children) {
-        node.serializeToWAL(buffer);
+      buffer.putInt(count + 1);
+      for (int i = 0; i < count + 1; i++) {
+        children[i].serializeToWAL(buffer);
       }
     }
 
     @Override
     public void clear() {
-      for (DeltaIndexTreeNode node : children) {
-        if (node != null) {
-          node.clear();
-        }
+      for (int i = 0; i < count + 1; i++) {
+        children[i].clear();
       }
-      this.keys.clear();
-      this.children.clear();
+      Arrays.fill(keys, 0);
+      Arrays.fill(children, null);
+      this.count = 0;
       DeltaIndexTreeNodeManager.release(this);
+    }
+
+    public long moveTo(DeltaIndexTreeInternalNode dest, int start, int end) {
+      System.arraycopy(this.keys, start, dest.keys, 0, end - start);
+      System.arraycopy(this.children, start, dest.children, 0, end - start + 1);
+      dest.count = end - start;
+
+      // Arrays.fill(this.children, start, end + 1, null);
+      int mid = start - 1;
+      // this.keys[mid] = 0;
+      this.count = mid;
+      return this.keys[mid];
     }
   }
 
   public static class DeltaIndexTreeLeafNode extends DeltaIndexTreeNode {
-    protected List<DeltaIndexEntry> entries;
+    protected DeltaIndexEntry[] entries;
     protected DeltaIndexTreeLeafNode next;
 
-    public DeltaIndexTreeLeafNode() {
+    public DeltaIndexTreeLeafNode(int degree) {
       this.isLeaf = true;
-      this.keys = new ArrayList<>();
-      this.entries = new ArrayList<>();
+      this.keys = new long[2 * degree - 1];
+      this.count = 0;
+      this.entries = new DeltaIndexEntry[2 * degree - 1];
+      for (int i = 0; i < entries.length; i++) {
+        entries[i] = new DeltaIndexEntry(-1, -1);
+      }
       this.next = null;
     }
 
     public void delete(long ts) {
       int entryIndex = findRightBoundIndex(ts);
-      while (entryIndex >= 0 && keys.get(entryIndex) == ts) {
-        keys.remove(entryIndex);
-        entries.remove(entryIndex);
+      while (entryIndex >= 0 && keys[entryIndex] == ts) {
+        remove(entryIndex);
         entryIndex--;
       }
     }
 
     public void insert(long ts, int stableId, int deltaId) {
+      if (count >= keys.length) {
+        throw new RuntimeException("Unexpected Error!");
+      }
       int entryIndex = findRightBoundIndex(ts) + 1;
-      keys.add(entryIndex, ts);
-      entries.add(entryIndex, new DeltaIndexEntry(stableId, deltaId));
+      add(entryIndex, ts, stableId, deltaId);
     }
 
     public int findRightBoundIndex(long ts) {
       int left = 0;
-      int right = keys.size();
+      int right = count;
       while (left < right) {
         int mid = left + (right - left) / 2;
-        if (keys.get(mid) <= ts) {
+        if (keys[mid] <= ts) {
           left = mid + 1;
         } else {
           right = mid;
@@ -434,31 +453,74 @@ public class DeltaIndexTree implements WALEntryValue {
       // isLeaf
       int size = Byte.BYTES;
       // length & values for keys
-      size += Integer.BYTES + keys.size() * Long.BYTES;
+      size += Integer.BYTES + count * Long.BYTES;
       // length & values for entries
-      size += Integer.BYTES + entries.size() * DeltaIndexEntry.serializedSize();
+      size += Integer.BYTES + count * DeltaIndexEntry.serializedSize();
       return size;
     }
 
     @Override
     public void serializeToWAL(IWALByteBufferView buffer) {
       buffer.put(BytesUtils.boolToByte(isLeaf));
-      buffer.putInt(keys.size());
-      for (Long key : keys) {
-        buffer.putLong(key);
+      buffer.putInt(count);
+      for (int i = 0; i < count; i++) {
+        buffer.putLong(keys[i]);
       }
-      buffer.putInt(entries.size());
-      for (DeltaIndexEntry e : entries) {
-        e.serializeToWAL(buffer);
+      buffer.putInt(count);
+      for (int i = 0; i < count; i++) {
+        entries[i].serializeToWAL(buffer);
       }
     }
 
     @Override
     public void clear() {
-      this.keys.clear();
-      this.entries.clear();
+      Arrays.fill(keys, 0);
+      for (int i = 0; i < count; i++) {
+        entries[i].reset();
+      }
+      this.count = 0;
       this.next = null;
       DeltaIndexTreeNodeManager.release(this);
+    }
+
+    public void moveTo(DeltaIndexTreeLeafNode dest, int start, int end) {
+      System.arraycopy(this.keys, start, dest.keys, 0, end - start);
+      for (int i = start; i < end; i++) {
+        DeltaIndexEntry entry = entries[i];
+        dest.entries[i - start].set(entry.getStableId(), entry.getDeltaId());
+        // entry.reset();
+      }
+      this.count = start;
+      dest.count = end - start;
+    }
+
+    private void remove(int index) {
+      if (index == count - 1) {
+        keys[index] = 0;
+        entries[index].reset();
+      } else {
+        System.arraycopy(keys, index + 1, keys, index, count - index - 1);
+        DeltaIndexEntry toRemove = entries[index];
+        toRemove.reset();
+        System.arraycopy(entries, index + 1, entries, index, count - index - 1);
+        entries[count] = toRemove;
+      }
+      count--;
+    }
+
+    private void add(int index, long ts, int stableId, int deltaId) {
+      if (index == count) {
+        keys[index] = ts;
+        entries[index].set(stableId, deltaId);
+      } else {
+        System.arraycopy(keys, index, keys, index + 1, count - index);
+        keys[index] = ts;
+        DeltaIndexEntry toAdd = entries[count];
+        toAdd.set(stableId, deltaId);
+        System.arraycopy(entries, index, entries, index + 1, count - index);
+        entries[index] = toAdd;
+      }
+      count++;
     }
   }
 }
