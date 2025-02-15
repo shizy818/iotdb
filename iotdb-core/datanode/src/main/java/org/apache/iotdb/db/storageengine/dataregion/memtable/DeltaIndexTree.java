@@ -81,8 +81,7 @@ public class DeltaIndexTree implements WALEntryValue {
       for (int i = 0; i < keySize; i++) {
         leafNode.keys[i] = ReadWriteIOUtils.readLong(stream);
       }
-      int entrySize = ReadWriteIOUtils.readInt(stream);
-      for (int i = 0; i < entrySize; i++) {
+      for (int i = 0; i < keySize; i++) {
         leafNode.stableIds[i] = ReadWriteIOUtils.readInt(stream);
         leafNode.deltaIds[i] = ReadWriteIOUtils.readInt(stream);
       }
@@ -99,8 +98,7 @@ public class DeltaIndexTree implements WALEntryValue {
       for (int i = 0; i < keySize; i++) {
         internalNode.keys[i] = ReadWriteIOUtils.readLong(stream);
       }
-      int childrenSize = ReadWriteIOUtils.readInt(stream);
-      for (int i = 0; i < childrenSize; i++) {
+      for (int i = 0; i < keySize + 1; i++) {
         Pair<DeltaIndexTreeNode, DeltaIndexTreeLeafNode> p = deserialize(stream, leftNode, degree);
         leftNode = p.right;
       }
@@ -135,7 +133,7 @@ public class DeltaIndexTree implements WALEntryValue {
   /** Insert API */
   public void insert(long ts, int stableId, int deltaId) {
     DeltaIndexTreeNode root = this.root;
-    if (isFull(root)) {
+    if (root.isFull()) {
       DeltaIndexTreeInternalNode newRoot =
           (DeltaIndexTreeInternalNode) DeltaIndexTreeNodeManager.allocate(false, degree);
       newRoot.children[0] = root;
@@ -155,7 +153,7 @@ public class DeltaIndexTree implements WALEntryValue {
       DeltaIndexTreeInternalNode internal = (DeltaIndexTreeInternalNode) node;
       int childIndex = internal.findChildIndex(ts);
       DeltaIndexTreeNode child = internal.children[childIndex];
-      if (isFull(child)) {
+      if (child.isFull()) {
         splitChild(internal, childIndex, child);
         if (ts > internal.keys[childIndex]) {
           childIndex++;
@@ -203,7 +201,7 @@ public class DeltaIndexTree implements WALEntryValue {
   //      int childIndex = internal.findChildIndex(ts);
   //      DeltaIndexTreeNode child = internal.children.get(childIndex);
   //      delete(child, ts);
-  //      if (isDeficient(child)) {
+  //      if (child.isDeficient()) {
   //        fixShortage(internal, childIndex);
   //      }
   //    }
@@ -214,9 +212,9 @@ public class DeltaIndexTree implements WALEntryValue {
   //    DeltaIndexTreeNode rightSibling =
   //        index < parent.children.size() - 1 ? parent.children.get(index + 1) : null;
   //
-  //    if (leftSibling != null && isLendable(leftSibling)) {
+  //    if (leftSibling != null && leftSibling.isLendable()) {
   //      borrowFromLeft(parent, index);
-  //    } else if (rightSibling != null && isLendable(rightSibling)) {
+  //    } else if (rightSibling != null && rightSibling.isLendable()) {
   //      borrowFromRight(parent, index);
   //    } else {
   //      if (leftSibling != null) {
@@ -290,18 +288,6 @@ public class DeltaIndexTree implements WALEntryValue {
   //    parent.children.remove(index + 1);
   //  }
 
-  private boolean isFull(DeltaIndexTreeNode node) {
-    return node.count == 2 * degree - 1;
-  }
-
-  private boolean isDeficient(DeltaIndexTreeNode node) {
-    return node.count < degree - 1;
-  }
-
-  private boolean isLendable(DeltaIndexTreeNode node) {
-    return node.count > degree - 1;
-  }
-
   public abstract static class DeltaIndexTreeNode implements WALEntryValue {
     protected long[] keys;
     protected int count;
@@ -313,6 +299,20 @@ public class DeltaIndexTree implements WALEntryValue {
 
     public boolean isEmpty() {
       return count == 0;
+    }
+
+    private boolean isFull() {
+      return count == keys.length;
+    }
+
+    private boolean isDeficient() {
+      int degree = (keys.length + 1) / 2;
+      return count < degree - 1;
+    }
+
+    private boolean isLendable() {
+      int degree = (keys.length + 1) / 2;
+      return count > degree - 1;
     }
 
     public abstract void clear();
@@ -355,12 +355,11 @@ public class DeltaIndexTree implements WALEntryValue {
 
     @Override
     public int serializedSize() {
-      // isLeaf
-      int size = Byte.BYTES;
-      // length & values for keys
-      size += Integer.BYTES + count * Long.BYTES;
-      // length & values for entries
-      size += Integer.BYTES;
+      // isLeaf & count
+      int size = Byte.BYTES + Integer.BYTES;
+      // keys
+      size += count * Long.BYTES;
+      // children
       for (int i = 0; i < count + 1; i++) {
         size += children[i].serializedSize();
       }
@@ -374,7 +373,6 @@ public class DeltaIndexTree implements WALEntryValue {
       for (int i = 0; i < count; i++) {
         buffer.putLong(keys[i]);
       }
-      buffer.putInt(count + 1);
       for (int i = 0; i < count + 1; i++) {
         children[i].serializeToWAL(buffer);
       }
@@ -448,12 +446,12 @@ public class DeltaIndexTree implements WALEntryValue {
 
     @Override
     public int serializedSize() {
-      // isLeaf
-      int size = Byte.BYTES;
-      // length & values for keys
-      size += Integer.BYTES + count * Long.BYTES;
-      // length & values for entries
-      size += Integer.BYTES + count * 2 * Integer.BYTES;
+      // isLeaf & count
+      int size = Byte.BYTES + Integer.BYTES;
+      // keys
+      size += count * Long.BYTES;
+      // stableIds & deltaIds
+      size += count * 2 * Integer.BYTES;
       return size;
     }
 
@@ -464,7 +462,6 @@ public class DeltaIndexTree implements WALEntryValue {
       for (int i = 0; i < count; i++) {
         buffer.putLong(keys[i]);
       }
-      buffer.putInt(count);
       for (int i = 0; i < count; i++) {
         buffer.putInt(stableIds[i]);
         buffer.putInt(deltaIds[i]);
