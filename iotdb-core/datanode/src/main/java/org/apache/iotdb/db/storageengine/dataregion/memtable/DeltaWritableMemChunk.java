@@ -630,14 +630,13 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
 
     private void prepareNext() {
       currentTvPair = null;
-      // available entry
-      DeltaIndexEntry currentEntry = null;
+      boolean validEntry = false;
 
       // skip deleted entry
       while (current != null && entryIndex < current.count) {
-        currentEntry = current.entries[entryIndex];
-        if (deltaList.isNullValue(currentEntry.getDeltaId())) {
-          currentEntry = null;
+        validEntry = true;
+        if (deltaList.isNullValue(current.deltaIds[entryIndex])) {
+          validEntry = false;
           nextDeltaEntry();
         } else {
           break;
@@ -651,16 +650,15 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
                 && !current.next.isEmpty()
                 && current.keys[entryIndex] == current.next.keys[0])) {
           nextDeltaEntry();
-          currentEntry = current.entries[entryIndex];
         } else {
           break;
         }
       }
 
       int stableRowCount = stableList.rowCount();
-      if (currentEntry != null) {
-        int deltaId = currentEntry.getDeltaId();
-        int stableId = currentEntry.getStableId();
+      if (validEntry) {
+        int stableId = current.stableIds[entryIndex];
+        int deltaId = current.deltaIds[entryIndex];
         // skip deleted rows
         while (stableIndex <= stableId && stableList.isNullValue(stableIndex)) {
           stableIndex++;
@@ -711,8 +709,7 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
       if (current == null || current.isEmpty()) {
         stableIndex++;
       } else {
-        DeltaIndexEntry currentEntry = current.entries[entryIndex];
-        int stableId = currentEntry.getStableId();
+        int stableId = current.stableIds[entryIndex];
         if (stableIndex <= stableId) {
           stableIndex++;
         } else {

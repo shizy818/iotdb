@@ -83,7 +83,8 @@ public class DeltaIndexTree implements WALEntryValue {
       }
       int entrySize = ReadWriteIOUtils.readInt(stream);
       for (int i = 0; i < entrySize; i++) {
-        leafNode.entries[i] = DeltaIndexEntry.deserialize(stream);
+        leafNode.stableIds[i] = ReadWriteIOUtils.readInt(stream);
+        leafNode.deltaIds[i] = ReadWriteIOUtils.readInt(stream);
       }
 
       if (leftSibling != null) {
@@ -395,26 +396,23 @@ public class DeltaIndexTree implements WALEntryValue {
       System.arraycopy(this.children, start, dest.children, 0, end - start + 1);
       dest.count = end - start;
 
-      // Arrays.fill(this.children, start, end + 1, null);
       int mid = start - 1;
-      // this.keys[mid] = 0;
       this.count = mid;
       return this.keys[mid];
     }
   }
 
   public static class DeltaIndexTreeLeafNode extends DeltaIndexTreeNode {
-    protected DeltaIndexEntry[] entries;
+    protected int[] stableIds;
+    protected int[] deltaIds;
     protected DeltaIndexTreeLeafNode next;
 
     public DeltaIndexTreeLeafNode(int degree) {
       this.isLeaf = true;
       this.keys = new long[2 * degree - 1];
+      this.stableIds = new int[2 * degree - 1];
+      this.deltaIds = new int[2 * degree - 1];
       this.count = 0;
-      this.entries = new DeltaIndexEntry[2 * degree - 1];
-      for (int i = 0; i < entries.length; i++) {
-        entries[i] = new DeltaIndexEntry(-1, -1);
-      }
       this.next = null;
     }
 
@@ -428,7 +426,7 @@ public class DeltaIndexTree implements WALEntryValue {
 
     public void insert(long ts, int stableId, int deltaId) {
       if (count >= keys.length) {
-        throw new RuntimeException("Unexpected Error!");
+        throw new ArrayIndexOutOfBoundsException(count);
       }
       int entryIndex = findRightBoundIndex(ts) + 1;
       add(entryIndex, ts, stableId, deltaId);
@@ -455,7 +453,7 @@ public class DeltaIndexTree implements WALEntryValue {
       // length & values for keys
       size += Integer.BYTES + count * Long.BYTES;
       // length & values for entries
-      size += Integer.BYTES + count * DeltaIndexEntry.serializedSize();
+      size += Integer.BYTES + count * 2 * Integer.BYTES;
       return size;
     }
 
@@ -468,16 +466,16 @@ public class DeltaIndexTree implements WALEntryValue {
       }
       buffer.putInt(count);
       for (int i = 0; i < count; i++) {
-        entries[i].serializeToWAL(buffer);
+        buffer.putInt(stableIds[i]);
+        buffer.putInt(deltaIds[i]);
       }
     }
 
     @Override
     public void clear() {
       Arrays.fill(keys, 0);
-      for (int i = 0; i < count; i++) {
-        entries[i].reset();
-      }
+      Arrays.fill(stableIds, -1);
+      Arrays.fill(deltaIds, -1);
       this.count = 0;
       this.next = null;
       DeltaIndexTreeNodeManager.release(this);
@@ -485,11 +483,8 @@ public class DeltaIndexTree implements WALEntryValue {
 
     public void moveTo(DeltaIndexTreeLeafNode dest, int start, int end) {
       System.arraycopy(this.keys, start, dest.keys, 0, end - start);
-      for (int i = start; i < end; i++) {
-        DeltaIndexEntry entry = entries[i];
-        dest.entries[i - start].set(entry.getStableId(), entry.getDeltaId());
-        // entry.reset();
-      }
+      System.arraycopy(this.stableIds, start, dest.stableIds, 0, end - start);
+      System.arraycopy(this.deltaIds, start, dest.deltaIds, 0, end - start);
       this.count = start;
       dest.count = end - start;
     }
@@ -497,13 +492,12 @@ public class DeltaIndexTree implements WALEntryValue {
     private void remove(int index) {
       if (index == count - 1) {
         keys[index] = 0;
-        entries[index].reset();
+        stableIds[index] = -1;
+        deltaIds[index] = -1;
       } else {
         System.arraycopy(keys, index + 1, keys, index, count - index - 1);
-        DeltaIndexEntry toRemove = entries[index];
-        toRemove.reset();
-        System.arraycopy(entries, index + 1, entries, index, count - index - 1);
-        entries[count] = toRemove;
+        System.arraycopy(stableIds, index + 1, stableIds, index, count - index - 1);
+        System.arraycopy(deltaIds, index + 1, deltaIds, index, count - index - 1);
       }
       count--;
     }
@@ -511,14 +505,15 @@ public class DeltaIndexTree implements WALEntryValue {
     private void add(int index, long ts, int stableId, int deltaId) {
       if (index == count) {
         keys[index] = ts;
-        entries[index].set(stableId, deltaId);
+        stableIds[index] = stableId;
+        deltaIds[index] = deltaId;
       } else {
         System.arraycopy(keys, index, keys, index + 1, count - index);
+        System.arraycopy(stableIds, index, stableIds, index + 1, count - index);
+        System.arraycopy(deltaIds, index, deltaIds, index + 1, count - index);
         keys[index] = ts;
-        DeltaIndexEntry toAdd = entries[count];
-        toAdd.set(stableId, deltaId);
-        System.arraycopy(entries, index, entries, index + 1, count - index);
-        entries[index] = toAdd;
+        stableIds[index] = stableId;
+        deltaIds[index] = deltaId;
       }
       count++;
     }
