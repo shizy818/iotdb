@@ -106,10 +106,6 @@ public class DeltaIndexTree implements WALEntryValue {
     }
   }
 
-  public long getMinTime() {
-    return firstLeaf.isEmpty() ? Long.MAX_VALUE : firstLeaf.keys[0];
-  }
-
   //  /** Search API */
   //  public DeltaIndexEntry search(long ts) {
   //    return search(root, ts);

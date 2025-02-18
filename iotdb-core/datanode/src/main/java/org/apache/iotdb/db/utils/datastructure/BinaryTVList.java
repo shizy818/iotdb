@@ -85,6 +85,7 @@ public abstract class BinaryTVList extends TVList {
     int arrayIndex = rowCount / ARRAY_SIZE;
     int elementIndex = rowCount % ARRAY_SIZE;
     maxTime = Math.max(maxTime, timestamp);
+    minTime = Math.min(minTime, timestamp);
     timestamps.get(arrayIndex)[elementIndex] = timestamp;
     values.get(arrayIndex)[elementIndex] = value;
     rowCount++;
@@ -97,11 +98,13 @@ public abstract class BinaryTVList extends TVList {
   public int delete(long lowerBound, long upperBound) {
     int newSize = 0;
     maxTime = Long.MIN_VALUE;
+    minTime = Long.MAX_VALUE;
     for (int i = 0; i < rowCount; i++) {
       long time = getTime(i);
       if (time < lowerBound || time > upperBound) {
         set(i, newSize++);
         maxTime = Math.max(maxTime, time);
+        minTime = Math.min(minTime, time);
       }
     }
     int deletedNumber = rowCount - newSize;
@@ -210,10 +213,10 @@ public abstract class BinaryTVList extends TVList {
       value = clonedValue;
       // drop null at the end of value array
       int nullCnt =
-          dropNullValThenUpdateMaxTimeAndSorted(time, value, bitMap, start, end, timeIdxOffset);
+          dropNullValThenUpdateMaxMinTimeAndSorted(time, value, bitMap, start, end, timeIdxOffset);
       end -= nullCnt;
     } else {
-      updateMaxTimeAndSorted(time, start, end);
+      updateMaxMinTimeAndSorted(time, start, end);
     }
 
     while (idx < end) {
@@ -242,7 +245,7 @@ public abstract class BinaryTVList extends TVList {
   }
 
   // move null values to the end of time array and value array, then return number of null values
-  int dropNullValThenUpdateMaxTimeAndSorted(
+  int dropNullValThenUpdateMaxMinTimeAndSorted(
       long[] time, Binary[] values, BitMap bitMap, int start, int end, int tIdxOffset) {
     long inPutMinTime = Long.MAX_VALUE;
     boolean inputSorted = true;
@@ -263,6 +266,7 @@ public abstract class BinaryTVList extends TVList {
       tIdx = tIdx - nullCnt;
       inPutMinTime = Math.min(inPutMinTime, time[tIdx]);
       maxTime = Math.max(maxTime, time[tIdx]);
+      minTime = Math.min(minTime, time[tIdx]);
       if (inputSorted && tIdx > 0 && time[tIdx - 1] > time[tIdx]) {
         inputSorted = false;
       }

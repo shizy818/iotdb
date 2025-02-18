@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 
 public interface IWritableMemChunk extends WALEntryValue {
+  int DELTA_TREE_DEGREE = 32;
 
   void putLong(long t, long v);
 
