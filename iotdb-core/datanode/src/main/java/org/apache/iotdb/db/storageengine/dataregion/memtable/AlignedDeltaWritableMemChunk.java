@@ -600,8 +600,8 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
             case FLOAT:
               float fv = values[columnIndex].getFloat();
               if (!Float.isNaN(fv)
-                  && (encodingList.get(columnIndex) == TSEncoding.RLE
-                      || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
+                  && (encodingList.get(i) == TSEncoding.RLE
+                      || encodingList.get(i) == TSEncoding.TS_2DIFF)) {
                 fv = MathUtils.roundWithGivenPrecision(fv, floatPrecision);
               }
               valueBuilder.writeFloat(fv);
@@ -609,8 +609,8 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
             case DOUBLE:
               double dv = values[columnIndex].getDouble();
               if (!Double.isNaN(dv)
-                  && (encodingList.get(columnIndex) == TSEncoding.RLE
-                      || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
+                  && (encodingList.get(i) == TSEncoding.RLE
+                      || encodingList.get(i) == TSEncoding.TS_2DIFF)) {
                 dv = MathUtils.roundWithGivenPrecision(dv, floatPrecision);
               }
               valueBuilder.writeDouble(dv);
