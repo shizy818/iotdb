@@ -24,8 +24,8 @@ import org.apache.iotdb.commons.path.IFullPath;
 import org.apache.iotdb.commons.path.NonAlignedFullPath;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
+import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedDeltaWritableMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
-import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedWritableMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedWritableMemChunkGroup;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.DeltaWritableMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.IMemTable;
@@ -34,7 +34,6 @@ import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunk;
 import org.apache.iotdb.db.storageengine.dataregion.modification.ModEntry;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.utils.ModificationUtils;
-import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileDescriptor;
 import org.apache.tsfile.encoding.encoder.Encoder;
@@ -194,7 +193,7 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
     if (!memTableMap.containsKey(deviceID)) {
       return null;
     }
-    AlignedWritableMemChunk alignedMemChunk =
+    AlignedDeltaWritableMemChunk alignedMemChunk =
         ((AlignedWritableMemChunkGroup) memTableMap.get(deviceID)).getAlignedMemChunk();
     // only need to do this check for tree model
     if (context.isIgnoreAllNullRows()) {
@@ -210,10 +209,6 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
       }
     }
 
-    // get sorted tv list is synchronized so different query can get right sorted list reference
-    TVList alignedTvListCopy =
-        alignedMemChunk.getSortedTvListForQuery(
-            alignedFullPath.getSchemaList(), context.isIgnoreAllNullRows());
     List<TimeRange> timeColumnDeletion = null;
     List<List<TimeRange>> valueColumnsDeletionList = null;
     if (modsToMemtable != null) {
@@ -233,12 +228,23 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
               modsToMemtable,
               timeLowerBound);
     }
-    return new AlignedReadOnlyMemChunk(
-        context,
-        getMeasurementSchema(),
-        alignedTvListCopy,
-        timeColumnDeletion,
-        valueColumnsDeletionList);
+
+    int floatPrecision = TSFileDescriptor.getInstance().getConfig().getFloatPrecision();
+    List<TSEncoding> encodingList = getMeasurementSchema().getSubMeasurementsTSEncodingList();
+    List<IMeasurementSchema> fullPathSchemaList = alignedFullPath.getSchemaList();
+    List<Integer> columnIndexList =
+        alignedMemChunk.buildColumnIndexList(alignedFullPath.getSchemaList());
+
+    TsBlock tsBlock =
+        alignedMemChunk.buildTsBlock(
+            fullPathSchemaList,
+            columnIndexList,
+            floatPrecision,
+            encodingList,
+            timeColumnDeletion,
+            valueColumnsDeletionList,
+            context.isIgnoreAllNullRows());
+    return new AlignedReadOnlyMemChunk(context, getMeasurementSchema(), tsBlock);
   }
 
   public VectorMeasurementSchema getMeasurementSchema() {

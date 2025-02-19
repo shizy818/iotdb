@@ -33,6 +33,7 @@ import org.apache.tsfile.file.metadata.IChunkMetadata;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
 import org.apache.tsfile.read.common.TimeRange;
+import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.reader.IPointReader;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
 
@@ -75,6 +76,16 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
                 timeColumnDeletion,
                 valueColumnsDeletionList,
                 context.isIgnoreAllNullRows());
+    initAlignedChunkMetaFromTsBlock();
+  }
+
+  public AlignedReadOnlyMemChunk(QueryContext context, IMeasurementSchema schema, TsBlock tsBlock)
+      throws QueryProcessException {
+    super(context);
+    this.timeChunkName = schema.getMeasurementName();
+    this.valueChunkNames = schema.getSubMeasurementsList();
+    this.dataTypes = schema.getSubMeasurementsTSDataTypeList();
+    this.tsBlock = tsBlock;
     initAlignedChunkMetaFromTsBlock();
   }
 

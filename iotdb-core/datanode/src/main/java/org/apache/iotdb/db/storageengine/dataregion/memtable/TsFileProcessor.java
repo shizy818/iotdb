@@ -744,7 +744,7 @@ public class TsFileProcessor {
       memTableIncrement += AlignedTVList.alignedTvListArrayMemCost(dataTypes, columnCategories);
     } else {
       // For existed device of this mem table
-      AlignedWritableMemChunk alignedMemChunk =
+      AlignedDeltaWritableMemChunk alignedMemChunk =
           ((AlignedWritableMemChunkGroup) workMemTable.getMemTableMap().get(deviceId))
               .getAlignedMemChunk();
       List<TSDataType> dataTypesInTVList = new ArrayList<>();
@@ -769,7 +769,7 @@ public class TsFileProcessor {
       }
       // this insertion will result in a new array
       if ((alignedMemChunk.alignedListSize() % PrimitiveArrayManager.ARRAY_SIZE) == 0) {
-        dataTypesInTVList.addAll(((AlignedTVList) alignedMemChunk.getTVList()).getTsDataTypes());
+        dataTypesInTVList.addAll(alignedMemChunk.getTsDataTypes());
         memTableIncrement += AlignedTVList.alignedTvListArrayMemCost(dataTypesInTVList);
       }
     }
@@ -824,7 +824,7 @@ public class TsFileProcessor {
         // For existed device of this mem table
         AlignedWritableMemChunkGroup memChunkGroup =
             (AlignedWritableMemChunkGroup) workMemTable.getMemTableMap().get(deviceId);
-        AlignedWritableMemChunk alignedMemChunk =
+        AlignedDeltaWritableMemChunk alignedMemChunk =
             memChunkGroup == null ? null : memChunkGroup.getAlignedMemChunk();
         int currentChunkPointNum = alignedMemChunk == null ? 0 : alignedMemChunk.alignedListSize();
         List<TSDataType> dataTypesInTVList = new ArrayList<>();
@@ -1035,7 +1035,7 @@ public class TsFileProcessor {
       memIncrements[0] +=
           numArraysToAdd * AlignedTVList.alignedTvListArrayMemCost(dataTypes, columnCategories);
     } else {
-      AlignedWritableMemChunk alignedMemChunk =
+      AlignedDeltaWritableMemChunk alignedMemChunk =
           ((AlignedWritableMemChunkGroup) workMemTable.getMemTableMap().get(deviceId))
               .getAlignedMemChunk();
       List<TSDataType> dataTypesInTVList = new ArrayList<>();
@@ -1072,7 +1072,7 @@ public class TsFileProcessor {
 
       if (acquireArray != 0) {
         // memory of extending the TVList
-        dataTypesInTVList.addAll(((AlignedTVList) alignedMemChunk.getTVList()).getTsDataTypes());
+        dataTypesInTVList.addAll(alignedMemChunk.getTsDataTypes());
         memIncrements[0] +=
             acquireArray * AlignedTVList.alignedTvListArrayMemCost(dataTypesInTVList);
       }

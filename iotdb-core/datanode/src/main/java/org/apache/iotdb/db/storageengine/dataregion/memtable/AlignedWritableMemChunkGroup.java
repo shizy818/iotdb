@@ -38,10 +38,10 @@ import java.util.Set;
 
 public class AlignedWritableMemChunkGroup implements IWritableMemChunkGroup {
 
-  private AlignedWritableMemChunk memChunk;
+  private AlignedDeltaWritableMemChunk memChunk;
 
   public AlignedWritableMemChunkGroup(List<IMeasurementSchema> schemaList, boolean isTableModel) {
-    memChunk = new AlignedWritableMemChunk(schemaList, isTableModel);
+    memChunk = new AlignedDeltaWritableMemChunk(schemaList, isTableModel);
   }
 
   private AlignedWritableMemChunkGroup() {
@@ -140,7 +140,7 @@ public class AlignedWritableMemChunkGroup implements IWritableMemChunkGroup {
     return memChunk.getMaxTime();
   }
 
-  public AlignedWritableMemChunk getAlignedMemChunk() {
+  public AlignedDeltaWritableMemChunk getAlignedMemChunk() {
     return memChunk;
   }
 
@@ -157,7 +157,7 @@ public class AlignedWritableMemChunkGroup implements IWritableMemChunkGroup {
   public static AlignedWritableMemChunkGroup deserialize(
       DataInputStream stream, boolean isTableModel) throws IOException {
     AlignedWritableMemChunkGroup memChunkGroup = new AlignedWritableMemChunkGroup();
-    memChunkGroup.memChunk = AlignedWritableMemChunk.deserialize(stream, isTableModel);
+    memChunkGroup.memChunk = AlignedDeltaWritableMemChunk.deserialize(stream, isTableModel);
     return memChunkGroup;
   }
 }
