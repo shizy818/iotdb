@@ -5,6 +5,7 @@ import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
 import org.apache.iotdb.db.utils.MathUtils;
+import org.apache.iotdb.db.utils.ModificationUtils;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.enums.TSDataType;
@@ -25,9 +26,12 @@ import org.slf4j.LoggerFactory;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.stream.Collectors;
 
 import static org.apache.iotdb.db.utils.MemUtils.getBinarySize;
 import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
@@ -236,32 +240,32 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   }
 
   private int findSplitIndex(long[] t, BitMap bitMap, int start, int end) {
-    int index = end - 1;
-    for (; index >= start; index--) {
-      if (bitMap != null && bitMap.isMarked(index)) {
+    int index = start;
+    for (int i = start; i < end; i++) {
+      if (bitMap != null && bitMap.isMarked(i)) {
         continue;
       }
-      if (t[index] >= maxTime) {
-        maxTime = t[index];
+      if (t[i] >= maxTime) {
+        maxTime = t[i];
       } else {
-        break;
+        index = i;
       }
     }
-    return index + 1;
+    return index;
   }
 
   @Override
   public void putBooleans(long[] t, boolean[] v, BitMap bitMap, int start, int end) {
     int splitIndex = findSplitIndex(t, bitMap, start, end);
     // delta part
+    int deltaId = deltaList.rowCount();
+    deltaList.putBooleans(t, v, bitMap, start, splitIndex);
     for (int i = start; i < splitIndex; i++) {
       if (bitMap != null && bitMap.isMarked(i)) {
         continue;
       }
       int stableId = stableList.binarySearch(t[i]);
-      deltaList.putBoolean(t[i], v[i]);
-      int deltaId = deltaList.rowCount() - 1;
-      deltaTree.insert(t[i], stableId, deltaId);
+      deltaTree.insert(t[i], stableId, deltaId + i - start);
     }
     // stable part
     stableList.putBooleans(t, v, bitMap, splitIndex, end);
@@ -271,14 +275,14 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   public void putInts(long[] t, int[] v, BitMap bitMap, int start, int end) {
     int splitIndex = findSplitIndex(t, bitMap, start, end);
     // delta part
+    int deltaId = deltaList.rowCount();
+    deltaList.putInts(t, v, bitMap, start, splitIndex);
     for (int i = start; i < splitIndex; i++) {
       if (bitMap != null && bitMap.isMarked(i)) {
         continue;
       }
       int stableId = stableList.binarySearch(t[i]);
-      deltaList.putInt(t[i], v[i]);
-      int deltaId = deltaList.rowCount() - 1;
-      deltaTree.insert(t[i], stableId, deltaId);
+      deltaTree.insert(t[i], stableId, deltaId + i - start);
     }
     // stable part
     stableList.putInts(t, v, bitMap, splitIndex, end);
@@ -288,14 +292,14 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   public void putLongs(long[] t, long[] v, BitMap bitMap, int start, int end) {
     int splitIndex = findSplitIndex(t, bitMap, start, end);
     // delta part
+    int deltaId = deltaList.rowCount();
+    deltaList.putLongs(t, v, bitMap, start, splitIndex);
     for (int i = start; i < splitIndex; i++) {
       if (bitMap != null && bitMap.isMarked(i)) {
         continue;
       }
       int stableId = stableList.binarySearch(t[i]);
-      deltaList.putLong(t[i], v[i]);
-      int deltaId = deltaList.rowCount() - 1;
-      deltaTree.insert(t[i], stableId, deltaId);
+      deltaTree.insert(t[i], stableId, deltaId + i - start);
     }
     // stable part
     stableList.putLongs(t, v, bitMap, splitIndex, end);
@@ -305,14 +309,14 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   public void putFloats(long[] t, float[] v, BitMap bitMap, int start, int end) {
     int splitIndex = findSplitIndex(t, bitMap, start, end);
     // delta part
+    int deltaId = deltaList.rowCount();
+    deltaList.putFloats(t, v, bitMap, start, splitIndex);
     for (int i = start; i < splitIndex; i++) {
       if (bitMap != null && bitMap.isMarked(i)) {
         continue;
       }
       int stableId = stableList.binarySearch(t[i]);
-      deltaList.putFloat(t[i], v[i]);
-      int deltaId = deltaList.rowCount() - 1;
-      deltaTree.insert(t[i], stableId, deltaId);
+      deltaTree.insert(t[i], stableId, deltaId + i - start);
     }
     // stable part
     stableList.putFloats(t, v, bitMap, splitIndex, end);
@@ -322,14 +326,14 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   public void putDoubles(long[] t, double[] v, BitMap bitMap, int start, int end) {
     int splitIndex = findSplitIndex(t, bitMap, start, end);
     // delta part
+    int deltaId = deltaList.rowCount();
+    deltaList.putDoubles(t, v, bitMap, start, splitIndex);
     for (int i = start; i < splitIndex; i++) {
       if (bitMap != null && bitMap.isMarked(i)) {
         continue;
       }
       int stableId = stableList.binarySearch(t[i]);
-      deltaList.putDouble(t[i], v[i]);
-      int deltaId = deltaList.rowCount() - 1;
-      deltaTree.insert(t[i], stableId, deltaId);
+      deltaTree.insert(t[i], stableId, deltaId + i - start);
     }
     // stable part
     stableList.putDoubles(t, v, bitMap, splitIndex, end);
@@ -339,14 +343,14 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
   public void putBinaries(long[] t, Binary[] v, BitMap bitMap, int start, int end) {
     int splitIndex = findSplitIndex(t, bitMap, start, end);
     // delta part
+    int deltaId = deltaList.rowCount();
+    deltaList.putBinaries(t, v, bitMap, start, splitIndex);
     for (int i = start; i < splitIndex; i++) {
       if (bitMap != null && bitMap.isMarked(i)) {
         continue;
       }
       int stableId = stableList.binarySearch(t[i]);
-      deltaList.putBinary(t[i], v[i]);
-      int deltaId = deltaList.rowCount() - 1;
-      deltaTree.insert(t[i], stableId, deltaId);
+      deltaTree.insert(t[i], stableId, deltaId + i - start);
     }
     // stable part
     stableList.putBinaries(t, v, bitMap, splitIndex, end);
@@ -635,6 +639,41 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
     return new DeltaWritableMemChunk(schema, stableList, deltaList, deltaTree);
   }
 
+  private void filterDeletedTimestamp(
+      TVList tvlist, List<TimeRange> deletionList, List<Long> timestampList) {
+    long lastTime = Long.MIN_VALUE;
+    int[] deletionCursor = {0};
+    int rowCount = tvlist.rowCount();
+    for (int i = 0; i < rowCount; i++) {
+      if (tvlist.getBitMap() != null && tvlist.isNullValue(i)) {
+        continue;
+      }
+      long curTime = tvlist.getTime(i);
+      if (deletionList != null
+          && ModificationUtils.isPointDeleted(curTime, deletionList, deletionCursor)) {
+        continue;
+      }
+
+      if (i == rowCount - 1 || curTime != lastTime) {
+        timestampList.add(curTime);
+      }
+      lastTime = curTime;
+    }
+  }
+
+  public long[] getFilteredTimestamp(List<TimeRange> deletionList) {
+    List<Long> timestampList = new ArrayList<>();
+    filterDeletedTimestamp(stableList, deletionList, timestampList);
+    filterDeletedTimestamp(deltaList, deletionList, timestampList);
+
+    // remove duplicated time
+    List<Long> distinctTimestamps = timestampList.stream().distinct().collect(Collectors.toList());
+    // sort timestamps
+    long[] filteredTimestamps = distinctTimestamps.stream().mapToLong(Long::longValue).toArray();
+    Arrays.sort(filteredTimestamps);
+    return filteredTimestamps;
+  }
+
   public DeltaMemChunkIterator iterator() {
     return new DeltaMemChunkIterator();
   }
@@ -646,6 +685,7 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
 
     private boolean probeNext = false;
     private TimeValuePair currentTvPair = null;
+    private boolean validEntry = false;
 
     public DeltaMemChunkIterator() {
       this.current = deltaTree.getFirstLeaf();
@@ -662,28 +702,29 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
 
     private void prepareNext() {
       currentTvPair = null;
-      boolean validEntry = false;
 
-      // skip deleted entry
-      while (current != null && entryIndex < current.count) {
-        validEntry = true;
-        if (deltaList.isNullValue(current.deltaIds[entryIndex])) {
-          validEntry = false;
-          nextDeltaEntry();
-        } else {
-          break;
+      // try to find valid entry in delta index tree
+      if (!validEntry) {
+        // skip deleted entry
+        while (current != null && entryIndex < current.count) {
+          if (deltaList.isNullValue(current.deltaIds[entryIndex])) {
+            nextDeltaEntry();
+          } else {
+            validEntry = true;
+            break;
+          }
         }
-      }
-      // skip duplicated timestamp
-      while (current != null && entryIndex < current.count) {
-        if ((entryIndex + 1 < current.count
-                && current.keys[entryIndex] == current.keys[entryIndex + 1])
-            || (current.next != null
-                && !current.next.isEmpty()
-                && current.keys[entryIndex] == current.next.keys[0])) {
-          nextDeltaEntry();
-        } else {
-          break;
+        // skip duplicated timestamp
+        while (current != null && entryIndex < current.count) {
+          if ((entryIndex + 1 < current.count
+                  && current.keys[entryIndex] == current.keys[entryIndex + 1])
+              || (current.next != null
+                  && !current.next.isEmpty()
+                  && current.keys[entryIndex] == current.next.keys[0])) {
+            nextDeltaEntry();
+          } else {
+            break;
+          }
         }
       }
 
@@ -746,6 +787,7 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
           stableIndex++;
         } else {
           nextDeltaEntry();
+          validEntry = false;
         }
       }
       probeNext = false;

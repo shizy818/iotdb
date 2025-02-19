@@ -252,6 +252,10 @@ public abstract class TVList implements WALEntryValue {
     return minTime;
   }
 
+  public List<BitMap> getBitMap() {
+    return bitMap;
+  }
+
   public long getVersion() {
     return version;
   }
