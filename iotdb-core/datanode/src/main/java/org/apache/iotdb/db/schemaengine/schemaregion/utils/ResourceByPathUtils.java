@@ -401,7 +401,14 @@ class MeasurementResourceByPathUtils extends ResourceByPathUtils {
     TSEncoding encoding = fullPath.getMeasurementSchema().getEncodingType();
     Map<String, String> props = fullPath.getMeasurementSchema().getProps();
     if (props != null && props.containsKey(Encoder.MAX_POINT_NUMBER)) {
-      floatPrecision = Integer.parseInt(props.get(Encoder.MAX_POINT_NUMBER));
+      try {
+        floatPrecision = Integer.parseInt(props.get(Encoder.MAX_POINT_NUMBER));
+      } catch (NumberFormatException e) {
+        // do nothing
+      }
+      if (floatPrecision < 0) {
+        floatPrecision = TSFileDescriptor.getInstance().getConfig().getFloatPrecision();
+      }
     }
     TsBlock tsBlock = memChunk.buildTsBlock(floatPrecision, encoding, deletionList);
     return new ReadOnlyMemChunk(

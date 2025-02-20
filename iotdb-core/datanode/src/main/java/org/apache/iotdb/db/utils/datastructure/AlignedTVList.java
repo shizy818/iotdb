@@ -623,7 +623,9 @@ public abstract class AlignedTVList extends TVList {
       PrimitiveArrayManager.release(array);
     }
     values.remove(columnIndex);
-    bitMaps.remove(columnIndex);
+    if (bitMaps != null) {
+      bitMaps.remove(columnIndex);
+    }
   }
 
   protected void set(int index, long timestamp, int value) {
