@@ -267,7 +267,7 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
       if (t[i] >= maxTime) {
         maxTime = t[i];
       } else {
-        index = i;
+        index = i + 1;
       }
     }
     return index;
