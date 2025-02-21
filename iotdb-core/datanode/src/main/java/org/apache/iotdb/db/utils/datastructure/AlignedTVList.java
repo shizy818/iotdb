@@ -256,6 +256,11 @@ public abstract class AlignedTVList extends TVList {
         getTime(index), (TsPrimitiveType) getAlignedValueForQuery(index, null, null));
   }
 
+  public TimeValuePair getTimeValuePair(int index, BitMap ignoreColumns) {
+    return new TimeValuePair(
+        getTime(index), (TsPrimitiveType) getAlignedValueForQuery(index, ignoreColumns));
+  }
+
   private Object getAlignedValueForQuery(
       int index, Integer floatPrecision, List<TSEncoding> encodingList) {
     if (index >= rowCount) {
@@ -264,19 +269,31 @@ public abstract class AlignedTVList extends TVList {
     int arrayIndex = index / ARRAY_SIZE;
     int elementIndex = index % ARRAY_SIZE;
     int valueIndex = indices.get(arrayIndex)[elementIndex];
-    return getAlignedValueByValueIndex(valueIndex, null, floatPrecision, encodingList);
+    return getAlignedValueByValueIndex(valueIndex, null, floatPrecision, encodingList, null);
+  }
+
+  private Object getAlignedValueForQuery(int index, BitMap ignoreColumns) {
+    if (index >= rowCount) {
+      throw new ArrayIndexOutOfBoundsException(index);
+    }
+    return getAlignedValueByValueIndex(index, null, null, null, ignoreColumns);
   }
 
   private TsPrimitiveType getAlignedValueByValueIndex(
       int valueIndex,
       int[] validIndexesForTimeDuplicatedRows,
       Integer floatPrecision,
-      List<TSEncoding> encodingList) {
+      List<TSEncoding> encodingList,
+      BitMap ignoreColumns) {
     if (valueIndex >= rowCount) {
       throw new ArrayIndexOutOfBoundsException(valueIndex);
     }
     TsPrimitiveType[] vector = new TsPrimitiveType[values.size()];
     for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
+      if (ignoreColumns != null && ignoreColumns.isMarked(columnIndex)) {
+        continue;
+      }
+
       List<Object> columnValues = values.get(columnIndex);
       int validValueIndex;
       if (validIndexesForTimeDuplicatedRows != null) {

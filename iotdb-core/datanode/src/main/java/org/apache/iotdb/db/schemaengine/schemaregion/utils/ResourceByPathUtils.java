@@ -232,13 +232,10 @@ class AlignedResourceByPathUtils extends ResourceByPathUtils {
     int floatPrecision = TSFileDescriptor.getInstance().getConfig().getFloatPrecision();
     List<TSEncoding> encodingList = getMeasurementSchema().getSubMeasurementsTSEncodingList();
     List<IMeasurementSchema> fullPathSchemaList = alignedFullPath.getSchemaList();
-    List<Integer> columnIndexList =
-        alignedMemChunk.buildColumnIndexList(alignedFullPath.getSchemaList());
 
     TsBlock tsBlock =
         alignedMemChunk.buildTsBlock(
             fullPathSchemaList,
-            columnIndexList,
             floatPrecision,
             encodingList,
             timeColumnDeletion,
