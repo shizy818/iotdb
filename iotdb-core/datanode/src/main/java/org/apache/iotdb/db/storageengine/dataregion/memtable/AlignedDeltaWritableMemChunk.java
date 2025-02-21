@@ -208,7 +208,7 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
       if (t[i] >= maxTime) {
         maxTime = t[i];
       } else {
-        index = i;
+        index = i + 1;
       }
     }
     return index;
@@ -220,12 +220,16 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
     int splitIndex = findSplitIndex(t, start, end);
     // delta part
     int deltaId = deltaList.rowCount();
-    deltaList.putAlignedValues(t, v, bitMaps, start, splitIndex, results);
-    for (int i = start; i < splitIndex; i++) {
-      int stableId = stableList.binarySearch(t[i]);
-      deltaTree.insert(t[i], stableId, deltaId + i - start);
+    if (splitIndex > start) {
+      deltaList.putAlignedValues(t, v, bitMaps, start, splitIndex, results);
+      for (int i = start; i < splitIndex; i++) {
+        int stableId = stableList.binarySearch(t[i]);
+        deltaTree.insert(t[i], stableId, deltaId + i - start);
+      }
     }
-    stableList.putAlignedValues(t, v, bitMaps, splitIndex, end, results);
+    if (end > splitIndex) {
+      stableList.putAlignedValues(t, v, bitMaps, splitIndex, end, results);
+    }
   }
 
   @Override
