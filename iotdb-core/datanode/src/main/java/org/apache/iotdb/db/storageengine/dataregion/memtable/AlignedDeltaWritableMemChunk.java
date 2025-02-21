@@ -751,10 +751,14 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
     private int stableIndex = 0;
 
     private boolean probeNext = false;
-    private TimeValuePair currentTvPair = null;
     private boolean validEntry = false;
-    private TimeValuePair intermediateDeltaTvPair = null;
-    private TimeValuePair intermediateStableTvPair = null;
+    private TimeValuePair currentTvPair = null;
+    private final Object[] currentObjects = new Object[schemaList.size()];
+
+    private final Object[] internDeltaObjects = new Object[schemaList.size()];
+    private final Object[] internStableObjects = new Object[schemaList.size()];
+    long internDeltaTime = 0;
+    long internStableTime = 0;
 
     BitMap stableDeletedRowMap = ignoreAllNullRows ? stableList.getAllValueColDeletedMap() : null;
     BitMap deltaDeletedRowMap = ignoreAllNullRows ? deltaList.getAllValueColDeletedMap() : null;
@@ -790,6 +794,16 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
       }
     }
 
+    private TimeValuePair buildTvPair(long time, Object[] values) {
+      TsPrimitiveType[] vector = new TsPrimitiveType[schemaList.size()];
+      for (int i = 0; i < vector.length; i++) {
+        if (values[i] != null) {
+          vector[i] = TsPrimitiveType.getByType(schemaList.get(i).getType(), values[i]);
+        }
+      }
+      return new TimeValuePair(time, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
+    }
+
     private void prepareNext() {
       currentTvPair = null;
 
@@ -802,7 +816,8 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
             nextDeltaEntry();
           } else {
             validEntry = true;
-            intermediateDeltaTvPair = deltaList.getTimeValuePair(deltaId, ignoreColumns);
+            deltaList.getAlignedObjects(deltaId, ignoreColumns, internDeltaObjects, false);
+            internDeltaTime = deltaList.getTime(deltaId);
             break;
           }
         }
@@ -816,13 +831,7 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
             nextDeltaEntry();
             int deltaId = current.deltaIds[entryIndex];
             // update not-null column
-            TsPrimitiveType[] values =
-                deltaList.getTimeValuePair(deltaId, ignoreColumns).getValue().getVector();
-            for (int columnIndex = 0; columnIndex < schemaList.size(); columnIndex++) {
-              if (values[columnIndex] != null) {
-                intermediateDeltaTvPair.getValue().getVector()[columnIndex] = values[columnIndex];
-              }
-            }
+            deltaList.getAlignedObjects(deltaId, ignoreColumns, internDeltaObjects, true);
           } else {
             break;
           }
@@ -839,36 +848,29 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
             && stableDeletedRowMap.isMarked(stableIndex)) {
           stableIndex++;
         }
-        intermediateStableTvPair = stableList.getTimeValuePair(stableIndex, ignoreColumns);
+        stableList.getAlignedObjects(stableIndex, ignoreColumns, internStableObjects, false);
+        internStableTime = stableList.getTime(stableIndex);
         // handle duplicated timestamp
         while (stableIndex + 1 <= stableId
             && stableList.getTime(stableIndex) == stableList.getTime(stableIndex + 1)) {
           stableIndex++;
           // update not-null column
-          TsPrimitiveType[] values =
-              stableList.getTimeValuePair(stableIndex, ignoreColumns).getValue().getVector();
-          for (int columnIndex = 0; columnIndex < schemaList.size(); columnIndex++) {
-            if (values[columnIndex] != null) {
-              intermediateStableTvPair.getValue().getVector()[columnIndex] = values[columnIndex];
-            }
-          }
+          stableList.getAlignedObjects(stableIndex, ignoreColumns, internStableObjects, true);
         }
 
         if (stableIndex > stableId) {
-          currentTvPair = intermediateDeltaTvPair;
+          currentTvPair = buildTvPair(internDeltaTime, internDeltaObjects);
         } else if (stableIndex == stableId
             && stableList.getTime(stableIndex) == deltaList.getTime(deltaId)) {
-          currentTvPair = intermediateStableTvPair;
-          TsPrimitiveType[] values = intermediateDeltaTvPair.getValue().getVector();
           for (int columnIndex = 0; columnIndex < schemaList.size(); columnIndex++) {
-            if (values[columnIndex] != null) {
-              currentTvPair.getValue().getVector()[columnIndex] = values[columnIndex];
+            if (internDeltaObjects[columnIndex] != null) {
+              internStableObjects[columnIndex] = internDeltaObjects[columnIndex];
             }
           }
+          currentTvPair = buildTvPair(internStableTime, internStableObjects);
           stableIndex++;
-          intermediateStableTvPair = null;
         } else {
-          currentTvPair = intermediateStableTvPair;
+          currentTvPair = buildTvPair(internStableTime, internStableObjects);
         }
       } else {
         // skip deleted rows
@@ -877,20 +879,20 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
             && stableDeletedRowMap.isMarked(stableIndex)) {
           stableIndex++;
         }
+        boolean hasTvPair = false;
         if (stableIndex < stableRowCount) {
-          currentTvPair = stableList.getTimeValuePair(stableIndex, ignoreColumns);
+          stableList.getAlignedObjects(stableIndex, ignoreColumns, currentObjects, false);
+          hasTvPair = true;
         }
+
         // handle duplicated timestamp
         while (stableIndex + 1 < stableRowCount
             && stableList.getTime(stableIndex) == stableList.getTime(stableIndex + 1)) {
           stableIndex++;
-          TsPrimitiveType[] values =
-              stableList.getTimeValuePair(stableIndex, ignoreColumns).getValue().getVector();
-          for (int columnIndex = 0; columnIndex < schemaList.size(); columnIndex++) {
-            if (values[columnIndex] != null) {
-              currentTvPair.getValue().getVector()[columnIndex] = values[columnIndex];
-            }
-          }
+          stableList.getAlignedObjects(stableIndex, ignoreColumns, currentObjects, true);
+        }
+        if (hasTvPair) {
+          currentTvPair = buildTvPair(stableList.getTime(stableIndex), currentObjects);
         }
       }
       probeNext = true;
@@ -909,16 +911,13 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
       }
       if (current == null || current.isEmpty()) {
         stableIndex++;
-        intermediateStableTvPair = null;
       } else {
         int stableId = current.stableIds[entryIndex];
         if (stableIndex <= stableId) {
           stableIndex++;
-          intermediateStableTvPair = null;
         } else {
           nextDeltaEntry();
           validEntry = false;
-          intermediateDeltaTvPair = null;
         }
       }
       probeNext = false;
