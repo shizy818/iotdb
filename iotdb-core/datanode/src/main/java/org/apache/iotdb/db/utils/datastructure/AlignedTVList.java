@@ -46,6 +46,7 @@ import org.apache.tsfile.utils.TsPrimitiveType;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -256,21 +257,129 @@ public abstract class AlignedTVList extends TVList {
         getTime(index), (TsPrimitiveType) getAlignedValueForQuery(index, null, null));
   }
 
+  public int updateTimeValuePairCache(
+      int index, BitMap ignoreColumns, TimeValuePair[] cachedTvPairs, int cachedPage) {
+    int arrayIndex = index / ARRAY_SIZE;
+    if (arrayIndex > cachedPage || arrayIndex < cachedPage) {
+      Arrays.fill(cachedTvPairs, null);
+      readTimeValuePairs(index, ignoreColumns, cachedTvPairs);
+      cachedPage = arrayIndex;
+    }
+    return cachedPage;
+  }
+
+  public void readTimeValuePairs(int index, BitMap ignoreColumns, TimeValuePair[] cachedTvPairs) {
+    if (index >= rowCount) {
+      return;
+    }
+
+    int arrayIndex = index / ARRAY_SIZE;
+    int elementNum =
+        rowCount >= (arrayIndex + 1) * ARRAY_SIZE ? ARRAY_SIZE : rowCount - arrayIndex * ARRAY_SIZE;
+
+    TsPrimitiveType[][] vectors = new TsPrimitiveType[elementNum][];
+    for (int i = 0; i < elementNum; i++) {
+      vectors[i] = new TsPrimitiveType[values.size()];
+    }
+    for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
+      if (ignoreColumns != null && ignoreColumns.isMarked(columnIndex)) {
+        continue;
+      }
+      List<Object> columnValues = values.get(columnIndex);
+      if (columnValues == null) {
+        continue;
+      }
+      switch (dataTypes.get(columnIndex)) {
+        case TEXT:
+        case BLOB:
+        case STRING:
+          Binary[] valueT = ((Binary[]) columnValues.get(arrayIndex));
+          for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+            if (isNullValue(arrayIndex, elementIndex, columnIndex)) {
+              continue;
+            }
+            vectors[elementIndex][columnIndex] =
+                TsPrimitiveType.getByType(TSDataType.TEXT, valueT[elementIndex]);
+          }
+          break;
+        case FLOAT:
+          float[] valueF = ((float[]) columnValues.get(arrayIndex));
+          for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+            if (isNullValue(arrayIndex, elementIndex, columnIndex)) {
+              continue;
+            }
+            vectors[elementIndex][columnIndex] =
+                TsPrimitiveType.getByType(TSDataType.FLOAT, valueF[elementIndex]);
+          }
+          break;
+        case INT32:
+        case DATE:
+          int[] valueI = ((int[]) columnValues.get(arrayIndex));
+          for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+            if (isNullValue(arrayIndex, elementIndex, columnIndex)) {
+              continue;
+            }
+            vectors[elementIndex][columnIndex] =
+                TsPrimitiveType.getByType(TSDataType.INT32, valueI[elementIndex]);
+          }
+          break;
+        case INT64:
+        case TIMESTAMP:
+          long[] valueL = ((long[]) columnValues.get(arrayIndex));
+          for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+            if (isNullValue(arrayIndex, elementIndex, columnIndex)) {
+              continue;
+            }
+            vectors[elementIndex][columnIndex] =
+                TsPrimitiveType.getByType(TSDataType.INT64, valueL[elementIndex]);
+          }
+          break;
+        case DOUBLE:
+          double[] valueD = ((double[]) columnValues.get(arrayIndex));
+          for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+            if (isNullValue(arrayIndex, elementIndex, columnIndex)) {
+              continue;
+            }
+            vectors[elementIndex][columnIndex] =
+                TsPrimitiveType.getByType(TSDataType.DOUBLE, valueD[elementIndex]);
+          }
+          break;
+        case BOOLEAN:
+          boolean[] valueB = ((boolean[]) columnValues.get(arrayIndex));
+          for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+            if (isNullValue(arrayIndex, elementIndex, columnIndex)) {
+              continue;
+            }
+            vectors[elementIndex][columnIndex] =
+                TsPrimitiveType.getByType(TSDataType.BOOLEAN, valueB[elementIndex]);
+          }
+          break;
+        default:
+          throw new UnsupportedOperationException(ERR_DATATYPE_NOT_CONSISTENT);
+      }
+    }
+    for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+      cachedTvPairs[elementIndex] =
+          new TimeValuePair(
+              timestamps.get(arrayIndex)[elementIndex],
+              TsPrimitiveType.getByType(TSDataType.VECTOR, vectors[elementIndex]));
+    }
+  }
+
   public TimeValuePair getTimeValuePair(int index, BitMap ignoreColumns) {
     if (index >= rowCount) {
       throw new ArrayIndexOutOfBoundsException(index);
     }
     TsPrimitiveType[] vector = new TsPrimitiveType[values.size()];
     for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
-      if (ignoreColumns != null && ignoreColumns.isMarked(columnIndex)) {
+      if ((ignoreColumns != null && ignoreColumns.isMarked(columnIndex))
+          || isNullValue(index, columnIndex)) {
         continue;
       }
+
       List<Object> columnValues = values.get(columnIndex);
       int arrayIndex = index / ARRAY_SIZE;
       int elementIndex = index % ARRAY_SIZE;
-      if (columnValues == null || isNullValue(index, columnIndex)) {
-        continue;
-      }
       switch (dataTypes.get(columnIndex)) {
         case TEXT:
         case BLOB:
@@ -537,6 +646,26 @@ public abstract class AlignedTVList extends TVList {
     int elementIndex = rowIndex % ARRAY_SIZE;
     List<Object> columnValues = values.get(columnIndex);
     return ((boolean[]) columnValues.get(arrayIndex))[elementIndex];
+  }
+
+  public boolean isNullValue(int arrayIndex, int elementIndex, int columnIndex) {
+    int index = arrayIndex * ARRAY_SIZE + elementIndex;
+    if (index >= rowCount) {
+      return false;
+    }
+    if (allValueColDeletedMap != null && allValueColDeletedMap.isMarked(index)) {
+      return true;
+    }
+    if (values.get(columnIndex) == null) {
+      return true;
+    }
+    if (bitMaps == null
+        || bitMaps.get(columnIndex) == null
+        || bitMaps.get(columnIndex).get(arrayIndex) == null) {
+      return false;
+    }
+    List<BitMap> columnBitMaps = bitMaps.get(columnIndex);
+    return columnBitMaps.get(arrayIndex).isMarked(elementIndex);
   }
 
   /**
