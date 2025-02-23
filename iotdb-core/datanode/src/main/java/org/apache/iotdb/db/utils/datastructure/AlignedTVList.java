@@ -256,46 +256,24 @@ public abstract class AlignedTVList extends TVList {
         getTime(index), (TsPrimitiveType) getAlignedValueForQuery(index, null, null));
   }
 
-  public TimeValuePair getTimeValuePair(int index, BitMap ignoreColumns) {
-    if (index >= rowCount) {
-      throw new ArrayIndexOutOfBoundsException(index);
-    }
-    Object[] objects = getAlignedValues(index, ignoreColumns);
-    TsPrimitiveType[] vector = new TsPrimitiveType[values.size()];
-    for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
-      if (objects[columnIndex] == null) {
-        continue;
-      }
-      switch (dataTypes.get(columnIndex)) {
-        case TEXT:
-        case BLOB:
-        case STRING:
-          vector[columnIndex] = TsPrimitiveType.getByType(TSDataType.TEXT, objects[columnIndex]);
-          break;
-        case FLOAT:
-          vector[columnIndex] = TsPrimitiveType.getByType(TSDataType.FLOAT, objects[columnIndex]);
-          break;
-        case INT32:
-        case DATE:
-          vector[columnIndex] = TsPrimitiveType.getByType(TSDataType.INT32, objects[columnIndex]);
-          break;
-        case INT64:
-        case TIMESTAMP:
-          vector[columnIndex] = TsPrimitiveType.getByType(TSDataType.INT64, objects[columnIndex]);
-          break;
-        case DOUBLE:
-          vector[columnIndex] = TsPrimitiveType.getByType(TSDataType.DOUBLE, objects[columnIndex]);
-          break;
-        case BOOLEAN:
-          vector[columnIndex] = TsPrimitiveType.getByType(TSDataType.BOOLEAN, objects[columnIndex]);
-          break;
-        default:
-      }
-    }
-    return new TimeValuePair(getTime(index), TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
-  }
+  //  public TimeValuePair getTimeValuePair(int index, BitMap ignoreColumns) {
+  //    if (index >= rowCount) {
+  //      throw new ArrayIndexOutOfBoundsException(index);
+  //    }
+  //    Object[] objects = getAlignedValues(index, ignoreColumns);
+  //    TsPrimitiveType[] vector = new TsPrimitiveType[values.size()];
+  //    for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
+  //      if (objects[columnIndex] == null) {
+  //        continue;
+  //      }
+  //      vector[columnIndex] =
+  //          TsPrimitiveType.getByType(dataTypes.get(columnIndex), objects[columnIndex]);
+  //    }
+  //    return new TimeValuePair(getTime(index), TsPrimitiveType.getByType(TSDataType.VECTOR,
+  // vector));
+  //  }
 
-  private Object[] getAlignedValues(int index, BitMap ignoreColumns) {
+  public Object[] getAlignedValues(int index, BitMap ignoreColumns) {
     int arrayIndex = index / ARRAY_SIZE;
     int elementIndex = index % ARRAY_SIZE;
     Object[] vector = new Object[values.size()];
