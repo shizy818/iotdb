@@ -1537,10 +1537,10 @@ public abstract class AlignedTVList extends TVList {
     private Integer floatPrecision;
     private List<TSEncoding> encodingList;
 
-    // remember the selected index of last not-null value for each column during prepareNext phase.
-    // It is already converted by getValueIndex method, so it can be directly used in
-    // getPrimitiveObject method.
-    private int[] selectedIndex;
+    private final TsPrimitiveType[][] cachedVectors = new TsPrimitiveType[ARRAY_SIZE][];
+    private int cachedArray = -1;
+
+    private TimeValuePair currentTvPair = null;
 
     public AlignedTVListIterator() {
       super();
@@ -1561,7 +1561,9 @@ public abstract class AlignedTVList extends TVList {
       this.allValueColDeletedMap = ignoreAllNullRows ? getAllValueColDeletedMap() : null;
       this.floatPrecision = floatPrecision;
       this.encodingList = encodingList;
-      this.selectedIndex = new int[dataTypeList.size()];
+      for (int i = 0; i < this.cachedVectors.length; i++) {
+        this.cachedVectors[i] = new TsPrimitiveType[dataTypeList.size()];
+      }
     }
 
     private void prepareNext() {
@@ -1582,7 +1584,12 @@ public abstract class AlignedTVList extends TVList {
           probeNext = true;
           return;
         }
-        Arrays.fill(selectedIndex, rowIndex);
+
+        cachedArray = updateVectorCache(rowIndex, cachedVectors, cachedArray);
+        currentTvPair =
+            new TimeValuePair(
+                getTime(index),
+                TsPrimitiveType.getByType(TSDataType.VECTOR, cachedVectors[rowIndex % ARRAY_SIZE]));
         findValidRow = true;
       }
 
@@ -1592,10 +1599,12 @@ public abstract class AlignedTVList extends TVList {
         // skip all-Null rows if allValueColDeletedMap exists
         int rowIndex = getValueIndex(index);
         if (allValueColDeletedMap == null || !allValueColDeletedMap.isMarked(rowIndex)) {
+          cachedArray = updateVectorCache(rowIndex, cachedVectors, cachedArray);
+          TsPrimitiveType[] values = cachedVectors[rowIndex % ARRAY_SIZE];
           for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
             // update currTvPair if the column is not null
-            if (!isNull(rowIndex, columnIndex)) {
-              selectedIndex[columnIndex] = rowIndex;
+            if (values[columnIndex] != null) {
+              currentTvPair.getValue().getVector()[columnIndex] = values[columnIndex];
             }
           }
         }
@@ -1621,16 +1630,8 @@ public abstract class AlignedTVList extends TVList {
       if (!hasNext()) {
         return null;
       }
-
-      TsPrimitiveType[] vector = new TsPrimitiveType[dataTypeList.size()];
-      for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
-        vector[columnIndex] = getPrimitiveObject(selectedIndex[columnIndex], columnIndex);
-      }
-      TimeValuePair tvPair =
-          new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
-
       step();
-      return tvPair;
+      return currentTvPair;
     }
 
     @Override
@@ -1638,77 +1639,7 @@ public abstract class AlignedTVList extends TVList {
       if (!hasCurrent()) {
         return null;
       }
-      TsPrimitiveType[] vector = new TsPrimitiveType[dataTypeList.size()];
-      for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
-        vector[columnIndex] = getPrimitiveObject(selectedIndex[columnIndex], columnIndex);
-      }
-      return new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
-    }
-
-    public boolean isNull(int rowIndex, int columnIndex) {
-      int validColumnIndex = columnIndexList.get(columnIndex);
-      if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
-        return true;
-      }
-      return isNullValue(rowIndex, validColumnIndex);
-    }
-
-    public TsPrimitiveType getPrimitiveObject(int rowIndex, int columnIndex) {
-      if (rowIndex < 0 || rowIndex >= rows) {
-        return null;
-      }
-      int validColumnIndex = columnIndexList.get(columnIndex);
-      if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
-        return null;
-      }
-      if (isNullValue(rowIndex, validColumnIndex)) {
-        return null;
-      }
-      switch (dataTypeList.get(columnIndex)) {
-        case BOOLEAN:
-          return TsPrimitiveType.getByType(
-              TSDataType.BOOLEAN, getBooleanByValueIndex(rowIndex, validColumnIndex));
-        case INT32:
-        case DATE:
-          return TsPrimitiveType.getByType(
-              TSDataType.INT32, getIntByValueIndex(rowIndex, validColumnIndex));
-        case INT64:
-        case TIMESTAMP:
-          return TsPrimitiveType.getByType(
-              TSDataType.INT64, getLongByValueIndex(rowIndex, validColumnIndex));
-        case FLOAT:
-          float valueF = getFloatByValueIndex(rowIndex, validColumnIndex);
-          if (floatPrecision != null
-              && encodingList != null
-              && !Float.isNaN(valueF)
-              && (encodingList.get(columnIndex) == TSEncoding.RLE
-                  || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
-            valueF = MathUtils.roundWithGivenPrecision(valueF, floatPrecision);
-          }
-          return TsPrimitiveType.getByType(TSDataType.FLOAT, valueF);
-        case DOUBLE:
-          double valueD = getDoubleByValueIndex(rowIndex, validColumnIndex);
-          if (floatPrecision != null
-              && encodingList != null
-              && !Double.isNaN(valueD)
-              && (encodingList.get(columnIndex) == TSEncoding.RLE
-                  || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
-            valueD = MathUtils.roundWithGivenPrecision(valueD, floatPrecision);
-          }
-          return TsPrimitiveType.getByType(TSDataType.DOUBLE, valueD);
-        case TEXT:
-        case BLOB:
-        case STRING:
-          return TsPrimitiveType.getByType(
-              TSDataType.TEXT, getBinaryByValueIndex(rowIndex, validColumnIndex));
-        default:
-          throw new UnSupportedDataTypeException(
-              String.format("Data type %s is not supported.", dataTypeList.get(columnIndex)));
-      }
-    }
-
-    public int getSelectedIndex(int columnIndex) {
-      return selectedIndex[columnIndex];
+      return currentTvPair;
     }
 
     @Override
@@ -1720,9 +1651,116 @@ public abstract class AlignedTVList extends TVList {
       iterator.allValueColDeletedMap = allValueColDeletedMap;
       iterator.floatPrecision = floatPrecision;
       iterator.encodingList = this.encodingList;
-      iterator.selectedIndex = new int[encodingList.size()];
+      for (int i = 0; i < iterator.cachedVectors.length; i++) {
+        iterator.cachedVectors[i] = new TsPrimitiveType[dataTypeList.size()];
+      }
       iterator.reset();
       return iterator;
+    }
+
+    public int updateVectorCache(int index, TsPrimitiveType[][] cachedVectors, int cachedArray) {
+      int arrayIndex = index / ARRAY_SIZE;
+      if (arrayIndex != cachedArray) {
+        for (TsPrimitiveType[] vector : cachedVectors) {
+          Arrays.fill(vector, null);
+        }
+        readAlignedVectors(index, cachedVectors);
+        cachedArray = arrayIndex;
+      }
+      return cachedArray;
+    }
+
+    public void readAlignedVectors(int index, TsPrimitiveType[][] cachedVectors) {
+      if (index >= rowCount) {
+        return;
+      }
+
+      int arrayIndex = index / ARRAY_SIZE;
+      int elementNum =
+          rowCount >= (arrayIndex + 1) * ARRAY_SIZE
+              ? ARRAY_SIZE
+              : rowCount - arrayIndex * ARRAY_SIZE;
+
+      for (int i = 0; i < columnIndexList.size(); i++) {
+        int columnIndex = columnIndexList.get(i);
+        if (columnIndex < 0 || columnIndex >= dataTypes.size()) {
+          continue;
+        }
+
+        List<Object> columnValues = values.get(columnIndex);
+        if (columnValues == null) {
+          continue;
+        }
+
+        switch (dataTypes.get(columnIndex)) {
+          case TEXT:
+          case BLOB:
+          case STRING:
+            Binary[] valueT = ((Binary[]) columnValues.get(arrayIndex));
+            for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+              if (isNullValue(arrayIndex * ARRAY_SIZE + elementIndex, columnIndex)) {
+                continue;
+              }
+              cachedVectors[elementIndex][i] =
+                  TsPrimitiveType.getByType(TSDataType.TEXT, valueT[elementIndex]);
+            }
+            break;
+          case FLOAT:
+            float[] valueF = ((float[]) columnValues.get(arrayIndex));
+            for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+              if (isNullValue(arrayIndex * ARRAY_SIZE + elementIndex, columnIndex)) {
+                continue;
+              }
+              cachedVectors[elementIndex][i] =
+                  TsPrimitiveType.getByType(TSDataType.FLOAT, valueF[elementIndex]);
+            }
+            break;
+          case INT32:
+          case DATE:
+            int[] valueI = ((int[]) columnValues.get(arrayIndex));
+            for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+              if (isNullValue(arrayIndex * ARRAY_SIZE + elementIndex, columnIndex)) {
+                continue;
+              }
+              cachedVectors[elementIndex][i] =
+                  TsPrimitiveType.getByType(TSDataType.INT32, valueI[elementIndex]);
+            }
+            break;
+          case INT64:
+          case TIMESTAMP:
+            long[] valueL = ((long[]) columnValues.get(arrayIndex));
+            for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+              if (isNullValue(arrayIndex * ARRAY_SIZE + elementIndex, columnIndex)) {
+                continue;
+              }
+              cachedVectors[elementIndex][i] =
+                  TsPrimitiveType.getByType(TSDataType.INT64, valueL[elementIndex]);
+            }
+            break;
+          case DOUBLE:
+            double[] valueD = ((double[]) columnValues.get(arrayIndex));
+            for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+              if (isNullValue(arrayIndex * ARRAY_SIZE + elementIndex, columnIndex)) {
+                continue;
+              }
+              cachedVectors[elementIndex][i] =
+                  TsPrimitiveType.getByType(TSDataType.DOUBLE, valueD[elementIndex]);
+            }
+            break;
+          case BOOLEAN:
+            boolean[] valueB = ((boolean[]) columnValues.get(arrayIndex));
+            for (int elementIndex = 0; elementIndex < elementNum; elementIndex++) {
+              if (isNullValue(arrayIndex * ARRAY_SIZE + elementIndex, columnIndex)) {
+                continue;
+              }
+              cachedVectors[elementIndex][i] =
+                  TsPrimitiveType.getByType(TSDataType.BOOLEAN, valueB[elementIndex]);
+            }
+            break;
+          default:
+            throw new UnsupportedOperationException(ERR_DATATYPE_NOT_CONSISTENT);
+        }
+      }
     }
   }
 }
