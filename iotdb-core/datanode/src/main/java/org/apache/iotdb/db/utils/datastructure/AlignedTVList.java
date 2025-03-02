@@ -260,7 +260,7 @@ public abstract class AlignedTVList extends TVList {
   public int updateTimeValuePairCache(
       int index, BitMap ignoreColumns, TimeValuePair[] cachedTvPairs, int cachedPage) {
     int arrayIndex = index / ARRAY_SIZE;
-    if (arrayIndex > cachedPage || arrayIndex < cachedPage) {
+    if (arrayIndex != cachedPage) {
       Arrays.fill(cachedTvPairs, null);
       readTimeValuePairs(index, ignoreColumns, cachedTvPairs);
       cachedPage = arrayIndex;

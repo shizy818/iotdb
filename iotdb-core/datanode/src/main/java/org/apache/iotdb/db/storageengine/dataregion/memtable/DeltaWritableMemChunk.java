@@ -275,104 +275,134 @@ public class DeltaWritableMemChunk implements IWritableMemChunk {
 
   @Override
   public void putBooleans(long[] t, boolean[] v, BitMap bitMap, int start, int end) {
-    int splitIndex = findSplitIndex(t, bitMap, start, end);
-    // delta part
-    int deltaId = deltaList.rowCount();
-    deltaList.putBooleans(t, v, bitMap, start, splitIndex);
-    for (int i = start; i < splitIndex; i++) {
-      if (bitMap != null && bitMap.isMarked(i)) {
-        continue;
+    if (t.length > 0 && t[0] >= maxTime) {
+      maxTime = t[t.length - 1];
+      stableList.putBooleans(t, v, bitMap, start, end);
+    } else {
+      int splitIndex = findSplitIndex(t, bitMap, start, end);
+      // delta part
+      int deltaId = deltaList.rowCount();
+      deltaList.putBooleans(t, v, bitMap, start, splitIndex);
+      for (int i = start; i < splitIndex; i++) {
+        if (bitMap != null && bitMap.isMarked(i)) {
+          continue;
+        }
+        int stableId = stableList.binarySearch(t[i]);
+        deltaTree.insert(t[i], stableId, deltaId + i - start);
       }
-      int stableId = stableList.binarySearch(t[i]);
-      deltaTree.insert(t[i], stableId, deltaId + i - start);
+      // stable part
+      stableList.putBooleans(t, v, bitMap, splitIndex, end);
     }
-    // stable part
-    stableList.putBooleans(t, v, bitMap, splitIndex, end);
   }
 
   @Override
   public void putInts(long[] t, int[] v, BitMap bitMap, int start, int end) {
-    int splitIndex = findSplitIndex(t, bitMap, start, end);
-    // delta part
-    int deltaId = deltaList.rowCount();
-    deltaList.putInts(t, v, bitMap, start, splitIndex);
-    for (int i = start; i < splitIndex; i++) {
-      if (bitMap != null && bitMap.isMarked(i)) {
-        continue;
+    if (t.length > 0 && t[0] >= maxTime) {
+      maxTime = t[t.length - 1];
+      stableList.putInts(t, v, bitMap, start, end);
+    } else {
+      int splitIndex = findSplitIndex(t, bitMap, start, end);
+      // delta part
+      int deltaId = deltaList.rowCount();
+      deltaList.putInts(t, v, bitMap, start, splitIndex);
+      for (int i = start; i < splitIndex; i++) {
+        if (bitMap != null && bitMap.isMarked(i)) {
+          continue;
+        }
+        int stableId = stableList.binarySearch(t[i]);
+        deltaTree.insert(t[i], stableId, deltaId + i - start);
       }
-      int stableId = stableList.binarySearch(t[i]);
-      deltaTree.insert(t[i], stableId, deltaId + i - start);
+      // stable part
+      stableList.putInts(t, v, bitMap, splitIndex, end);
     }
-    // stable part
-    stableList.putInts(t, v, bitMap, splitIndex, end);
   }
 
   @Override
   public void putLongs(long[] t, long[] v, BitMap bitMap, int start, int end) {
-    int splitIndex = findSplitIndex(t, bitMap, start, end);
-    // delta part
-    int deltaId = deltaList.rowCount();
-    deltaList.putLongs(t, v, bitMap, start, splitIndex);
-    for (int i = start; i < splitIndex; i++) {
-      if (bitMap != null && bitMap.isMarked(i)) {
-        continue;
+    if (t.length > 0 && t[0] >= maxTime) {
+      maxTime = t[t.length - 1];
+      stableList.putLongs(t, v, bitMap, start, end);
+    } else {
+      int splitIndex = findSplitIndex(t, bitMap, start, end);
+      // delta part
+      int deltaId = deltaList.rowCount();
+      deltaList.putLongs(t, v, bitMap, start, splitIndex);
+      for (int i = start; i < splitIndex; i++) {
+        if (bitMap != null && bitMap.isMarked(i)) {
+          continue;
+        }
+        int stableId = stableList.binarySearch(t[i]);
+        deltaTree.insert(t[i], stableId, deltaId + i - start);
       }
-      int stableId = stableList.binarySearch(t[i]);
-      deltaTree.insert(t[i], stableId, deltaId + i - start);
+      // stable part
+      stableList.putLongs(t, v, bitMap, splitIndex, end);
     }
-    // stable part
-    stableList.putLongs(t, v, bitMap, splitIndex, end);
   }
 
   @Override
   public void putFloats(long[] t, float[] v, BitMap bitMap, int start, int end) {
-    int splitIndex = findSplitIndex(t, bitMap, start, end);
-    // delta part
-    int deltaId = deltaList.rowCount();
-    deltaList.putFloats(t, v, bitMap, start, splitIndex);
-    for (int i = start; i < splitIndex; i++) {
-      if (bitMap != null && bitMap.isMarked(i)) {
-        continue;
+    if (t.length > 0 && t[0] >= maxTime) {
+      maxTime = t[t.length - 1];
+      stableList.putFloats(t, v, bitMap, start, end);
+    } else {
+      int splitIndex = findSplitIndex(t, bitMap, start, end);
+      // delta part
+      int deltaId = deltaList.rowCount();
+      deltaList.putFloats(t, v, bitMap, start, splitIndex);
+      for (int i = start; i < splitIndex; i++) {
+        if (bitMap != null && bitMap.isMarked(i)) {
+          continue;
+        }
+        int stableId = stableList.binarySearch(t[i]);
+        deltaTree.insert(t[i], stableId, deltaId + i - start);
       }
-      int stableId = stableList.binarySearch(t[i]);
-      deltaTree.insert(t[i], stableId, deltaId + i - start);
+      // stable part
+      stableList.putFloats(t, v, bitMap, splitIndex, end);
     }
-    // stable part
-    stableList.putFloats(t, v, bitMap, splitIndex, end);
   }
 
   @Override
   public void putDoubles(long[] t, double[] v, BitMap bitMap, int start, int end) {
-    int splitIndex = findSplitIndex(t, bitMap, start, end);
-    // delta part
-    int deltaId = deltaList.rowCount();
-    deltaList.putDoubles(t, v, bitMap, start, splitIndex);
-    for (int i = start; i < splitIndex; i++) {
-      if (bitMap != null && bitMap.isMarked(i)) {
-        continue;
+    if (t.length > 0 && t[0] >= maxTime) {
+      maxTime = t[t.length - 1];
+      stableList.putDoubles(t, v, bitMap, start, end);
+    } else {
+      int splitIndex = findSplitIndex(t, bitMap, start, end);
+      // delta part
+      int deltaId = deltaList.rowCount();
+      deltaList.putDoubles(t, v, bitMap, start, splitIndex);
+      for (int i = start; i < splitIndex; i++) {
+        if (bitMap != null && bitMap.isMarked(i)) {
+          continue;
+        }
+        int stableId = stableList.binarySearch(t[i]);
+        deltaTree.insert(t[i], stableId, deltaId + i - start);
       }
-      int stableId = stableList.binarySearch(t[i]);
-      deltaTree.insert(t[i], stableId, deltaId + i - start);
+      // stable part
+      stableList.putDoubles(t, v, bitMap, splitIndex, end);
     }
-    // stable part
-    stableList.putDoubles(t, v, bitMap, splitIndex, end);
   }
 
   @Override
   public void putBinaries(long[] t, Binary[] v, BitMap bitMap, int start, int end) {
-    int splitIndex = findSplitIndex(t, bitMap, start, end);
-    // delta part
-    int deltaId = deltaList.rowCount();
-    deltaList.putBinaries(t, v, bitMap, start, splitIndex);
-    for (int i = start; i < splitIndex; i++) {
-      if (bitMap != null && bitMap.isMarked(i)) {
-        continue;
+    if (t.length > 0 && t[0] >= maxTime) {
+      maxTime = t[t.length - 1];
+      stableList.putBinaries(t, v, bitMap, start, end);
+    } else {
+      int splitIndex = findSplitIndex(t, bitMap, start, end);
+      // delta part
+      int deltaId = deltaList.rowCount();
+      deltaList.putBinaries(t, v, bitMap, start, splitIndex);
+      for (int i = start; i < splitIndex; i++) {
+        if (bitMap != null && bitMap.isMarked(i)) {
+          continue;
+        }
+        int stableId = stableList.binarySearch(t[i]);
+        deltaTree.insert(t[i], stableId, deltaId + i - start);
       }
-      int stableId = stableList.binarySearch(t[i]);
-      deltaTree.insert(t[i], stableId, deltaId + i - start);
+      // stable part
+      stableList.putBinaries(t, v, bitMap, splitIndex, end);
     }
-    // stable part
-    stableList.putBinaries(t, v, bitMap, splitIndex, end);
   }
 
   @Override
