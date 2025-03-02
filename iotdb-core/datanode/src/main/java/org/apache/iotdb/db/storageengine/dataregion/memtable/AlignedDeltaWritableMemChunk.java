@@ -217,17 +217,18 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
   @Override
   public void putAlignedTablet(
       long[] t, Object[] v, BitMap[] bitMaps, int start, int end, TSStatus[] results) {
-    int splitIndex = findSplitIndex(t, start, end);
-    // delta part
-    int deltaId = deltaList.rowCount();
-    if (splitIndex > start) {
+    if (t.length > 0 && t[0] >= maxTime) {
+      maxTime = t[t.length - 1];
+      stableList.putAlignedValues(t, v, bitMaps, start, end, results);
+    } else {
+      int splitIndex = findSplitIndex(t, start, end);
+      // delta part
+      int deltaId = deltaList.rowCount();
       deltaList.putAlignedValues(t, v, bitMaps, start, splitIndex, results);
       for (int i = start; i < splitIndex; i++) {
         int stableId = stableList.binarySearch(t[i]);
         deltaTree.insert(t[i], stableId, deltaId + i - start);
       }
-    }
-    if (end > splitIndex) {
       stableList.putAlignedValues(t, v, bitMaps, splitIndex, end, results);
     }
   }
