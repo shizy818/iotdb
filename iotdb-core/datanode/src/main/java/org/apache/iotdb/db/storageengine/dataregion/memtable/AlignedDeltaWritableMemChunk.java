@@ -850,10 +850,12 @@ public class AlignedDeltaWritableMemChunk implements IWritableMemChunk {
             && stableDeletedRowMap.isMarked(stableIndex)) {
           stableIndex++;
         }
-        cachedPage =
-            stableList.updateTimeValuePairCache(
-                stableIndex, ignoreColumns, cachedTvPairs, cachedPage);
-        internStableTvPair = cachedTvPairs[stableIndex % ARRAY_SIZE];
+        if (stableIndex < stableRowCount) {
+          cachedPage =
+              stableList.updateTimeValuePairCache(
+                  stableIndex, ignoreColumns, cachedTvPairs, cachedPage);
+          internStableTvPair = cachedTvPairs[stableIndex % ARRAY_SIZE];
+        }
 
         // handle duplicated timestamp
         while (stableIndex + 1 <= stableId
