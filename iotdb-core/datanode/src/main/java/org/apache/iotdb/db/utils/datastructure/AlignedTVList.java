@@ -1647,6 +1647,16 @@ public abstract class AlignedTVList extends TVList {
       return new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
     }
 
+    public void updateCurrentVector(TsPrimitiveType[] vector) {
+      for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
+        TsPrimitiveType primitiveObject =
+            fetchPrimitiveObject(selectedIndex[columnIndex], columnIndex);
+        if (primitiveObject != null) {
+          vector[columnIndex] = fetchPrimitiveObject(selectedIndex[columnIndex], columnIndex);
+        }
+      }
+    }
+
     public boolean isNull(int rowIndex, int columnIndex) {
       int validColumnIndex = columnIndexList.get(columnIndex);
       if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {

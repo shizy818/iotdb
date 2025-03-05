@@ -38,6 +38,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
 
   private boolean probeNext = false;
   private TimeValuePair currentTvPair;
+  TsPrimitiveType[] vector;
 
   private List<Integer> probeIterators;
 
@@ -64,6 +65,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     this.alignedTvListOffsets = new int[alignedTvLists.size()];
     this.probeIterators =
         IntStream.range(0, alignedTvListIterators.size()).boxed().collect(Collectors.toList());
+    this.vector = new TsPrimitiveType[tsDataTypes.size()];
   }
 
   private MergeSortAlignedTVListIterator() {}
@@ -82,22 +84,15 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
       Pair<Long, Integer> top = minHeap.poll();
       long time = top.left;
       probeIterators.add(top.right);
-      currentTvPair = alignedTvListIterators.get(top.right).current();
-      TsPrimitiveType[] currentValues = currentTvPair.getValue().getVector();
+      alignedTvListIterators.get(top.right).updateCurrentVector(vector);
 
       while (!minHeap.isEmpty() && minHeap.peek().left == time) {
         Pair<Long, Integer> element = minHeap.poll();
         probeIterators.add(element.right);
-
-        TimeValuePair tvPair = alignedTvListIterators.get(element.right).current();
-        TsPrimitiveType[] values = tvPair.getValue().getVector();
-        for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
-          // if the column is currently not null, it needs not update
-          if (currentValues[columnIndex] == null) {
-            currentValues[columnIndex] = values[columnIndex];
-          }
-        }
+        alignedTvListIterators.get(element.right).updateCurrentVector(vector);
       }
+
+      currentTvPair = new TimeValuePair(time, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
     }
     probeNext = true;
   }
@@ -172,6 +167,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     cloneIterator.alignedTvListOffsets = new int[alignedTvListIterators.size()];
     cloneIterator.probeIterators =
         IntStream.range(0, alignedTvListIterators.size()).boxed().collect(Collectors.toList());
+    cloneIterator.vector = new TsPrimitiveType[vector.length];
     return cloneIterator;
   }
 }
