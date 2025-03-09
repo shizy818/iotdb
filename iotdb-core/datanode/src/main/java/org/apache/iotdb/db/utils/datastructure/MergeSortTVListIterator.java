@@ -19,46 +19,75 @@
 
 package org.apache.iotdb.db.utils.datastructure;
 
+import org.apache.iotdb.db.utils.MathUtils;
+
+import org.apache.tsfile.common.conf.TSFileDescriptor;
+import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.TimeValuePair;
+import org.apache.tsfile.read.common.TimeRange;
+import org.apache.tsfile.read.common.block.TsBlock;
+import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPointReader;
 import org.apache.tsfile.utils.Pair;
+import org.apache.tsfile.write.UnSupportedDataTypeException;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class MergeSortTVListIterator implements IPointReader {
+  private TSDataType tsDataType;
   private List<TVList.TVListIterator> tvListIterators;
   private int[] tvListOffsets;
+  private Integer floatPrecision;
+  private TSEncoding encoding;
+  private List<TimeRange> deletionList;
 
   private boolean probeNext = false;
-  private TimeValuePair currentTvPair;
+  private boolean hasNext = false;
+  private int iteratorIndex = 0;
+  private int rowIndex = 0;
 
   private List<Integer> probeIterators;
   private final PriorityQueue<Pair<Long, Integer>> minHeap =
       new PriorityQueue<>(
           (a, b) -> a.left.equals(b.left) ? b.right.compareTo(a.right) : a.left.compareTo(b.left));
 
-  public MergeSortTVListIterator(List<TVList> tvLists) {
+  protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
+      TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
+
+  public MergeSortTVListIterator(
+      TSDataType tsDataType, List<TVList> tvLists, List<TimeRange> deletionList) {
+    this.tsDataType = tsDataType;
     tvListIterators = new ArrayList<>(tvLists.size());
     for (TVList tvList : tvLists) {
-      tvListIterators.add(tvList.iterator(null, null));
+      tvListIterators.add(tvList.iterator(deletionList));
     }
+    this.deletionList = deletionList;
     this.tvListOffsets = new int[tvLists.size()];
     this.probeIterators =
         IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
   }
 
   public MergeSortTVListIterator(
-      List<TVList> tvLists, Integer floatPrecision, TSEncoding encoding) {
-    tvListIterators = new ArrayList<>(tvLists.size());
+      TSDataType tsDataType,
+      List<TVList> tvLists,
+      List<TimeRange> deletionList,
+      Integer floatPrecision,
+      TSEncoding encoding) {
+    this.tsDataType = tsDataType;
+    this.tvListIterators = new ArrayList<>(tvLists.size());
     for (TVList tvList : tvLists) {
-      tvListIterators.add(tvList.iterator(floatPrecision, encoding));
+      tvListIterators.add(tvList.iterator(deletionList));
     }
+    this.deletionList = deletionList;
+    this.floatPrecision = floatPrecision;
+    this.encoding = encoding;
     this.tvListOffsets = new int[tvLists.size()];
     this.probeIterators =
         IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
@@ -67,11 +96,13 @@ public class MergeSortTVListIterator implements IPointReader {
   private MergeSortTVListIterator() {}
 
   private void prepareNext() {
-    currentTvPair = null;
+    hasNext = false;
     if (tvListIterators.size() == 1) {
-      TVList.TVListIterator iterator = tvListIterators.get(0);
+      iteratorIndex = 0;
+      TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
       if (iterator.hasNext()) {
-        currentTvPair = iterator.current();
+        rowIndex = iterator.getIndex();
+        hasNext = true;
       }
       probeNext = true;
       return;
@@ -87,8 +118,10 @@ public class MergeSortTVListIterator implements IPointReader {
 
     if (!minHeap.isEmpty()) {
       Pair<Long, Integer> top = minHeap.poll();
-      probeIterators.add(top.right);
-      currentTvPair = tvListIterators.get(top.right).current();
+      iteratorIndex = top.right;
+      probeIterators.add(iteratorIndex);
+      rowIndex = tvListIterators.get(iteratorIndex).getIndex();
+      hasNext = true;
       while (!minHeap.isEmpty() && minHeap.peek().left.longValue() == top.left.longValue()) {
         Pair<Long, Integer> element = minHeap.poll();
         probeIterators.add(element.right);
@@ -102,7 +135,7 @@ public class MergeSortTVListIterator implements IPointReader {
     if (!probeNext) {
       prepareNext();
     }
-    return currentTvPair != null;
+    return hasNext;
   }
 
   @Override
@@ -110,7 +143,12 @@ public class MergeSortTVListIterator implements IPointReader {
     if (!hasNextTimeValuePair()) {
       return null;
     }
-    step();
+    TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
+    TimeValuePair currentTvPair =
+        iterator
+            .getTVList()
+            .getTimeValuePair(rowIndex, iterator.currentTime(), floatPrecision, encoding);
+    next();
     return currentTvPair;
   }
 
@@ -119,10 +157,13 @@ public class MergeSortTVListIterator implements IPointReader {
     if (!hasNextTimeValuePair()) {
       return null;
     }
-    return currentTvPair;
+    TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
+    return iterator
+        .getTVList()
+        .getTimeValuePair(rowIndex, iterator.currentTime(), floatPrecision, encoding);
   }
 
-  public void step() {
+  public void next() {
     if (tvListIterators.size() == 1) {
       TVList.TVListIterator iterator = tvListIterators.get(0);
       iterator.step();
@@ -135,6 +176,70 @@ public class MergeSortTVListIterator implements IPointReader {
       }
     }
     probeNext = false;
+  }
+
+  public boolean hasNextBatch() {
+    return hasNextTimeValuePair();
+  }
+
+  public TsBlock nextBatch() {
+    return nextBatch(null);
+  }
+
+  public TsBlock nextBatch(int[] pageEndOffsets) {
+    TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(tsDataType));
+    int pointsInBatch = 0;
+    while (hasNextTimeValuePair() && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE) {
+      if (isOutOfMemPageBounds(pageEndOffsets)) {
+        break;
+      }
+
+      TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
+      builder.getTimeColumnBuilder().writeLong(iterator.currentTime());
+      switch (tsDataType) {
+        case BOOLEAN:
+          builder.getColumnBuilder(0).writeBoolean(iterator.getTVList().getBoolean(rowIndex));
+          break;
+        case INT32:
+        case DATE:
+          builder.getColumnBuilder(0).writeInt(iterator.getTVList().getInt(rowIndex));
+          break;
+        case INT64:
+        case TIMESTAMP:
+          builder.getColumnBuilder(0).writeLong(iterator.getTVList().getLong(rowIndex));
+          break;
+        case FLOAT:
+          float fValue = iterator.getTVList().getFloat(rowIndex);
+          if (!Float.isNaN(fValue)
+              && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+            fValue = MathUtils.roundWithGivenPrecision(fValue, floatPrecision);
+          }
+          builder.getColumnBuilder(0).writeFloat(fValue);
+          break;
+        case DOUBLE:
+          double dValue = iterator.getTVList().getDouble(rowIndex);
+          if (!Double.isNaN(dValue)
+              && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
+            dValue = MathUtils.roundWithGivenPrecision(dValue, floatPrecision);
+          }
+          builder.getColumnBuilder(0).writeDouble(dValue);
+          break;
+        case TEXT:
+        case BLOB:
+        case STRING:
+          builder.getColumnBuilder(0).writeBinary(iterator.getTVList().getBinary(rowIndex));
+          break;
+        default:
+          throw new UnSupportedDataTypeException(
+              String.format("Data type %s is not supported.", tsDataType));
+      }
+      next();
+
+      builder.declarePosition();
+      pointsInBatch++;
+    }
+    probeNext = false;
+    return builder.build();
   }
 
   @Override
@@ -168,6 +273,7 @@ public class MergeSortTVListIterator implements IPointReader {
   @Override
   public MergeSortTVListIterator clone() {
     MergeSortTVListIterator cloneIterator = new MergeSortTVListIterator();
+    cloneIterator.tsDataType = tsDataType;
     cloneIterator.tvListIterators = new ArrayList<>(tvListIterators.size());
     for (int i = 0; i < tvListIterators.size(); i++) {
       cloneIterator.tvListIterators.add(tvListIterators.get(i).clone());
@@ -176,5 +282,17 @@ public class MergeSortTVListIterator implements IPointReader {
     cloneIterator.probeIterators =
         IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
     return cloneIterator;
+  }
+
+  private boolean isOutOfMemPageBounds(int[] pageEndOffsets) {
+    if (pageEndOffsets == null) {
+      return false;
+    }
+    for (int i = 0; i < pageEndOffsets.length; i++) {
+      if (tvListOffsets[i] < pageEndOffsets[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }

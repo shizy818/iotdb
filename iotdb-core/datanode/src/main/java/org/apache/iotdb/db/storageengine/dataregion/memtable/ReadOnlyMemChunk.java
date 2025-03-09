@@ -23,7 +23,6 @@ import org.apache.iotdb.commons.utils.TestOnly;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.MemChunkLoader;
-import org.apache.iotdb.db.utils.MathUtils;
 import org.apache.iotdb.db.utils.datastructure.MergeSortTVListIterator;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
@@ -145,56 +144,89 @@ public class ReadOnlyMemChunk {
   public void initChunkMetaFromTvLists() {
     // create chunk statistics
     Statistics<? extends Serializable> chunkStatistics = Statistics.getStatsByType(dataType);
-    int pointsInChunk = 0;
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
-    timeValuePairIterator = new MergeSortTVListIterator(tvLists, floatPrecision, encoding);
+    timeValuePairIterator =
+        new MergeSortTVListIterator(dataType, tvLists, deletionList, floatPrecision, encoding);
     int[] tvListOffsets = timeValuePairIterator.getTVListOffsets();
-    while (timeValuePairIterator.hasNextTimeValuePair()) {
-      if (pointsInChunk % MAX_NUMBER_OF_POINTS_IN_PAGE == 0) {
-        Statistics<? extends Serializable> stats = Statistics.getStatsByType(dataType);
-        pageStatisticsList.add(stats);
-        pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
-      }
-      TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
-        Statistics<? extends Serializable> pageStatistics =
-            pageStatisticsList.get(pageStatisticsList.size() - 1);
+    while (timeValuePairIterator.hasNextBatch()) {
+      // statistics for current batch
+      Statistics<? extends Serializable> pageStatistics = Statistics.getStatsByType(dataType);
+      pageStatisticsList.add(pageStatistics);
+      pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
+
+      TsBlock tsBlock = timeValuePairIterator.nextBatch();
+      if (!tsBlock.isEmpty()) {
         switch (dataType) {
           case BOOLEAN:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
+            for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+              long time = tsBlock.getTimeByIndex(i);
+              if (isPointDeleted(time, deletionList, deleteCursor)) {
+                continue;
+              }
+              chunkStatistics.update(time, tsBlock.getColumn(0).getBoolean(i));
+              pageStatistics.update(time, tsBlock.getColumn(0).getBoolean(i));
+            }
             break;
           case INT32:
           case DATE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getInt());
+            for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+              long time = tsBlock.getTimeByIndex(i);
+              if (isPointDeleted(time, deletionList, deleteCursor)) {
+                continue;
+              }
+              chunkStatistics.update(time, tsBlock.getColumn(0).getInt(i));
+              pageStatistics.update(time, tsBlock.getColumn(0).getInt(i));
+            }
             break;
           case INT64:
           case TIMESTAMP:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getLong());
+            for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+              long time = tsBlock.getTimeByIndex(i);
+              if (isPointDeleted(time, deletionList, deleteCursor)) {
+                continue;
+              }
+              chunkStatistics.update(time, tsBlock.getColumn(0).getLong(i));
+              pageStatistics.update(time, tsBlock.getColumn(0).getLong(i));
+            }
             break;
           case FLOAT:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getFloat());
+            for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+              long time = tsBlock.getTimeByIndex(i);
+              if (isPointDeleted(time, deletionList, deleteCursor)) {
+                continue;
+              }
+              chunkStatistics.update(time, tsBlock.getColumn(0).getFloat(i));
+              pageStatistics.update(time, tsBlock.getColumn(0).getFloat(i));
+            }
             break;
           case DOUBLE:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getDouble());
+            for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+              long time = tsBlock.getTimeByIndex(i);
+              if (isPointDeleted(time, deletionList, deleteCursor)) {
+                continue;
+              }
+              chunkStatistics.update(time, tsBlock.getColumn(0).getDouble(i));
+              pageStatistics.update(time, tsBlock.getColumn(0).getDouble(i));
+            }
             break;
           case TEXT:
           case BLOB:
           case STRING:
-            chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
-            pageStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBinary());
+            for (int i = 0; i < tsBlock.getPositionCount(); i++) {
+              long time = tsBlock.getTimeByIndex(i);
+              if (isPointDeleted(time, deletionList, deleteCursor)) {
+                continue;
+              }
+              chunkStatistics.update(time, tsBlock.getColumn(0).getBinary(i));
+              pageStatistics.update(time, tsBlock.getColumn(0).getBinary(i));
+            }
             break;
           default:
             throw new UnSupportedDataTypeException(
                 String.format("Data type %s is not supported.", dataType));
         }
       }
-      pointsInChunk++;
     }
     pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
 
@@ -243,53 +275,40 @@ public class ReadOnlyMemChunk {
 
   // read all data in memory chunk and write to tsblock
   private void writeValidValuesIntoTsBlock(TsBlockBuilder builder) throws IOException {
-    int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     IPointReader timeValuePairIterator =
-        new MergeSortTVListIterator(tvLists, floatPrecision, encoding);
+        new MergeSortTVListIterator(getDataType(), tvLists, deletionList, floatPrecision, encoding);
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
-      if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
-        builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
-        switch (dataType) {
-          case BOOLEAN:
-            builder.getColumnBuilder(0).writeBoolean(tvPair.getValue().getBoolean());
-            break;
-          case INT32:
-          case DATE:
-            builder.getColumnBuilder(0).writeInt(tvPair.getValue().getInt());
-            break;
-          case INT64:
-          case TIMESTAMP:
-            builder.getColumnBuilder(0).writeLong(tvPair.getValue().getLong());
-            break;
-          case FLOAT:
-            float fv = tvPair.getValue().getFloat();
-            if (!Float.isNaN(fv)
-                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-              fv = MathUtils.roundWithGivenPrecision(fv, floatPrecision);
-            }
-            builder.getColumnBuilder(0).writeFloat(fv);
-            break;
-          case DOUBLE:
-            double dv = tvPair.getValue().getDouble();
-            if (!Double.isNaN(dv)
-                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-              dv = MathUtils.roundWithGivenPrecision(dv, floatPrecision);
-            }
-            builder.getColumnBuilder(0).writeDouble(dv);
-            break;
-          case TEXT:
-          case STRING:
-          case BLOB:
-            builder.getColumnBuilder(0).writeBinary(tvPair.getValue().getBinary());
-            break;
-          default:
-            break;
-        }
-        builder.declarePosition();
+      builder.getTimeColumnBuilder().writeLong(tvPair.getTimestamp());
+      switch (dataType) {
+        case BOOLEAN:
+          builder.getColumnBuilder(0).writeBoolean(tvPair.getValue().getBoolean());
+          break;
+        case INT32:
+        case DATE:
+          builder.getColumnBuilder(0).writeInt(tvPair.getValue().getInt());
+          break;
+        case INT64:
+        case TIMESTAMP:
+          builder.getColumnBuilder(0).writeLong(tvPair.getValue().getLong());
+          break;
+        case FLOAT:
+          builder.getColumnBuilder(0).writeFloat(tvPair.getValue().getFloat());
+          break;
+        case DOUBLE:
+          builder.getColumnBuilder(0).writeDouble(tvPair.getValue().getDouble());
+          break;
+        case TEXT:
+        case STRING:
+        case BLOB:
+          builder.getColumnBuilder(0).writeBinary(tvPair.getValue().getBinary());
+          break;
+        default:
+          break;
       }
+      builder.declarePosition();
     }
   }
 

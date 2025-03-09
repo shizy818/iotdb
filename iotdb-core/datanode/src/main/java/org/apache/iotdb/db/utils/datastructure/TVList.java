@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager.ARRAY_SIZE;
+import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_ARRAY_HEADER;
 import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_OBJECT_REF;
 
@@ -83,6 +84,8 @@ public abstract class TVList implements WALEntryValue {
   // currently this reference will only be increase because we can't know when to decrease it
   protected AtomicInteger referenceCount;
   private long version;
+
+  private final TVList outer = this;
 
   protected TVList() {
     timestamps = new ArrayList<>();
@@ -634,8 +637,8 @@ public abstract class TVList implements WALEntryValue {
     queryListLock.unlock();
   }
 
-  public TVListIterator iterator(Integer floatPrecision, TSEncoding encoding) {
-    return new TVListIterator(floatPrecision, encoding);
+  public TVListIterator iterator(List<TimeRange> deletionList) {
+    return new TVListIterator(deletionList);
   }
 
   /* TVList Iterator */
@@ -644,27 +647,23 @@ public abstract class TVList implements WALEntryValue {
     protected int rows;
     protected long currentTime;
     protected boolean probeNext;
-    private Integer floatPrecision;
-    private TSEncoding encoding;
+    private List<TimeRange> deletionList;
+    int[] deleteCursor = {0};
 
-    public TVListIterator() {}
-
-    public TVListIterator(Integer floatPrecision, TSEncoding encoding) {
+    public TVListIterator(List<TimeRange> deletionList) {
+      this.deletionList = deletionList;
       this.index = 0;
       this.rows = rowCount;
       this.currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
-      this.floatPrecision = floatPrecision;
-      this.encoding = encoding;
+      this.probeNext = false;
     }
 
     private void prepareNext() {
       // skip deleted rows
-      int prevIndex = index;
-      while (index < rows && (bitMap != null && isNullValue(getValueIndex(index)))) {
+      while (index < rows
+          && (isNullValue(getValueIndex(index))
+              || isPointDeleted(getTime(index), deletionList, deleteCursor))) {
         index++;
-      }
-      // update current timestamp if needed
-      if (index > prevIndex) {
         currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
       }
 
@@ -682,28 +681,14 @@ public abstract class TVList implements WALEntryValue {
       return index < rows;
     }
 
-    public TimeValuePair next() {
-      if (!hasNext()) {
-        return null;
-      }
-      TimeValuePair ret = getTimeValuePair(index++, currentTime, floatPrecision, encoding);
+    public void step() {
+      index++;
       currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
       probeNext = false;
-      return ret;
-    }
-
-    public TimeValuePair current() {
-      if (!hasCurrent()) {
-        return null;
-      }
-      return getTimeValuePair(index, currentTime, floatPrecision, encoding);
     }
 
     public boolean hasCurrent() {
-      if (bitMap == null) {
-        return index < rows;
-      }
-      return index < rows && !isNullValue(getValueIndex(index));
+      return index < rows;
     }
 
     public long currentTime() {
@@ -719,14 +704,8 @@ public abstract class TVList implements WALEntryValue {
 
     public void setIndex(int index) {
       this.index = index;
-      this.probeNext = false;
       this.currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
-    }
-
-    protected void step() {
-      index++;
-      probeNext = false;
-      currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
+      this.probeNext = false;
     }
 
     public void reset() {
@@ -737,12 +716,17 @@ public abstract class TVList implements WALEntryValue {
 
     @Override
     public TVListIterator clone() {
-      TVListIterator iterator = new TVListIterator();
-      iterator.rows = rows;
-      iterator.floatPrecision = floatPrecision;
-      iterator.encoding = encoding;
-      iterator.reset();
-      return iterator;
+      TVListIterator cloneIterator = new TVListIterator();
+      cloneIterator.deletionList = deletionList;
+      cloneIterator.rows = rows;
+      cloneIterator.reset();
+      return cloneIterator;
     }
+
+    public TVList getTVList() {
+      return outer;
+    }
+
+    private TVListIterator() {}
   }
 }

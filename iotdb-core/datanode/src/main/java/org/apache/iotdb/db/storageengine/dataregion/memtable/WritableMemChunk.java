@@ -33,9 +33,9 @@ import org.apache.iotdb.db.utils.datastructure.TVList;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
+import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
-import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 import org.apache.tsfile.write.chunk.ChunkWriterImpl;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
@@ -580,55 +580,9 @@ public class WritableMemChunk implements IWritableMemChunk {
     }
   }
 
-  private Pair<Long, Integer> writeData(
-      ChunkWriterImpl chunkWriterImpl,
-      TimeValuePair tvPair,
-      long dataSizeInCurrentChunk,
-      int pointNumInCurrentChunk) {
-    switch (schema.getType()) {
-      case BOOLEAN:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
-        dataSizeInCurrentChunk += 8L + 1L;
-        break;
-      case INT32:
-      case DATE:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getInt());
-        dataSizeInCurrentChunk += 8L + 4L;
-        break;
-      case INT64:
-      case TIMESTAMP:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getLong());
-        dataSizeInCurrentChunk += 8L + 8L;
-        break;
-      case FLOAT:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getFloat());
-        dataSizeInCurrentChunk += 8L + 4L;
-        break;
-      case DOUBLE:
-        chunkWriterImpl.write(tvPair.getTimestamp(), tvPair.getValue().getDouble());
-        dataSizeInCurrentChunk += 8L + 8L;
-        break;
-      case TEXT:
-      case BLOB:
-      case STRING:
-        Binary value = tvPair.getValue().getBinary();
-        chunkWriterImpl.write(tvPair.getTimestamp(), value);
-        dataSizeInCurrentChunk += 8L + getBinarySize(value);
-        break;
-      default:
-        LOGGER.error("WritableMemChunk does not support data type: {}", schema.getType());
-        break;
-    }
-    pointNumInCurrentChunk++;
-    return new Pair<>(dataSizeInCurrentChunk, pointNumInCurrentChunk);
-  }
-
   @Override
   public synchronized void encode(BlockingQueue<Object> ioTaskQueue) {
-    if (TVLIST_SORT_THRESHOLD == 0) {
-      encodeWorkingTVList(ioTaskQueue);
-      return;
-    }
+    TSDataType tsDataType = schema.getType();
 
     ChunkWriterImpl chunkWriterImpl = createIChunkWriter();
     long dataSizeInCurrentChunk = 0;
@@ -637,43 +591,73 @@ public class WritableMemChunk implements IWritableMemChunk {
     // create MergeSortTvListIterator. It need not handle float/double precision here.
     List<TVList> tvLists = new ArrayList<>(sortedList);
     tvLists.add(list);
-    MergeSortTVListIterator timeValuePairIterator = new MergeSortTVListIterator(tvLists);
+    MergeSortTVListIterator timeValuePairIterator =
+        new MergeSortTVListIterator(schema.getType(), tvLists, null);
 
-    TimeValuePair prevTvPair = null;
-    while (timeValuePairIterator.hasNextTimeValuePair()) {
-      TimeValuePair currTvPair = timeValuePairIterator.nextTimeValuePair();
-      if (prevTvPair == null) {
-        prevTvPair = currTvPair;
+    while (timeValuePairIterator.hasNextBatch()) {
+      TsBlock tsBlock = timeValuePairIterator.nextBatch();
+      if (tsBlock == null) {
         continue;
       }
-      Pair<Long, Integer> updatedStats =
-          writeData(chunkWriterImpl, prevTvPair, dataSizeInCurrentChunk, pointNumInCurrentChunk);
-      dataSizeInCurrentChunk = updatedStats.left;
-      pointNumInCurrentChunk = updatedStats.right;
-      prevTvPair = currTvPair;
 
-      if (pointNumInCurrentChunk > MAX_NUMBER_OF_POINTS_IN_CHUNK
-          || dataSizeInCurrentChunk > TARGET_CHUNK_SIZE) {
-        chunkWriterImpl.sealCurrentPage();
-        chunkWriterImpl.clearPageWriter();
-        try {
-          ioTaskQueue.put(chunkWriterImpl);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
+      for (int rowIndex = 0; rowIndex < tsBlock.getPositionCount(); rowIndex++) {
+        long time = tsBlock.getTimeByIndex(rowIndex);
+        // store last point for SDT
+        if (rowIndex + 1 == tsBlock.getPositionCount() && !timeValuePairIterator.hasNextBatch()) {
+          chunkWriterImpl.setLastPoint(true);
         }
-        chunkWriterImpl = createIChunkWriter();
-        dataSizeInCurrentChunk = 0;
-        pointNumInCurrentChunk = 0;
+
+        switch (tsDataType) {
+          case BOOLEAN:
+            chunkWriterImpl.write(time, tsBlock.getColumn(0).getBoolean(rowIndex));
+            dataSizeInCurrentChunk += 8L + 1L;
+            break;
+          case INT32:
+          case DATE:
+            chunkWriterImpl.write(time, tsBlock.getColumn(0).getInt(rowIndex));
+            dataSizeInCurrentChunk += 8L + 4L;
+            break;
+          case INT64:
+          case TIMESTAMP:
+            chunkWriterImpl.write(time, tsBlock.getColumn(0).getLong(rowIndex));
+            dataSizeInCurrentChunk += 8L + 8L;
+            break;
+          case FLOAT:
+            chunkWriterImpl.write(time, tsBlock.getColumn(0).getFloat(rowIndex));
+            dataSizeInCurrentChunk += 8L + 4L;
+            break;
+          case DOUBLE:
+            chunkWriterImpl.write(time, tsBlock.getColumn(0).getDouble(rowIndex));
+            dataSizeInCurrentChunk += 8L + 8L;
+            break;
+          case TEXT:
+          case BLOB:
+          case STRING:
+            Binary value = tsBlock.getColumn(0).getBinary(rowIndex);
+            chunkWriterImpl.write(time, value);
+            dataSizeInCurrentChunk += 8L + getBinarySize(value);
+            break;
+          default:
+            LOGGER.error("WritableMemChunk does not support data type: {}", tsDataType);
+            break;
+        }
+
+        pointNumInCurrentChunk++;
+        if (pointNumInCurrentChunk > MAX_NUMBER_OF_POINTS_IN_CHUNK
+            || dataSizeInCurrentChunk > TARGET_CHUNK_SIZE) {
+          chunkWriterImpl.sealCurrentPage();
+          chunkWriterImpl.clearPageWriter();
+          try {
+            ioTaskQueue.put(chunkWriterImpl);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+          chunkWriterImpl = createIChunkWriter();
+          dataSizeInCurrentChunk = 0;
+          pointNumInCurrentChunk = 0;
+        }
       }
     }
-    // last point for SDT
-    if (prevTvPair != null) {
-      chunkWriterImpl.setLastPoint(true);
-      Pair<Long, Integer> updatedStats =
-          writeData(chunkWriterImpl, prevTvPair, dataSizeInCurrentChunk, pointNumInCurrentChunk);
-      pointNumInCurrentChunk = updatedStats.right;
-    }
-
     if (pointNumInCurrentChunk != 0) {
       chunkWriterImpl.sealCurrentPage();
       chunkWriterImpl.clearPageWriter();

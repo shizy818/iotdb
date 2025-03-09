@@ -1539,7 +1539,7 @@ public abstract class AlignedTVList extends TVList {
     private int[] selectedIndex;
 
     public AlignedTVListIterator() {
-      super();
+      super(null);
     }
 
     public AlignedTVListIterator(
@@ -1548,7 +1548,7 @@ public abstract class AlignedTVList extends TVList {
         boolean ignoreAllNullRows,
         Integer floatPrecision,
         List<TSEncoding> encodingList) {
-      super(null, null);
+      super(null);
       this.dataTypeList = dataTypeList;
       this.columnIndexList =
           (columnIndexList == null)
@@ -1607,12 +1607,6 @@ public abstract class AlignedTVList extends TVList {
       return index < rows;
     }
 
-    @Override
-    public boolean hasCurrent() {
-      return index < rows;
-    }
-
-    @Override
     public TimeValuePair next() {
       if (!hasNext()) {
         return null;
@@ -1629,7 +1623,6 @@ public abstract class AlignedTVList extends TVList {
       return tvPair;
     }
 
-    @Override
     public TimeValuePair current() {
       if (!hasCurrent()) {
         return null;
