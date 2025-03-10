@@ -20,7 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
 import org.apache.iotdb.db.storageengine.dataregion.memtable.ReadOnlyMemChunk;
-import org.apache.iotdb.db.utils.datastructure.MergeSortTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIterator;
 
 import org.apache.tsfile.file.metadata.IChunkMetadata;
 import org.apache.tsfile.file.metadata.statistics.Statistics;
@@ -42,7 +42,7 @@ import java.util.function.Supplier;
 public class MemChunkReader implements IChunkReader, IPointReader {
 
   private final ReadOnlyMemChunk readableChunk;
-  private final MergeSortTVListIterator timeValuePairIterator;
+  private final MultiTVListIterator timeValuePairIterator;
   private final Filter globalTimeFilter;
   private final List<IPageReader> pageReaderList;
 
@@ -51,7 +51,7 @@ public class MemChunkReader implements IChunkReader, IPointReader {
 
   public MemChunkReader(ReadOnlyMemChunk readableChunk, Filter globalTimeFilter) {
     this.readableChunk = readableChunk;
-    timeValuePairIterator = readableChunk.getMergeSortTVListIterator().clone();
+    timeValuePairIterator = readableChunk.getMultiTVListIterator().clone();
     this.globalTimeFilter = globalTimeFilter;
     this.pageReaderList = new ArrayList<>();
     initAllPageReaders(

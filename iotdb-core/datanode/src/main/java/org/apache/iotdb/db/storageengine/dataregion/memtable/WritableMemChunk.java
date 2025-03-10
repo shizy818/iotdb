@@ -27,7 +27,8 @@ import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.queryengine.plan.planner.memory.MemoryReservationManager;
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
 import org.apache.iotdb.db.utils.ModificationUtils;
-import org.apache.iotdb.db.utils.datastructure.MergeSortTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.enums.TSDataType;
@@ -588,11 +589,11 @@ public class WritableMemChunk implements IWritableMemChunk {
     long dataSizeInCurrentChunk = 0;
     int pointNumInCurrentChunk = 0;
 
-    // create MergeSortTvListIterator. It need not handle float/double precision here.
+    // create MultiTvListIterator. It need not handle float/double precision here.
     List<TVList> tvLists = new ArrayList<>(sortedList);
     tvLists.add(list);
-    MergeSortTVListIterator timeValuePairIterator =
-        new MergeSortTVListIterator(schema.getType(), tvLists, null);
+    MultiTVListIterator timeValuePairIterator =
+        MultiTVListIteratorFactory.create(schema.getType(), tvLists);
 
     while (timeValuePairIterator.hasNextBatch()) {
       TsBlock tsBlock = timeValuePairIterator.nextBatch();

@@ -20,7 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.metadata.PageMetadata;
-import org.apache.iotdb.db.utils.datastructure.MergeSortTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIterator;
 
 import org.apache.tsfile.block.column.Column;
 import org.apache.tsfile.block.column.ColumnBuilder;
@@ -51,7 +51,7 @@ public class MemPageReader implements IPageReader {
   private TsBlock tsBlock;
   private Filter recordFilter;
 
-  private final MergeSortTVListIterator mergeSortTvListIterator;
+  private final MultiTVListIterator multiTvListIterator;
   // MemPage range - [pageStartOffsets, pageEndOffsets)
   private final int[] pageStartOffsets;
   private final int[] pageEndOffsets;
@@ -63,7 +63,7 @@ public class MemPageReader implements IPageReader {
 
   public MemPageReader(
       Supplier<TsBlock> tsBlockSupplier,
-      MergeSortTVListIterator mergeSortTvListIterator,
+      MultiTVListIterator multiTvListIterator,
       int[] pageStartOffsets,
       int[] pageEndOffSets,
       TSDataType tsDataType,
@@ -71,7 +71,7 @@ public class MemPageReader implements IPageReader {
       Statistics statistics,
       Filter recordFilter) {
     this.tsBlockSupplier = tsBlockSupplier;
-    this.mergeSortTvListIterator = mergeSortTvListIterator;
+    this.multiTvListIterator = multiTvListIterator;
     this.pageStartOffsets = pageStartOffsets;
     this.pageEndOffsets = pageEndOffSets;
     this.recordFilter = recordFilter;
@@ -250,7 +250,7 @@ public class MemPageReader implements IPageReader {
 
   private void initializeOffsets() {
     if (pageStartOffsets != null) {
-      mergeSortTvListIterator.setTVListOffsets(pageStartOffsets);
+      multiTvListIterator.setTVListOffsets(pageStartOffsets);
     }
     if (tsBlockSupplier instanceof MemChunkReader.TsBlockSupplier) {
       ((MemChunkReader.TsBlockSupplier) tsBlockSupplier).setPageEndOffsets(pageEndOffsets);

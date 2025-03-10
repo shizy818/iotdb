@@ -29,52 +29,32 @@ import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.reader.IPointReader;
-import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.PriorityQueue;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
-public class MergeSortTVListIterator implements IPointReader {
-  private TSDataType tsDataType;
-  private List<TVList.TVListIterator> tvListIterators;
-  private int[] tvListOffsets;
-  private Integer floatPrecision;
-  private TSEncoding encoding;
-  private List<TimeRange> deletionList;
+public abstract class MultiTVListIterator implements IPointReader {
+  protected TSDataType tsDataType;
+  protected List<TVList.TVListIterator> tvListIterators;
+  protected int[] tvListOffsets;
+  protected Integer floatPrecision;
+  protected TSEncoding encoding;
+  protected List<TimeRange> deletionList;
 
-  private boolean probeNext = false;
-  private boolean hasNext = false;
-  private int iteratorIndex = 0;
-  private int rowIndex = 0;
-
-  private List<Integer> probeIterators;
-  private final PriorityQueue<Pair<Long, Integer>> minHeap =
-      new PriorityQueue<>(
-          (a, b) -> a.left.equals(b.left) ? b.right.compareTo(a.right) : a.left.compareTo(b.left));
+  protected boolean probeNext = false;
+  protected boolean hasNext = false;
+  protected int iteratorIndex = 0;
+  protected int rowIndex = 0;
 
   protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
       TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
 
-  public MergeSortTVListIterator(
-      TSDataType tsDataType, List<TVList> tvLists, List<TimeRange> deletionList) {
-    this.tsDataType = tsDataType;
-    tvListIterators = new ArrayList<>(tvLists.size());
-    for (TVList tvList : tvLists) {
-      tvListIterators.add(tvList.iterator(deletionList));
-    }
-    this.deletionList = deletionList;
-    this.tvListOffsets = new int[tvLists.size()];
-    this.probeIterators =
-        IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
-  }
+  protected MultiTVListIterator() {}
 
-  public MergeSortTVListIterator(
+  protected MultiTVListIterator(
       TSDataType tsDataType,
       List<TVList> tvLists,
       List<TimeRange> deletionList,
@@ -89,45 +69,6 @@ public class MergeSortTVListIterator implements IPointReader {
     this.floatPrecision = floatPrecision;
     this.encoding = encoding;
     this.tvListOffsets = new int[tvLists.size()];
-    this.probeIterators =
-        IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
-  }
-
-  private MergeSortTVListIterator() {}
-
-  private void prepareNext() {
-    hasNext = false;
-    if (tvListIterators.size() == 1) {
-      iteratorIndex = 0;
-      TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
-      if (iterator.hasNext()) {
-        rowIndex = iterator.getIndex();
-        hasNext = true;
-      }
-      probeNext = true;
-      return;
-    }
-
-    for (int i : probeIterators) {
-      TVList.TVListIterator iterator = tvListIterators.get(i);
-      if (iterator.hasNext()) {
-        minHeap.add(new Pair<>(iterator.currentTime(), i));
-      }
-    }
-    probeIterators.clear();
-
-    if (!minHeap.isEmpty()) {
-      Pair<Long, Integer> top = minHeap.poll();
-      iteratorIndex = top.right;
-      probeIterators.add(iteratorIndex);
-      rowIndex = tvListIterators.get(iteratorIndex).getIndex();
-      hasNext = true;
-      while (!minHeap.isEmpty() && minHeap.peek().left.longValue() == top.left.longValue()) {
-        Pair<Long, Integer> element = minHeap.poll();
-        probeIterators.add(element.right);
-      }
-    }
-    probeNext = true;
   }
 
   @Override
@@ -161,21 +102,6 @@ public class MergeSortTVListIterator implements IPointReader {
     return iterator
         .getTVList()
         .getTimeValuePair(rowIndex, iterator.currentTime(), floatPrecision, encoding);
-  }
-
-  public void next() {
-    if (tvListIterators.size() == 1) {
-      TVList.TVListIterator iterator = tvListIterators.get(0);
-      iterator.step();
-      tvListOffsets[0] = iterator.getIndex();
-    } else {
-      for (int index : probeIterators) {
-        TVList.TVListIterator iterator = tvListIterators.get(index);
-        iterator.step();
-        tvListOffsets[index] = iterator.getIndex();
-      }
-    }
-    probeNext = false;
   }
 
   public boolean hasNextBatch() {
@@ -255,34 +181,13 @@ public class MergeSortTVListIterator implements IPointReader {
     return tvListOffsets;
   }
 
-  public void setTVListOffsets(int[] tvListOffsets) {
-    for (int i = 0; i < tvListIterators.size(); i++) {
-      tvListIterators.get(i).setIndex(tvListOffsets[i]);
-      this.tvListOffsets[i] = tvListOffsets[i];
-    }
-    if (tvListIterators.size() > 1) {
-      minHeap.clear();
-      probeIterators.clear();
-      for (int i = 0; i < tvListIterators.size(); i++) {
-        probeIterators.add(i);
-      }
-    }
-    probeNext = false;
-  }
+  public abstract void setTVListOffsets(int[] tvListOffsets);
 
-  @Override
-  public MergeSortTVListIterator clone() {
-    MergeSortTVListIterator cloneIterator = new MergeSortTVListIterator();
-    cloneIterator.tsDataType = tsDataType;
-    cloneIterator.tvListIterators = new ArrayList<>(tvListIterators.size());
-    for (int i = 0; i < tvListIterators.size(); i++) {
-      cloneIterator.tvListIterators.add(tvListIterators.get(i).clone());
-    }
-    cloneIterator.tvListOffsets = new int[tvListIterators.size()];
-    cloneIterator.probeIterators =
-        IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
-    return cloneIterator;
-  }
+  public abstract MultiTVListIterator clone();
+
+  protected abstract void prepareNext();
+
+  protected abstract void next();
 
   private boolean isOutOfMemPageBounds(int[] pageEndOffsets) {
     if (pageEndOffsets == null) {

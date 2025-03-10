@@ -23,7 +23,8 @@ import org.apache.iotdb.commons.utils.TestOnly;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.MemChunkLoader;
-import org.apache.iotdb.db.utils.datastructure.MergeSortTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileDescriptor;
@@ -84,7 +85,7 @@ public class ReadOnlyMemChunk {
   // TVList and its rowCount during query
   private Map<TVList, Integer> tvListQueryMap;
 
-  private MergeSortTVListIterator timeValuePairIterator;
+  private MultiTVListIterator timeValuePairIterator;
 
   protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
       TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
@@ -147,7 +148,8 @@ public class ReadOnlyMemChunk {
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     timeValuePairIterator =
-        new MergeSortTVListIterator(dataType, tvLists, deletionList, floatPrecision, encoding);
+        MultiTVListIteratorFactory.create(
+            dataType, tvLists, deletionList, floatPrecision, encoding);
     int[] tvListOffsets = timeValuePairIterator.getTVListOffsets();
     while (timeValuePairIterator.hasNextBatch()) {
       // statistics for current batch
@@ -277,7 +279,8 @@ public class ReadOnlyMemChunk {
   private void writeValidValuesIntoTsBlock(TsBlockBuilder builder) throws IOException {
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     IPointReader timeValuePairIterator =
-        new MergeSortTVListIterator(getDataType(), tvLists, deletionList, floatPrecision, encoding);
+        MultiTVListIteratorFactory.create(
+            getDataType(), tvLists, deletionList, floatPrecision, encoding);
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
@@ -353,7 +356,7 @@ public class ReadOnlyMemChunk {
     return null;
   }
 
-  public MergeSortTVListIterator getMergeSortTVListIterator() {
+  public MultiTVListIterator getMultiTVListIterator() {
     return timeValuePairIterator;
   }
 
