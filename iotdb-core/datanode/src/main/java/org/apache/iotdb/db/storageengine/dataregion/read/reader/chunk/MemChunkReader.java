@@ -41,7 +41,6 @@ import java.util.function.Supplier;
 /** To read chunk data in memory. */
 public class MemChunkReader implements IChunkReader, IPointReader {
 
-  private final ReadOnlyMemChunk readableChunk;
   private final MultiTVListIterator timeValuePairIterator;
   private final Filter globalTimeFilter;
   private final List<IPageReader> pageReaderList;
@@ -50,31 +49,23 @@ public class MemChunkReader implements IChunkReader, IPointReader {
   private TimeValuePair cachedTimeValuePair;
 
   public MemChunkReader(ReadOnlyMemChunk readableChunk, Filter globalTimeFilter) {
-    this.readableChunk = readableChunk;
     timeValuePairIterator = readableChunk.getMultiTVListIterator().clone();
     this.globalTimeFilter = globalTimeFilter;
     this.pageReaderList = new ArrayList<>();
-    initAllPageReaders(
-        readableChunk.getChunkMetaData(),
-        readableChunk.getPageStatisticsList(),
-        readableChunk.getPageOffsetsList());
+    initAllPageReaders(readableChunk.getChunkMetaData(), readableChunk.getPageStatisticsList());
   }
 
   private void initAllPageReaders(
-      IChunkMetadata metadata,
-      List<Statistics<? extends Serializable>> pageStats,
-      List<int[]> pageOffsetsList) {
+      IChunkMetadata metadata, List<Statistics<? extends Serializable>> pageStats) {
     Supplier<TsBlock> tsBlockSupplier = new TsBlockSupplier();
-    for (int i = 0; i < pageStats.size(); i++) {
+    for (int pageIndex = 0; pageIndex < pageStats.size(); pageIndex++) {
       MemPageReader pageReader =
           new MemPageReader(
               tsBlockSupplier,
-              timeValuePairIterator,
-              pageOffsetsList.get(i),
-              pageOffsetsList.get(i + 1),
+              pageIndex,
               metadata.getDataType(),
               metadata.getMeasurementUid(),
-              pageStats.get(i),
+              pageStats.get(pageIndex),
               globalTimeFilter);
       this.pageReaderList.add(pageReader);
     }
@@ -148,18 +139,18 @@ public class MemChunkReader implements IChunkReader, IPointReader {
    * TsBlockSupplier object.
    */
   class TsBlockSupplier implements Supplier<TsBlock> {
-    private int[] pageEndOffsets;
+    private int tsBlockIndex;
 
     public TsBlockSupplier() {}
 
-    public void setPageEndOffsets(int[] pageEndOffsets) {
-      this.pageEndOffsets = pageEndOffsets;
+    public void setTsBlockIndex(int tsBlockIndex) {
+      this.tsBlockIndex = tsBlockIndex;
     }
 
     @Override
     public TsBlock get() {
-      if (timeValuePairIterator.hasNextBatch()) {
-        return timeValuePairIterator.nextBatch(pageEndOffsets);
+      if (timeValuePairIterator.hasNextBatch(tsBlockIndex)) {
+        return timeValuePairIterator.nextBatch(tsBlockIndex);
       }
       return null;
     }

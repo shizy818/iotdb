@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -128,7 +127,6 @@ public class ReadOnlyMemChunk {
     this.deletionList = deletionList;
     this.tvListQueryMap = tvListQueryMap;
     this.pageStatisticsList = new ArrayList<>();
-    this.pageOffsetsList = new ArrayList<>();
     this.context.addTVListToSet(tvListQueryMap);
   }
 
@@ -150,12 +148,10 @@ public class ReadOnlyMemChunk {
     timeValuePairIterator =
         MultiTVListIteratorFactory.create(
             dataType, tvLists, deletionList, floatPrecision, encoding);
-    int[] tvListOffsets = timeValuePairIterator.getTVListOffsets();
     while (timeValuePairIterator.hasNextBatch()) {
       // statistics for current batch
       Statistics<? extends Serializable> pageStatistics = Statistics.getStatsByType(dataType);
       pageStatisticsList.add(pageStatistics);
-      pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
 
       TsBlock tsBlock = timeValuePairIterator.nextBatch();
       if (!tsBlock.isEmpty()) {
@@ -230,7 +226,6 @@ public class ReadOnlyMemChunk {
         }
       }
     }
-    pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
 
     // chunk meta
     IChunkMetadata metaData =

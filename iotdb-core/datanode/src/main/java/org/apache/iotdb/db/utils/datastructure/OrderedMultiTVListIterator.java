@@ -4,7 +4,6 @@ import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.common.TimeRange;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class OrderedMultiTVListIterator extends MultiTVListIterator {
@@ -22,30 +21,18 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
   }
 
   @Override
-  public void setTVListOffsets(int[] tvListOffsets) {
-    for (int i = 0; i < tvListIterators.size(); i++) {
-      tvListIterators.get(i).setIndex(tvListOffsets[i]);
-      this.tvListOffsets[i] = tvListOffsets[i];
-    }
-    probeNext = false;
-  }
-
-  @Override
   public MultiTVListIterator clone() {
     OrderedMultiTVListIterator cloneIterator = new OrderedMultiTVListIterator();
     cloneIterator.tsDataType = tsDataType;
-    cloneIterator.tvListIterators = new ArrayList<>(tvListIterators.size());
-    for (int i = 0; i < tvListIterators.size(); i++) {
-      cloneIterator.tvListIterators.add(tvListIterators.get(i).clone());
-    }
-    cloneIterator.tvListOffsets = new int[tvListIterators.size()];
+    cloneIterator.tsBlocks = tsBlocks;
     return cloneIterator;
   }
 
+  @Override
   protected void prepareNext() {
     hasNext = false;
-    while (!tvListIterators.get(iteratorIndex).hasNext()
-        && iteratorIndex < tvListIterators.size() - 1) {
+    while (iteratorIndex < tvListIterators.size() - 1
+        && !tvListIterators.get(iteratorIndex).hasNext()) {
       iteratorIndex++;
     }
     TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
@@ -56,10 +43,10 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
     probeNext = true;
   }
 
+  @Override
   protected void next() {
     TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
     iterator.step();
-    tvListOffsets[iteratorIndex] = iterator.getIndex();
     probeNext = false;
   }
 }

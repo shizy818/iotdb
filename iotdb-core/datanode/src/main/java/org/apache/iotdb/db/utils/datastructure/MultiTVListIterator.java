@@ -39,7 +39,7 @@ import java.util.List;
 public abstract class MultiTVListIterator implements IPointReader {
   protected TSDataType tsDataType;
   protected List<TVList.TVListIterator> tvListIterators;
-  protected int[] tvListOffsets;
+  protected List<TsBlock> tsBlocks;
   protected Integer floatPrecision;
   protected TSEncoding encoding;
   protected List<TimeRange> deletionList;
@@ -68,7 +68,7 @@ public abstract class MultiTVListIterator implements IPointReader {
     this.deletionList = deletionList;
     this.floatPrecision = floatPrecision;
     this.encoding = encoding;
-    this.tvListOffsets = new int[tvLists.size()];
+    this.tsBlocks = new ArrayList<>();
   }
 
   @Override
@@ -104,22 +104,30 @@ public abstract class MultiTVListIterator implements IPointReader {
         .getTimeValuePair(rowIndex, iterator.currentTime(), floatPrecision, encoding);
   }
 
+  public boolean hasNextBatch(int tsBlockIndex) {
+    if (tsBlocks == null) {
+      return false;
+    }
+    return tsBlockIndex < tsBlocks.size();
+  }
+
   public boolean hasNextBatch() {
     return hasNextTimeValuePair();
   }
 
-  public TsBlock nextBatch() {
-    return nextBatch(null);
+  public TsBlock nextBatch(int tsBlockIndex) {
+    if (tsBlockIndex < 0 || tsBlockIndex >= tsBlocks.size()) {
+      return null;
+    }
+    TsBlock tsBlock = tsBlocks.get(tsBlockIndex);
+    tsBlocks.set(tsBlockIndex, null);
+    return tsBlock;
   }
 
-  public TsBlock nextBatch(int[] pageEndOffsets) {
+  public TsBlock nextBatch() {
     TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(tsDataType));
     int pointsInBatch = 0;
     while (hasNextTimeValuePair() && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE) {
-      if (isOutOfMemPageBounds(pageEndOffsets)) {
-        break;
-      }
-
       TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
       builder.getTimeColumnBuilder().writeLong(iterator.currentTime());
       switch (tsDataType) {
@@ -164,8 +172,9 @@ public abstract class MultiTVListIterator implements IPointReader {
       builder.declarePosition();
       pointsInBatch++;
     }
-    probeNext = false;
-    return builder.build();
+    TsBlock tsBlock = builder.build();
+    tsBlocks.add(tsBlock);
+    return tsBlock;
   }
 
   @Override
@@ -177,27 +186,9 @@ public abstract class MultiTVListIterator implements IPointReader {
   @Override
   public void close() throws IOException {}
 
-  public int[] getTVListOffsets() {
-    return tvListOffsets;
-  }
-
-  public abstract void setTVListOffsets(int[] tvListOffsets);
-
   public abstract MultiTVListIterator clone();
 
   protected abstract void prepareNext();
 
   protected abstract void next();
-
-  private boolean isOutOfMemPageBounds(int[] pageEndOffsets) {
-    if (pageEndOffsets == null) {
-      return false;
-    }
-    for (int i = 0; i < pageEndOffsets.length; i++) {
-      if (tvListOffsets[i] < pageEndOffsets[i]) {
-        return false;
-      }
-    }
-    return true;
-  }
 }

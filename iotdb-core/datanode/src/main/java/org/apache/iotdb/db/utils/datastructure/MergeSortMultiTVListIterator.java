@@ -24,7 +24,6 @@ import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.utils.Pair;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
@@ -52,33 +51,14 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
   }
 
   @Override
-  public void setTVListOffsets(int[] tvListOffsets) {
-    for (int i = 0; i < tvListIterators.size(); i++) {
-      tvListIterators.get(i).setIndex(tvListOffsets[i]);
-      this.tvListOffsets[i] = tvListOffsets[i];
-    }
-    minHeap.clear();
-    probeIterators.clear();
-    for (int i = 0; i < tvListIterators.size(); i++) {
-      probeIterators.add(i);
-    }
-    probeNext = false;
-  }
-
-  @Override
   public MultiTVListIterator clone() {
     MergeSortMultiTVListIterator cloneIterator = new MergeSortMultiTVListIterator();
     cloneIterator.tsDataType = tsDataType;
-    cloneIterator.tvListIterators = new ArrayList<>(tvListIterators.size());
-    for (int i = 0; i < tvListIterators.size(); i++) {
-      cloneIterator.tvListIterators.add(tvListIterators.get(i).clone());
-    }
-    cloneIterator.tvListOffsets = new int[tvListIterators.size()];
-    cloneIterator.probeIterators =
-        IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
+    cloneIterator.tsBlocks = tsBlocks;
     return cloneIterator;
   }
 
+  @Override
   protected void prepareNext() {
     hasNext = false;
     for (int i : probeIterators) {
@@ -103,11 +83,11 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
     probeNext = true;
   }
 
+  @Override
   protected void next() {
     for (int index : probeIterators) {
       TVList.TVListIterator iterator = tvListIterators.get(index);
       iterator.step();
-      tvListOffsets[index] = iterator.getIndex();
     }
     probeNext = false;
   }
