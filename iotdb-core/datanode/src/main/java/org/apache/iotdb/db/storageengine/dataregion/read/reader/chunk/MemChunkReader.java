@@ -49,7 +49,7 @@ public class MemChunkReader implements IChunkReader, IPointReader {
   private TimeValuePair cachedTimeValuePair;
 
   public MemChunkReader(ReadOnlyMemChunk readableChunk, Filter globalTimeFilter) {
-    timeValuePairIterator = readableChunk.getMultiTVListIterator().clone();
+    this.timeValuePairIterator = readableChunk.getMultiTVListIterator();
     this.globalTimeFilter = globalTimeFilter;
     this.pageReaderList = new ArrayList<>();
     initAllPageReaders(readableChunk.getChunkMetaData(), readableChunk.getPageStatisticsList());
@@ -149,10 +149,7 @@ public class MemChunkReader implements IChunkReader, IPointReader {
 
     @Override
     public TsBlock get() {
-      if (timeValuePairIterator.hasNextBatch(tsBlockIndex)) {
-        return timeValuePairIterator.nextBatch(tsBlockIndex);
-      }
-      return null;
+      return timeValuePairIterator.getBatch(tsBlockIndex);
     }
   }
 }

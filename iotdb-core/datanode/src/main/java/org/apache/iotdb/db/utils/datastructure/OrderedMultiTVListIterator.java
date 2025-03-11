@@ -16,17 +16,22 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
     super(tsDataType, tvLists, deletionList, floatPrecision, encoding);
   }
 
-  private OrderedMultiTVListIterator() {
-    super();
-  }
+  //  private OrderedMultiTVListIterator() {
+  //    super();
+  //  }
 
-  @Override
-  public MultiTVListIterator clone() {
-    OrderedMultiTVListIterator cloneIterator = new OrderedMultiTVListIterator();
-    cloneIterator.tsDataType = tsDataType;
-    cloneIterator.tsBlocks = tsBlocks;
-    return cloneIterator;
-  }
+  //  @Override
+  //  public MultiTVListIterator clone() {
+  //    OrderedMultiTVListIterator cloneIterator = new OrderedMultiTVListIterator();
+  //    cloneIterator.tsDataType = tsDataType;
+  //    cloneIterator.tsBlocks = tsBlocks;
+  //    for(TVList.TVListIterator iterator: tvListIterators) {
+  //      cloneIterator.tvListIterators.add(iterator.clone());
+  //    }
+  //    cloneIterator.floatPrecision = floatPrecision;
+  //    cloneIterator.encoding = encoding;
+  //    return cloneIterator;
+  //  }
 
   @Override
   protected void prepareNext() {

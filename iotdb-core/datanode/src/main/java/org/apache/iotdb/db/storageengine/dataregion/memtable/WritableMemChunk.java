@@ -583,8 +583,12 @@ public class WritableMemChunk implements IWritableMemChunk {
 
   @Override
   public synchronized void encode(BlockingQueue<Object> ioTaskQueue) {
-    TSDataType tsDataType = schema.getType();
+    if (TVLIST_SORT_THRESHOLD == 0) {
+      encodeWorkingTVList(ioTaskQueue);
+      return;
+    }
 
+    TSDataType tsDataType = schema.getType();
     ChunkWriterImpl chunkWriterImpl = createIChunkWriter();
     long dataSizeInCurrentChunk = 0;
     int pointNumInCurrentChunk = 0;

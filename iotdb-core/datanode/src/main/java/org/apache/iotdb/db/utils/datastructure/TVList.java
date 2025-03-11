@@ -681,6 +681,15 @@ public abstract class TVList implements WALEntryValue {
       return index < rows;
     }
 
+    public TimeValuePair next() {
+      if (!hasNext()) {
+        return null;
+      }
+      TimeValuePair tvp = getTimeValuePair(index);
+      step();
+      return tvp;
+    }
+
     public void step() {
       index++;
       currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;

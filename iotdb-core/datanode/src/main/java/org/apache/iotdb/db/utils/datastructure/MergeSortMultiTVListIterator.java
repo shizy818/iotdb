@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class MergeSortMultiTVListIterator extends MultiTVListIterator {
-  private List<Integer> probeIterators;
+  private final List<Integer> probeIterators;
   private final PriorityQueue<Pair<Long, Integer>> minHeap =
       new PriorityQueue<>(
           (a, b) -> a.left.equals(b.left) ? b.right.compareTo(a.right) : a.left.compareTo(b.left));
@@ -46,17 +46,24 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
         IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
   }
 
-  private MergeSortMultiTVListIterator() {
-    super();
-  }
+  //  private MergeSortMultiTVListIterator() {
+  //    super();
+  //  }
 
-  @Override
-  public MultiTVListIterator clone() {
-    MergeSortMultiTVListIterator cloneIterator = new MergeSortMultiTVListIterator();
-    cloneIterator.tsDataType = tsDataType;
-    cloneIterator.tsBlocks = tsBlocks;
-    return cloneIterator;
-  }
+  //  @Override
+  //  public MultiTVListIterator clone() {
+  //    MergeSortMultiTVListIterator cloneIterator = new MergeSortMultiTVListIterator();
+  //    cloneIterator.tsDataType = tsDataType;
+  //    cloneIterator.tsBlocks = tsBlocks;
+  //    for(TVList.TVListIterator iterator: tvListIterators) {
+  //      cloneIterator.tvListIterators.add(iterator.clone());
+  //    }
+  //    cloneIterator.floatPrecision = floatPrecision;
+  //    cloneIterator.encoding = encoding;
+  //    this.probeIterators =
+  //            IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
+  //    return cloneIterator;
+  //  }
 
   @Override
   protected void prepareNext() {
@@ -75,6 +82,8 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
       probeIterators.add(iteratorIndex);
       rowIndex = tvListIterators.get(iteratorIndex).getIndex();
       hasNext = true;
+
+      // duplicated timestamps
       while (!minHeap.isEmpty() && minHeap.peek().left.longValue() == top.left.longValue()) {
         Pair<Long, Integer> element = minHeap.poll();
         probeIterators.add(element.right);

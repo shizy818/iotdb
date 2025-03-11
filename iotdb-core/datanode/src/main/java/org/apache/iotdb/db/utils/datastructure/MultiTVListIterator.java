@@ -42,7 +42,6 @@ public abstract class MultiTVListIterator implements IPointReader {
   protected List<TsBlock> tsBlocks;
   protected Integer floatPrecision;
   protected TSEncoding encoding;
-  protected List<TimeRange> deletionList;
 
   protected boolean probeNext = false;
   protected boolean hasNext = false;
@@ -65,7 +64,6 @@ public abstract class MultiTVListIterator implements IPointReader {
     for (TVList tvList : tvLists) {
       tvListIterators.add(tvList.iterator(deletionList));
     }
-    this.deletionList = deletionList;
     this.floatPrecision = floatPrecision;
     this.encoding = encoding;
     this.tsBlocks = new ArrayList<>();
@@ -104,24 +102,8 @@ public abstract class MultiTVListIterator implements IPointReader {
         .getTimeValuePair(rowIndex, iterator.currentTime(), floatPrecision, encoding);
   }
 
-  public boolean hasNextBatch(int tsBlockIndex) {
-    if (tsBlocks == null) {
-      return false;
-    }
-    return tsBlockIndex < tsBlocks.size();
-  }
-
   public boolean hasNextBatch() {
     return hasNextTimeValuePair();
-  }
-
-  public TsBlock nextBatch(int tsBlockIndex) {
-    if (tsBlockIndex < 0 || tsBlockIndex >= tsBlocks.size()) {
-      return null;
-    }
-    TsBlock tsBlock = tsBlocks.get(tsBlockIndex);
-    tsBlocks.set(tsBlockIndex, null);
-    return tsBlock;
   }
 
   public TsBlock nextBatch() {
@@ -177,6 +159,15 @@ public abstract class MultiTVListIterator implements IPointReader {
     return tsBlock;
   }
 
+  public TsBlock getBatch(int tsBlockIndex) {
+    if (tsBlockIndex < 0 || tsBlockIndex >= tsBlocks.size()) {
+      return null;
+    }
+    TsBlock tsBlock = tsBlocks.get(tsBlockIndex);
+    tsBlocks.set(tsBlockIndex, null);
+    return tsBlock;
+  }
+
   @Override
   public long getUsedMemorySize() {
     // not used
@@ -186,7 +177,7 @@ public abstract class MultiTVListIterator implements IPointReader {
   @Override
   public void close() throws IOException {}
 
-  public abstract MultiTVListIterator clone();
+  //  public abstract MultiTVListIterator clone();
 
   protected abstract void prepareNext();
 
