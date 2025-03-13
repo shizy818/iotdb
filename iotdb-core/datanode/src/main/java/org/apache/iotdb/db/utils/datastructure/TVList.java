@@ -723,7 +723,7 @@ public abstract class TVList implements WALEntryValue {
         return null;
       }
       TsBlock tsBlock = tsBlocks.get(tsBlockIndex);
-      tsBlocks.set(tsBlockIndex, null);
+      // tsBlocks.set(tsBlockIndex, null);
       return tsBlock;
     }
 

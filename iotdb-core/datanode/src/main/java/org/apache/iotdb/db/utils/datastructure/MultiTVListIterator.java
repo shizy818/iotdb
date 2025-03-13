@@ -166,7 +166,7 @@ public abstract class MultiTVListIterator implements MemPointIterator {
       return null;
     }
     TsBlock tsBlock = tsBlocks.get(tsBlockIndex);
-    tsBlocks.set(tsBlockIndex, null);
+    // tsBlocks.set(tsBlockIndex, null);
     return tsBlock;
   }
 
