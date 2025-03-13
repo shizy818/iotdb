@@ -19,8 +19,6 @@
 
 package org.apache.iotdb.db.utils.datastructure;
 
-import org.apache.iotdb.db.utils.MathUtils;
-
 import org.apache.tsfile.common.conf.TSFileDescriptor;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
@@ -28,7 +26,6 @@ import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
-import org.apache.tsfile.read.reader.IPointReader;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 
 import java.io.IOException;
@@ -36,11 +33,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public abstract class MultiTVListIterator implements IPointReader {
+public abstract class MultiTVListIterator implements MemPointIterator {
   protected TSDataType tsDataType;
   protected List<TVList.TVListIterator> tvListIterators;
   protected List<TsBlock> tsBlocks;
-  protected Integer floatPrecision;
+  protected int floatPrecision;
   protected TSEncoding encoding;
 
   protected boolean probeNext = false;
@@ -51,7 +48,9 @@ public abstract class MultiTVListIterator implements IPointReader {
   protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
       TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
 
-  protected MultiTVListIterator() {}
+  protected MultiTVListIterator() {
+    this.tsBlocks = new ArrayList<>();
+  }
 
   protected MultiTVListIterator(
       TSDataType tsDataType,
@@ -102,10 +101,12 @@ public abstract class MultiTVListIterator implements IPointReader {
         .getTimeValuePair(rowIndex, iterator.currentTime(), floatPrecision, encoding);
   }
 
+  @Override
   public boolean hasNextBatch() {
     return hasNextTimeValuePair();
   }
 
+  @Override
   public TsBlock nextBatch() {
     TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(tsDataType));
     int pointsInBatch = 0;
@@ -125,20 +126,20 @@ public abstract class MultiTVListIterator implements IPointReader {
           builder.getColumnBuilder(0).writeLong(iterator.getTVList().getLong(rowIndex));
           break;
         case FLOAT:
-          float fValue = iterator.getTVList().getFloat(rowIndex);
-          if (!Float.isNaN(fValue)
-              && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-            fValue = MathUtils.roundWithGivenPrecision(fValue, floatPrecision);
-          }
-          builder.getColumnBuilder(0).writeFloat(fValue);
+          TVList floatTvList = iterator.getTVList();
+          builder
+              .getColumnBuilder(0)
+              .writeFloat(
+                  floatTvList.roundValueWithGivenPrecision(
+                      floatTvList.getFloat(rowIndex), floatPrecision, encoding));
           break;
         case DOUBLE:
-          double dValue = iterator.getTVList().getDouble(rowIndex);
-          if (!Double.isNaN(dValue)
-              && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-            dValue = MathUtils.roundWithGivenPrecision(dValue, floatPrecision);
-          }
-          builder.getColumnBuilder(0).writeDouble(dValue);
+          TVList doubleTvList = iterator.getTVList();
+          builder
+              .getColumnBuilder(0)
+              .writeDouble(
+                  doubleTvList.roundValueWithGivenPrecision(
+                      doubleTvList.getDouble(rowIndex), floatPrecision, encoding));
           break;
         case TEXT:
         case BLOB:
@@ -159,6 +160,7 @@ public abstract class MultiTVListIterator implements IPointReader {
     return tsBlock;
   }
 
+  @Override
   public TsBlock getBatch(int tsBlockIndex) {
     if (tsBlockIndex < 0 || tsBlockIndex >= tsBlocks.size()) {
       return null;
@@ -175,9 +177,11 @@ public abstract class MultiTVListIterator implements IPointReader {
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    tsBlocks.clear();
+  }
 
-  //  public abstract MultiTVListIterator clone();
+  public abstract MemPointIterator clone();
 
   protected abstract void prepareNext();
 

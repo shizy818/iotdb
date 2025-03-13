@@ -1539,7 +1539,7 @@ public abstract class AlignedTVList extends TVList {
     private int[] selectedIndex;
 
     public AlignedTVListIterator() {
-      super(null);
+      super(null, null, null);
     }
 
     public AlignedTVListIterator(
@@ -1548,7 +1548,7 @@ public abstract class AlignedTVList extends TVList {
         boolean ignoreAllNullRows,
         Integer floatPrecision,
         List<TSEncoding> encodingList) {
-      super(null);
+      super(null, null, null);
       this.dataTypeList = dataTypeList;
       this.columnIndexList =
           (columnIndexList == null)
@@ -1560,7 +1560,8 @@ public abstract class AlignedTVList extends TVList {
       this.selectedIndex = new int[dataTypeList.size()];
     }
 
-    private void prepareNext() {
+    @Override
+    protected void prepareNext() {
       // find the first row that is neither deleted nor empty (all NULL values)
       boolean findValidRow = false;
       while (index < rows && !findValidRow) {
@@ -1600,15 +1601,8 @@ public abstract class AlignedTVList extends TVList {
     }
 
     @Override
-    public boolean hasNext() {
-      if (!probeNext) {
-        prepareNext();
-      }
-      return index < rows;
-    }
-
-    public TimeValuePair next() {
-      if (!hasNext()) {
+    public TimeValuePair nextTimeValuePair() {
+      if (!hasNextTimeValuePair()) {
         return null;
       }
 
@@ -1619,11 +1613,12 @@ public abstract class AlignedTVList extends TVList {
       TimeValuePair tvPair =
           new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
 
-      step();
+      next();
       return tvPair;
     }
 
-    public TimeValuePair current() {
+    @Override
+    public TimeValuePair currentTimeValuePair() {
       if (!hasCurrent()) {
         return null;
       }

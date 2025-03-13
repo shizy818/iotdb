@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class MergeSortMultiTVListIterator extends MultiTVListIterator {
-  private final List<Integer> probeIterators;
+  private List<Integer> probeIterators;
   private final PriorityQueue<Pair<Long, Integer>> minHeap =
       new PriorityQueue<>(
           (a, b) -> a.left.equals(b.left) ? b.right.compareTo(a.right) : a.left.compareTo(b.left));
@@ -46,31 +46,31 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
         IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
   }
 
-  //  private MergeSortMultiTVListIterator() {
-  //    super();
-  //  }
+  private MergeSortMultiTVListIterator() {
+    super();
+  }
 
-  //  @Override
-  //  public MultiTVListIterator clone() {
-  //    MergeSortMultiTVListIterator cloneIterator = new MergeSortMultiTVListIterator();
-  //    cloneIterator.tsDataType = tsDataType;
-  //    cloneIterator.tsBlocks = tsBlocks;
-  //    for(TVList.TVListIterator iterator: tvListIterators) {
-  //      cloneIterator.tvListIterators.add(iterator.clone());
-  //    }
-  //    cloneIterator.floatPrecision = floatPrecision;
-  //    cloneIterator.encoding = encoding;
-  //    this.probeIterators =
-  //            IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
-  //    return cloneIterator;
-  //  }
+  @Override
+  public MemPointIterator clone() {
+    MergeSortMultiTVListIterator cloneIterator = new MergeSortMultiTVListIterator();
+    cloneIterator.tsDataType = tsDataType;
+    cloneIterator.tsBlocks.addAll(tsBlocks);
+    for (TVList.TVListIterator iterator : tvListIterators) {
+      cloneIterator.tvListIterators.add(iterator.clone());
+    }
+    cloneIterator.floatPrecision = floatPrecision;
+    cloneIterator.encoding = encoding;
+    cloneIterator.probeIterators =
+        IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
+    return cloneIterator;
+  }
 
   @Override
   protected void prepareNext() {
     hasNext = false;
     for (int i : probeIterators) {
       TVList.TVListIterator iterator = tvListIterators.get(i);
-      if (iterator.hasNext()) {
+      if (iterator.hasNextTimeValuePair()) {
         minHeap.add(new Pair<>(iterator.currentTime(), i));
       }
     }
@@ -96,7 +96,7 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
   protected void next() {
     for (int index : probeIterators) {
       TVList.TVListIterator iterator = tvListIterators.get(index);
-      iterator.step();
+      iterator.next();
     }
     probeNext = false;
   }

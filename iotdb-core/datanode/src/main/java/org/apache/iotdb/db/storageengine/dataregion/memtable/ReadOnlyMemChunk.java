@@ -23,8 +23,8 @@ import org.apache.iotdb.commons.utils.TestOnly;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.MemChunkLoader;
-import org.apache.iotdb.db.utils.datastructure.MultiTVListIterator;
-import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
+import org.apache.iotdb.db.utils.datastructure.MemPointIterator;
+import org.apache.iotdb.db.utils.datastructure.MemPointIteratorFactory;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileDescriptor;
@@ -84,7 +84,7 @@ public class ReadOnlyMemChunk {
   // TVList and its rowCount during query
   private Map<TVList, Integer> tvListQueryMap;
 
-  private MultiTVListIterator timeValuePairIterator;
+  private MemPointIterator timeValuePairIterator;
 
   protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
       TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
@@ -146,8 +146,7 @@ public class ReadOnlyMemChunk {
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     timeValuePairIterator =
-        MultiTVListIteratorFactory.create(
-            dataType, tvLists, deletionList, floatPrecision, encoding);
+        MemPointIteratorFactory.create(dataType, tvLists, deletionList, floatPrecision, encoding);
     while (timeValuePairIterator.hasNextBatch()) {
       // statistics for current batch
       Statistics<? extends Serializable> pageStatistics = Statistics.getStatsByType(dataType);
@@ -273,8 +272,8 @@ public class ReadOnlyMemChunk {
   // read all data in memory chunk and write to tsblock
   private void writeValidValuesIntoTsBlock(TsBlockBuilder builder) throws IOException {
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
-    IPointReader timeValuePairIterator =
-        MultiTVListIteratorFactory.create(
+    MemPointIterator timeValuePairIterator =
+        MemPointIteratorFactory.create(
             getDataType(), tvLists, deletionList, floatPrecision, encoding);
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
@@ -351,7 +350,7 @@ public class ReadOnlyMemChunk {
     return null;
   }
 
-  public MultiTVListIterator getMultiTVListIterator() {
+  public MemPointIterator getMemPointIterator() {
     return timeValuePairIterator;
   }
 

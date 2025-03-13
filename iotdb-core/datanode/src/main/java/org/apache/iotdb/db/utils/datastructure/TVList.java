@@ -26,6 +26,7 @@ import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.WALEntryValue;
 import org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager;
 import org.apache.iotdb.db.utils.MathUtils;
 
+import org.apache.tsfile.common.conf.TSFileDescriptor;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.TimeValuePair;
@@ -638,27 +639,43 @@ public abstract class TVList implements WALEntryValue {
   }
 
   public TVListIterator iterator(List<TimeRange> deletionList) {
-    return new TVListIterator(deletionList);
+    return new TVListIterator(deletionList, null, null);
+  }
+
+  public TVListIterator iterator(
+      List<TimeRange> deletionList, Integer floatPrecision, TSEncoding encoding) {
+    return new TVListIterator(deletionList, floatPrecision, encoding);
   }
 
   /* TVList Iterator */
-  public class TVListIterator {
+  public class TVListIterator implements MemPointIterator {
     protected int index;
     protected int rows;
     protected long currentTime;
     protected boolean probeNext;
-    private List<TimeRange> deletionList;
-    int[] deleteCursor = {0};
+    protected List<TsBlock> tsBlocks;
 
-    public TVListIterator(List<TimeRange> deletionList) {
+    private int floatPrecision;
+    private TSEncoding encoding;
+    private List<TimeRange> deletionList;
+    private final int[] deleteCursor = {0};
+
+    protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
+        TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
+
+    public TVListIterator(
+        List<TimeRange> deletionList, Integer floatPrecision, TSEncoding encoding) {
       this.deletionList = deletionList;
       this.index = 0;
       this.rows = rowCount;
       this.currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
       this.probeNext = false;
+      this.floatPrecision = floatPrecision == null ? 0 : floatPrecision;
+      this.encoding = encoding;
+      this.tsBlocks = new ArrayList<>();
     }
 
-    private void prepareNext() {
+    protected void prepareNext() {
       // skip deleted rows
       while (index < rows
           && (isNullValue(getValueIndex(index))
@@ -674,23 +691,152 @@ public abstract class TVList implements WALEntryValue {
       probeNext = true;
     }
 
-    public boolean hasNext() {
+    @Override
+    public boolean hasNextTimeValuePair() {
       if (!probeNext) {
         prepareNext();
       }
       return index < rows;
     }
 
-    public TimeValuePair next() {
-      if (!hasNext()) {
+    @Override
+    public TimeValuePair nextTimeValuePair() {
+      if (!hasNextTimeValuePair()) {
         return null;
       }
       TimeValuePair tvp = getTimeValuePair(index);
-      step();
+      next();
       return tvp;
     }
 
-    public void step() {
+    @Override
+    public TimeValuePair currentTimeValuePair() {
+      if (!hasNextTimeValuePair()) {
+        return null;
+      }
+      return getTimeValuePair(index);
+    }
+
+    @Override
+    public TsBlock getBatch(int tsBlockIndex) {
+      if (tsBlockIndex < 0 || tsBlockIndex >= tsBlocks.size()) {
+        return null;
+      }
+      TsBlock tsBlock = tsBlocks.get(tsBlockIndex);
+      tsBlocks.set(tsBlockIndex, null);
+      return tsBlock;
+    }
+
+    @Override
+    public boolean hasNextBatch() {
+      return hasNextTimeValuePair();
+    }
+
+    @Override
+    public TsBlock nextBatch() {
+      TSDataType dataType = getDataType();
+      TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(dataType));
+      int pointsInBatch = 0;
+      switch (dataType) {
+        case BOOLEAN:
+          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+            if (!isNullValue(getValueIndex(index))
+                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
+                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(getTime(index));
+              builder.getColumnBuilder(0).writeBoolean(getBoolean(index));
+              builder.declarePosition();
+              pointsInBatch++;
+            }
+          }
+          break;
+        case INT32:
+        case DATE:
+          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+            if (!isNullValue(getValueIndex(index))
+                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
+                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(getTime(index));
+              builder.getColumnBuilder(0).writeInt(getInt(index));
+              builder.declarePosition();
+              pointsInBatch++;
+            }
+          }
+          break;
+        case INT64:
+        case TIMESTAMP:
+          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+            if (!isNullValue(getValueIndex(index))
+                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
+                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(getTime(index));
+              builder.getColumnBuilder(0).writeLong(getLong(index));
+              builder.declarePosition();
+              pointsInBatch++;
+            }
+          }
+          break;
+        case FLOAT:
+          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+            if (!isNullValue(getValueIndex(index))
+                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
+                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(getTime(index));
+              builder
+                  .getColumnBuilder(0)
+                  .writeFloat(
+                      roundValueWithGivenPrecision(getFloat(index), floatPrecision, encoding));
+              builder.declarePosition();
+              pointsInBatch++;
+            }
+          }
+          break;
+        case DOUBLE:
+          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+            if (!isNullValue(getValueIndex(index))
+                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
+                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(getTime(index));
+              builder
+                  .getColumnBuilder(0)
+                  .writeDouble(
+                      roundValueWithGivenPrecision(getDouble(index), floatPrecision, encoding));
+              builder.declarePosition();
+              pointsInBatch++;
+            }
+          }
+          break;
+        case TEXT:
+        case BLOB:
+        case STRING:
+          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+            if (!isNullValue(getValueIndex(index))
+                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
+                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(getTime(index));
+              builder.getColumnBuilder(0).writeBinary(getBinary(index));
+              builder.declarePosition();
+              pointsInBatch++;
+            }
+          }
+          break;
+      }
+      TsBlock tsBlock = builder.build();
+      tsBlocks.add(tsBlock);
+      return tsBlock;
+    }
+
+    @Override
+    public long getUsedMemorySize() {
+      return 0;
+    }
+
+    @Override
+    public void close() throws IOException {
+      tsBlocks.clear();
+    }
+
+    public void next() {
       index++;
       currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
       probeNext = false;
@@ -728,6 +874,7 @@ public abstract class TVList implements WALEntryValue {
       TVListIterator cloneIterator = new TVListIterator();
       cloneIterator.deletionList = deletionList;
       cloneIterator.rows = rows;
+      cloneIterator.tsBlocks.addAll(tsBlocks);
       cloneIterator.reset();
       return cloneIterator;
     }
@@ -736,6 +883,8 @@ public abstract class TVList implements WALEntryValue {
       return outer;
     }
 
-    private TVListIterator() {}
+    private TVListIterator() {
+      this.tsBlocks = new ArrayList<>();
+    }
   }
 }

@@ -6,21 +6,34 @@ import org.apache.tsfile.read.common.TimeRange;
 
 import java.util.List;
 
-public class MultiTVListIteratorFactory {
-  private MultiTVListIteratorFactory() {
+public class MemPointIteratorFactory {
+  private MemPointIteratorFactory() {
     // forbidden construction
   }
 
-  public static MultiTVListIterator mergeSort(TSDataType tsDataType, List<TVList> tvLists) {
+  public static MemPointIterator single(TVList tvList) {
+    return tvList.iterator(null);
+  }
+
+  public static MemPointIterator single(TVList tvList, List<TimeRange> deletionList) {
+    return tvList.iterator(deletionList);
+  }
+
+  public static MemPointIterator single(
+      TVList tvList, List<TimeRange> deletionList, Integer floatPrecision, TSEncoding encoding) {
+    return tvList.iterator(deletionList, floatPrecision, encoding);
+  }
+
+  public static MemPointIterator mergeSort(TSDataType tsDataType, List<TVList> tvLists) {
     return new MergeSortMultiTVListIterator(tsDataType, tvLists, null, null, null);
   }
 
-  public static MultiTVListIterator mergeSort(
+  public static MemPointIterator mergeSort(
       TSDataType tsDataType, List<TVList> tvLists, List<TimeRange> deletionList) {
     return new MergeSortMultiTVListIterator(tsDataType, tvLists, deletionList, null, null);
   }
 
-  public static MultiTVListIterator mergeSort(
+  public static MemPointIterator mergeSort(
       TSDataType tsDataType,
       List<TVList> tvLists,
       List<TimeRange> deletionList,
@@ -30,16 +43,16 @@ public class MultiTVListIteratorFactory {
         tsDataType, tvLists, deletionList, floatPrecision, encoding);
   }
 
-  public static MultiTVListIterator ordered(TSDataType tsDataType, List<TVList> tvLists) {
+  public static MemPointIterator ordered(TSDataType tsDataType, List<TVList> tvLists) {
     return new OrderedMultiTVListIterator(tsDataType, tvLists, null, null, null);
   }
 
-  public static MultiTVListIterator ordered(
+  public static MemPointIterator ordered(
       TSDataType tsDataType, List<TVList> tvLists, List<TimeRange> deletionList) {
     return new OrderedMultiTVListIterator(tsDataType, tvLists, deletionList, null, null);
   }
 
-  public static MultiTVListIterator ordered(
+  public static MemPointIterator ordered(
       TSDataType tsDataType,
       List<TVList> tvLists,
       List<TimeRange> deletionList,
@@ -49,30 +62,36 @@ public class MultiTVListIteratorFactory {
         tsDataType, tvLists, deletionList, floatPrecision, encoding);
   }
 
-  public static MultiTVListIterator create(TSDataType tsDataType, List<TVList> tvLists) {
-    if (isCompleteOrdered(tvLists)) {
+  public static MemPointIterator create(TSDataType tsDataType, List<TVList> tvLists) {
+    if (tvLists.size() == 1) {
+      return single(tvLists.get(0));
+    } else if (isCompleteOrdered(tvLists)) {
       return ordered(tsDataType, tvLists);
     } else {
       return mergeSort(tsDataType, tvLists);
     }
   }
 
-  public static MultiTVListIterator create(
+  public static MemPointIterator create(
       TSDataType tsDataType, List<TVList> tvLists, List<TimeRange> deletionList) {
-    if (isCompleteOrdered(tvLists)) {
+    if (tvLists.size() == 1) {
+      return single(tvLists.get(0), deletionList);
+    } else if (isCompleteOrdered(tvLists)) {
       return ordered(tsDataType, tvLists, deletionList);
     } else {
       return mergeSort(tsDataType, tvLists, deletionList);
     }
   }
 
-  public static MultiTVListIterator create(
+  public static MemPointIterator create(
       TSDataType tsDataType,
       List<TVList> tvLists,
       List<TimeRange> deletionList,
       Integer floatPrecision,
       TSEncoding encoding) {
-    if (isCompleteOrdered(tvLists)) {
+    if (tvLists.size() == 1) {
+      return single(tvLists.get(0), deletionList, floatPrecision, encoding);
+    } else if (isCompleteOrdered(tvLists)) {
       return ordered(tsDataType, tvLists, deletionList, floatPrecision, encoding);
     } else {
       return mergeSort(tsDataType, tvLists, deletionList, floatPrecision, encoding);

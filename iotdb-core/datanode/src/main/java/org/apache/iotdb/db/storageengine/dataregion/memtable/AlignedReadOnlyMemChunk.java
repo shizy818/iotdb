@@ -165,7 +165,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
       // ignore deleted row
       if (timeColumnDeletion != null
           && isPointDeleted(tvPair.getTimestamp(), timeColumnDeletion, timeDeleteCursor)) {
-        timeValuePairIterator.step();
+        timeValuePairIterator.next();
         continue;
       }
 
@@ -184,7 +184,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         }
       }
       if (context.isIgnoreAllNullRows() && bitMap.isAllMarked()) {
-        timeValuePairIterator.step();
+        timeValuePairIterator.next();
         continue;
       }
 
@@ -270,7 +270,7 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
                 String.format("Data type %s is not supported.", dataTypes.get(column)));
         }
       }
-      timeValuePairIterator.step();
+      timeValuePairIterator.next();
       pointsInChunk++;
     }
 

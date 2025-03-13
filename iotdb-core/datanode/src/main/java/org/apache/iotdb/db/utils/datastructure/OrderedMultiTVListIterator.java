@@ -16,32 +16,32 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
     super(tsDataType, tvLists, deletionList, floatPrecision, encoding);
   }
 
-  //  private OrderedMultiTVListIterator() {
-  //    super();
-  //  }
+  private OrderedMultiTVListIterator() {
+    super();
+  }
 
-  //  @Override
-  //  public MultiTVListIterator clone() {
-  //    OrderedMultiTVListIterator cloneIterator = new OrderedMultiTVListIterator();
-  //    cloneIterator.tsDataType = tsDataType;
-  //    cloneIterator.tsBlocks = tsBlocks;
-  //    for(TVList.TVListIterator iterator: tvListIterators) {
-  //      cloneIterator.tvListIterators.add(iterator.clone());
-  //    }
-  //    cloneIterator.floatPrecision = floatPrecision;
-  //    cloneIterator.encoding = encoding;
-  //    return cloneIterator;
-  //  }
+  @Override
+  public MemPointIterator clone() {
+    OrderedMultiTVListIterator cloneIterator = new OrderedMultiTVListIterator();
+    cloneIterator.tsDataType = tsDataType;
+    cloneIterator.tsBlocks.addAll(tsBlocks);
+    for (TVList.TVListIterator iterator : tvListIterators) {
+      cloneIterator.tvListIterators.add(iterator.clone());
+    }
+    cloneIterator.floatPrecision = floatPrecision;
+    cloneIterator.encoding = encoding;
+    return cloneIterator;
+  }
 
   @Override
   protected void prepareNext() {
     hasNext = false;
     while (iteratorIndex < tvListIterators.size() - 1
-        && !tvListIterators.get(iteratorIndex).hasNext()) {
+        && !tvListIterators.get(iteratorIndex).hasNextTimeValuePair()) {
       iteratorIndex++;
     }
     TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
-    if (iterator.hasNext()) {
+    if (iterator.hasNextTimeValuePair()) {
       rowIndex = iterator.getIndex();
       hasNext = true;
     }
@@ -51,7 +51,7 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
   @Override
   protected void next() {
     TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
-    iterator.step();
+    iterator.next();
     probeNext = false;
   }
 }

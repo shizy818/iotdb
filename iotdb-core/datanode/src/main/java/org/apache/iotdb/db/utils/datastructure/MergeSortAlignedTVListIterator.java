@@ -72,8 +72,8 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     currentTvPair = null;
     if (alignedTvListIterators.size() == 1) {
       AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(0);
-      if (iterator.hasNext()) {
-        currentTvPair = iterator.current();
+      if (iterator.hasNextTimeValuePair()) {
+        currentTvPair = iterator.currentTimeValuePair();
       }
       probeNext = true;
       return;
@@ -81,7 +81,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
 
     for (int i : probeIterators) {
       AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(i);
-      if (iterator.hasNext()) {
+      if (iterator.hasNextTimeValuePair()) {
         minHeap.add(new Pair<>(iterator.currentTime(), i));
       }
     }
@@ -91,14 +91,14 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
       Pair<Long, Integer> top = minHeap.poll();
       long time = top.left;
       probeIterators.add(top.right);
-      currentTvPair = alignedTvListIterators.get(top.right).current();
+      currentTvPair = alignedTvListIterators.get(top.right).currentTimeValuePair();
       TsPrimitiveType[] currentValues = currentTvPair.getValue().getVector();
 
       while (!minHeap.isEmpty() && minHeap.peek().left == time) {
         Pair<Long, Integer> element = minHeap.poll();
         probeIterators.add(element.right);
 
-        TimeValuePair tvPair = alignedTvListIterators.get(element.right).current();
+        TimeValuePair tvPair = alignedTvListIterators.get(element.right).currentTimeValuePair();
         TsPrimitiveType[] values = tvPair.getValue().getVector();
         for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
           // if the column is currently not null, it needs not update
@@ -124,7 +124,7 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     if (!hasNextTimeValuePair()) {
       return null;
     }
-    step();
+    next();
     return currentTvPair;
   }
 
@@ -136,15 +136,15 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
     return currentTvPair;
   }
 
-  public void step() {
+  public void next() {
     if (alignedTvListIterators.size() == 1) {
       AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(0);
-      iterator.step();
+      iterator.next();
       alignedTvListOffsets[0] = iterator.getIndex();
     } else {
       for (int index : probeIterators) {
         AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(index);
-        iterator.step();
+        iterator.next();
         alignedTvListOffsets[index] = iterator.getIndex();
       }
     }
