@@ -736,48 +736,52 @@ public abstract class TVList implements WALEntryValue {
     public TsBlock nextBatch() {
       TSDataType dataType = getDataType();
       TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(dataType));
-      int pointsInBatch = 0;
       switch (dataType) {
         case BOOLEAN:
-          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+          for (;
+              index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE;
+              index++) {
             if (!isNullValue(getValueIndex(index))
                 && !isPointDeleted(getTime(index), deletionList, deleteCursor)
                 && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
               builder.getTimeColumnBuilder().writeLong(getTime(index));
               builder.getColumnBuilder(0).writeBoolean(getBoolean(index));
               builder.declarePosition();
-              pointsInBatch++;
             }
           }
           break;
         case INT32:
         case DATE:
-          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+          for (;
+              index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE;
+              index++) {
             if (!isNullValue(getValueIndex(index))
                 && !isPointDeleted(getTime(index), deletionList, deleteCursor)
                 && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
               builder.getTimeColumnBuilder().writeLong(getTime(index));
               builder.getColumnBuilder(0).writeInt(getInt(index));
               builder.declarePosition();
-              pointsInBatch++;
             }
           }
           break;
         case INT64:
         case TIMESTAMP:
-          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+          for (;
+              index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE;
+              index++) {
             if (!isNullValue(getValueIndex(index))
                 && !isPointDeleted(getTime(index), deletionList, deleteCursor)
                 && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
               builder.getTimeColumnBuilder().writeLong(getTime(index));
               builder.getColumnBuilder(0).writeLong(getLong(index));
               builder.declarePosition();
-              pointsInBatch++;
             }
           }
           break;
         case FLOAT:
-          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+          for (;
+              index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE;
+              index++) {
             if (!isNullValue(getValueIndex(index))
                 && !isPointDeleted(getTime(index), deletionList, deleteCursor)
                 && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
@@ -787,12 +791,13 @@ public abstract class TVList implements WALEntryValue {
                   .writeFloat(
                       roundValueWithGivenPrecision(getFloat(index), floatPrecision, encoding));
               builder.declarePosition();
-              pointsInBatch++;
             }
           }
           break;
         case DOUBLE:
-          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+          for (;
+              index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE;
+              index++) {
             if (!isNullValue(getValueIndex(index))
                 && !isPointDeleted(getTime(index), deletionList, deleteCursor)
                 && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
@@ -802,21 +807,21 @@ public abstract class TVList implements WALEntryValue {
                   .writeDouble(
                       roundValueWithGivenPrecision(getDouble(index), floatPrecision, encoding));
               builder.declarePosition();
-              pointsInBatch++;
             }
           }
           break;
         case TEXT:
         case BLOB:
         case STRING:
-          for (; index < rows && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE; index++) {
+          for (;
+              index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE;
+              index++) {
             if (!isNullValue(getValueIndex(index))
                 && !isPointDeleted(getTime(index), deletionList, deleteCursor)
                 && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
               builder.getTimeColumnBuilder().writeLong(getTime(index));
               builder.getColumnBuilder(0).writeBinary(getBinary(index));
               builder.declarePosition();
-              pointsInBatch++;
             }
           }
           break;

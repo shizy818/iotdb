@@ -109,8 +109,7 @@ public abstract class MultiTVListIterator implements MemPointIterator {
   @Override
   public TsBlock nextBatch() {
     TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(tsDataType));
-    int pointsInBatch = 0;
-    while (hasNextTimeValuePair() && pointsInBatch < MAX_NUMBER_OF_POINTS_IN_PAGE) {
+    while (hasNextTimeValuePair() && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE) {
       TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
       builder.getTimeColumnBuilder().writeLong(iterator.currentTime());
       switch (tsDataType) {
@@ -153,7 +152,6 @@ public abstract class MultiTVListIterator implements MemPointIterator {
       next();
 
       builder.declarePosition();
-      pointsInBatch++;
     }
     TsBlock tsBlock = builder.build();
     tsBlocks.add(tsBlock);

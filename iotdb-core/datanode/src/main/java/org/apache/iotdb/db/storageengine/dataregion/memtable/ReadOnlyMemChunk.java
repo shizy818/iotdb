@@ -50,8 +50,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
-
 /**
  * ReadOnlyMemChunk is a snapshot of the working MemTable and flushing memtable in the memory used
  * for querying.
@@ -143,7 +141,6 @@ public class ReadOnlyMemChunk {
   public void initChunkMetaFromTvLists() {
     // create chunk statistics
     Statistics<? extends Serializable> chunkStatistics = Statistics.getStatsByType(dataType);
-    int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
     timeValuePairIterator =
         MemPointIteratorFactory.create(dataType, tvLists, deletionList, floatPrecision, encoding);
@@ -158,9 +155,6 @@ public class ReadOnlyMemChunk {
           case BOOLEAN:
             for (int i = 0; i < tsBlock.getPositionCount(); i++) {
               long time = tsBlock.getTimeByIndex(i);
-              if (isPointDeleted(time, deletionList, deleteCursor)) {
-                continue;
-              }
               chunkStatistics.update(time, tsBlock.getColumn(0).getBoolean(i));
               pageStatistics.update(time, tsBlock.getColumn(0).getBoolean(i));
             }
@@ -169,9 +163,6 @@ public class ReadOnlyMemChunk {
           case DATE:
             for (int i = 0; i < tsBlock.getPositionCount(); i++) {
               long time = tsBlock.getTimeByIndex(i);
-              if (isPointDeleted(time, deletionList, deleteCursor)) {
-                continue;
-              }
               chunkStatistics.update(time, tsBlock.getColumn(0).getInt(i));
               pageStatistics.update(time, tsBlock.getColumn(0).getInt(i));
             }
@@ -180,9 +171,6 @@ public class ReadOnlyMemChunk {
           case TIMESTAMP:
             for (int i = 0; i < tsBlock.getPositionCount(); i++) {
               long time = tsBlock.getTimeByIndex(i);
-              if (isPointDeleted(time, deletionList, deleteCursor)) {
-                continue;
-              }
               chunkStatistics.update(time, tsBlock.getColumn(0).getLong(i));
               pageStatistics.update(time, tsBlock.getColumn(0).getLong(i));
             }
@@ -190,9 +178,6 @@ public class ReadOnlyMemChunk {
           case FLOAT:
             for (int i = 0; i < tsBlock.getPositionCount(); i++) {
               long time = tsBlock.getTimeByIndex(i);
-              if (isPointDeleted(time, deletionList, deleteCursor)) {
-                continue;
-              }
               chunkStatistics.update(time, tsBlock.getColumn(0).getFloat(i));
               pageStatistics.update(time, tsBlock.getColumn(0).getFloat(i));
             }
@@ -200,9 +185,6 @@ public class ReadOnlyMemChunk {
           case DOUBLE:
             for (int i = 0; i < tsBlock.getPositionCount(); i++) {
               long time = tsBlock.getTimeByIndex(i);
-              if (isPointDeleted(time, deletionList, deleteCursor)) {
-                continue;
-              }
               chunkStatistics.update(time, tsBlock.getColumn(0).getDouble(i));
               pageStatistics.update(time, tsBlock.getColumn(0).getDouble(i));
             }
@@ -212,9 +194,6 @@ public class ReadOnlyMemChunk {
           case STRING:
             for (int i = 0; i < tsBlock.getPositionCount(); i++) {
               long time = tsBlock.getTimeByIndex(i);
-              if (isPointDeleted(time, deletionList, deleteCursor)) {
-                continue;
-              }
               chunkStatistics.update(time, tsBlock.getColumn(0).getBinary(i));
               pageStatistics.update(time, tsBlock.getColumn(0).getBinary(i));
             }
