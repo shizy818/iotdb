@@ -670,7 +670,7 @@ public abstract class TVList implements WALEntryValue {
       this.rows = rowCount;
       this.currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
       this.probeNext = false;
-      this.floatPrecision = floatPrecision == null ? 0 : floatPrecision;
+      this.floatPrecision = floatPrecision != null ? floatPrecision : 0;
       this.encoding = encoding;
       this.tsBlocks = new ArrayList<>();
     }

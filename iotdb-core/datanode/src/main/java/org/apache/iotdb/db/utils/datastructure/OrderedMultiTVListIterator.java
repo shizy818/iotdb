@@ -4,6 +4,7 @@ import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.common.TimeRange;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class OrderedMultiTVListIterator extends MultiTVListIterator {
@@ -25,6 +26,7 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
     OrderedMultiTVListIterator cloneIterator = new OrderedMultiTVListIterator();
     cloneIterator.tsDataType = tsDataType;
     cloneIterator.tsBlocks.addAll(tsBlocks);
+    cloneIterator.tvListIterators = new ArrayList<>();
     for (TVList.TVListIterator iterator : tvListIterators) {
       cloneIterator.tvListIterators.add(iterator.clone());
     }

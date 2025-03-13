@@ -24,6 +24,7 @@ import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.utils.Pair;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
@@ -55,6 +56,7 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
     MergeSortMultiTVListIterator cloneIterator = new MergeSortMultiTVListIterator();
     cloneIterator.tsDataType = tsDataType;
     cloneIterator.tsBlocks.addAll(tsBlocks);
+    cloneIterator.tvListIterators = new ArrayList<>();
     for (TVList.TVListIterator iterator : tvListIterators) {
       cloneIterator.tvListIterators.add(iterator.clone());
     }

@@ -63,7 +63,7 @@ public abstract class MultiTVListIterator implements MemPointIterator {
     for (TVList tvList : tvLists) {
       tvListIterators.add(tvList.iterator(deletionList));
     }
-    this.floatPrecision = floatPrecision;
+    this.floatPrecision = floatPrecision != null ? floatPrecision : 0;
     this.encoding = encoding;
     this.tsBlocks = new ArrayList<>();
   }
