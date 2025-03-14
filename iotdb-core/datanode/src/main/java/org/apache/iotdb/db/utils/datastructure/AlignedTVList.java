@@ -84,6 +84,8 @@ public abstract class AlignedTVList extends TVList {
 
   protected int timeDeletedCnt = 0;
 
+  private final AlignedTVList outer = this;
+
   AlignedTVList(List<TSDataType> types) {
     super();
     dataTypes = types;
@@ -1517,37 +1519,40 @@ public abstract class AlignedTVList extends TVList {
   public AlignedTVListIterator iterator(
       List<TSDataType> dataTypeList,
       List<Integer> columnIndexList,
-      boolean ignoreAllNullRows,
+      List<TimeRange> timeColumnDeletion,
       Integer floatPrecision,
-      List<TSEncoding> encodingList) {
+      List<TSEncoding> encodingList,
+      boolean ignoreAllNullRows) {
     return new AlignedTVListIterator(
-        dataTypeList, columnIndexList, ignoreAllNullRows, floatPrecision, encodingList);
+        dataTypeList,
+        columnIndexList,
+        timeColumnDeletion,
+        floatPrecision,
+        encodingList,
+        ignoreAllNullRows);
   }
 
   /* AlignedTVList Iterator */
   public class AlignedTVListIterator extends TVListIterator {
     private BitMap allValueColDeletedMap;
-
     private List<TSDataType> dataTypeList;
     private List<Integer> columnIndexList;
+    private List<TimeRange> timeColumnDeletion;
     private Integer floatPrecision;
     private List<TSEncoding> encodingList;
 
-    // remember the selected index of last not-null value for each column during prepareNext phase.
-    // It is already converted by getValueIndex method, so it can be directly used in
-    // getPrimitiveObject method.
-    private int[] selectedIndex;
+    // remember the selected index of last not-null value for each column during prepareNext phase
+    private int[] selectedIndices;
 
-    public AlignedTVListIterator() {
-      super(null, null, null);
-    }
+    int[] timeDeleteCursor = {0};
 
     public AlignedTVListIterator(
         List<TSDataType> dataTypeList,
         List<Integer> columnIndexList,
-        boolean ignoreAllNullRows,
+        List<TimeRange> timeColumnDeletion,
         Integer floatPrecision,
-        List<TSEncoding> encodingList) {
+        List<TSEncoding> encodingList,
+        boolean ignoreAllNullRows) {
       super(null, null, null);
       this.dataTypeList = dataTypeList;
       this.columnIndexList =
@@ -1557,7 +1562,8 @@ public abstract class AlignedTVList extends TVList {
       this.allValueColDeletedMap = ignoreAllNullRows ? getAllValueColDeletedMap() : null;
       this.floatPrecision = floatPrecision;
       this.encodingList = encodingList;
-      this.selectedIndex = new int[dataTypeList.size()];
+      this.timeColumnDeletion = timeColumnDeletion;
+      this.selectedIndices = new int[dataTypeList.size()];
     }
 
     @Override
@@ -1568,7 +1574,8 @@ public abstract class AlignedTVList extends TVList {
         int rowIndex = getValueIndex(index);
         // all columns values are deleted
         if ((allValueColDeletedMap != null && allValueColDeletedMap.isMarked(rowIndex))
-            || isTimeDeleted(rowIndex, false)) {
+            || isTimeDeleted(rowIndex, false)
+            || isPointDeleted(currentTime, timeColumnDeletion, timeDeleteCursor)) {
           index++;
           currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
           continue;
@@ -1579,7 +1586,7 @@ public abstract class AlignedTVList extends TVList {
           probeNext = true;
           return;
         }
-        Arrays.fill(selectedIndex, rowIndex);
+        Arrays.fill(selectedIndices, rowIndex);
         findValidRow = true;
       }
 
@@ -1590,9 +1597,9 @@ public abstract class AlignedTVList extends TVList {
         int rowIndex = getValueIndex(index);
         if (allValueColDeletedMap == null || !allValueColDeletedMap.isMarked(rowIndex)) {
           for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
-            // update currTvPair if the column is not null
-            if (!isNull(rowIndex, columnIndex)) {
-              selectedIndex[columnIndex] = rowIndex;
+            // update selected index if the column is not null
+            if (!isNullValue(rowIndex, columnIndex)) {
+              selectedIndices[columnIndex] = rowIndex;
             }
           }
         }
@@ -1605,10 +1612,9 @@ public abstract class AlignedTVList extends TVList {
       if (!hasNextTimeValuePair()) {
         return null;
       }
-
       TsPrimitiveType[] vector = new TsPrimitiveType[dataTypeList.size()];
       for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
-        vector[columnIndex] = getPrimitiveObject(selectedIndex[columnIndex], columnIndex);
+        vector[columnIndex] = getPrimitiveTypeObject(selectedIndices[columnIndex], columnIndex);
       }
       TimeValuePair tvPair =
           new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
@@ -1624,20 +1630,12 @@ public abstract class AlignedTVList extends TVList {
       }
       TsPrimitiveType[] vector = new TsPrimitiveType[dataTypeList.size()];
       for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
-        vector[columnIndex] = getPrimitiveObject(selectedIndex[columnIndex], columnIndex);
+        vector[columnIndex] = getPrimitiveTypeObject(selectedIndices[columnIndex], columnIndex);
       }
       return new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
     }
 
-    public boolean isNull(int rowIndex, int columnIndex) {
-      int validColumnIndex = columnIndexList.get(columnIndex);
-      if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
-        return true;
-      }
-      return isNullValue(rowIndex, validColumnIndex);
-    }
-
-    public TsPrimitiveType getPrimitiveObject(int rowIndex, int columnIndex) {
+    public TsPrimitiveType getPrimitiveTypeObject(int rowIndex, int columnIndex) {
       if (rowIndex < 0 || rowIndex >= rows) {
         return null;
       }
@@ -1661,25 +1659,19 @@ public abstract class AlignedTVList extends TVList {
           return TsPrimitiveType.getByType(
               TSDataType.INT64, getLongByValueIndex(rowIndex, validColumnIndex));
         case FLOAT:
-          float valueF = getFloatByValueIndex(rowIndex, validColumnIndex);
-          if (floatPrecision != null
-              && encodingList != null
-              && !Float.isNaN(valueF)
-              && (encodingList.get(columnIndex) == TSEncoding.RLE
-                  || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
-            valueF = MathUtils.roundWithGivenPrecision(valueF, floatPrecision);
-          }
-          return TsPrimitiveType.getByType(TSDataType.FLOAT, valueF);
+          return TsPrimitiveType.getByType(
+              TSDataType.FLOAT,
+              roundValueWithGivenPrecision(
+                  getFloatByValueIndex(rowIndex, validColumnIndex),
+                  floatPrecision,
+                  encodingList.get(columnIndex)));
         case DOUBLE:
-          double valueD = getDoubleByValueIndex(rowIndex, validColumnIndex);
-          if (floatPrecision != null
-              && encodingList != null
-              && !Double.isNaN(valueD)
-              && (encodingList.get(columnIndex) == TSEncoding.RLE
-                  || encodingList.get(columnIndex) == TSEncoding.TS_2DIFF)) {
-            valueD = MathUtils.roundWithGivenPrecision(valueD, floatPrecision);
-          }
-          return TsPrimitiveType.getByType(TSDataType.DOUBLE, valueD);
+          return TsPrimitiveType.getByType(
+              TSDataType.DOUBLE,
+              roundValueWithGivenPrecision(
+                  getDoubleByValueIndex(rowIndex, validColumnIndex),
+                  floatPrecision,
+                  encodingList.get(columnIndex)));
         case TEXT:
         case BLOB:
         case STRING:
@@ -1691,22 +1683,38 @@ public abstract class AlignedTVList extends TVList {
       }
     }
 
-    public int getSelectedIndex(int columnIndex) {
-      return selectedIndex[columnIndex];
+    public int[] getSelectedIndices() {
+      return selectedIndices;
     }
 
     @Override
     public AlignedTVListIterator clone() {
       AlignedTVListIterator iterator = new AlignedTVListIterator();
-      iterator.rows = rows;
       iterator.dataTypeList = dataTypeList;
       iterator.columnIndexList = columnIndexList;
       iterator.allValueColDeletedMap = allValueColDeletedMap;
+      iterator.timeColumnDeletion = timeColumnDeletion;
       iterator.floatPrecision = floatPrecision;
       iterator.encodingList = this.encodingList;
-      iterator.selectedIndex = new int[dataTypeList.size()];
+      iterator.selectedIndices = new int[dataTypeList.size()];
       iterator.reset();
       return iterator;
+    }
+
+    public AlignedTVList getAlignedTVList() {
+      return outer;
+    }
+
+    public boolean isNullValue(int rowIndex, int columnIndex) {
+      int validColumnIndex = columnIndexList.get(columnIndex);
+      if (validColumnIndex < 0 || validColumnIndex >= dataTypes.size()) {
+        return true;
+      }
+      return outer.isNullValue(rowIndex, validColumnIndex);
+    }
+
+    private AlignedTVListIterator() {
+      super(null, null, null);
     }
   }
 }
