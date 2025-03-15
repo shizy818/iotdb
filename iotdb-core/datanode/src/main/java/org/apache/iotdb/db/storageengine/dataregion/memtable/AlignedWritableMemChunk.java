@@ -751,29 +751,32 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
       for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
         ValueChunkWriter valueChunkWriter =
             alignedChunkWriter.getValueChunkWriterByIndex(columnIndex);
-        boolean isNull = values[columnIndex] == null;
+        if (values[columnIndex] == null) {
+          valueChunkWriter.write(tvPair.getTimestamp(), null, true);
+          continue;
+        }
         switch (schemaList.get(columnIndex).getType()) {
           case BOOLEAN:
-            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getBoolean(), isNull);
+            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getBoolean(), false);
             break;
           case INT32:
           case DATE:
-            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getInt(), isNull);
+            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getInt(), false);
             break;
           case INT64:
           case TIMESTAMP:
-            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getLong(), isNull);
+            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getLong(), false);
             break;
           case FLOAT:
-            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getFloat(), isNull);
+            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getFloat(), false);
             break;
           case DOUBLE:
-            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getDouble(), isNull);
+            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getDouble(), false);
             break;
           case TEXT:
           case BLOB:
           case STRING:
-            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getBinary(), isNull);
+            valueChunkWriter.write(tvPair.getTimestamp(), values[columnIndex].getBinary(), false);
             break;
           default:
             break;
@@ -865,13 +868,24 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
 
   @Override
   public boolean isEmpty() {
-    if (list.rowCount() == 0) {
+    if (rowCount() == 0) {
       return true;
     }
     if (ignoreAllNullRows) {
-      return measurementIndexMap.isEmpty()
-          || (list.getAllValueColDeletedMap() != null
-              && list.getAllValueColDeletedMap().isAllMarked());
+      if (measurementIndexMap.isEmpty()) {
+        return true;
+      }
+      if (list.getAllValueColDeletedMap() == null
+          || !list.getAllValueColDeletedMap().isAllMarked()) {
+        return false;
+      }
+      for (AlignedTVList alignedTvList : sortedList) {
+        if (alignedTvList.getAllValueColDeletedMap() == null
+            || !alignedTvList.getAllValueColDeletedMap().isAllMarked()) {
+          return false;
+        }
+      }
+      return true;
     }
     return false;
   }
