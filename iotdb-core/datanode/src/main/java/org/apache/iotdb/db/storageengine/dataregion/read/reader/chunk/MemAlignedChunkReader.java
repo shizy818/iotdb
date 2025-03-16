@@ -20,7 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
-import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiAlignedTVListIterator;
 
 import org.apache.tsfile.block.column.ColumnBuilder;
 import org.apache.tsfile.enums.TSDataType;
@@ -47,13 +47,13 @@ import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 /** To read aligned chunk data in memory. */
 public class MemAlignedChunkReader implements IChunkReader {
   private final AlignedReadOnlyMemChunk readableChunk;
-  private final MergeSortAlignedTVListIterator timeValuePairIterator;
+  private final MultiAlignedTVListIterator timeValuePairIterator;
   private final Filter globalTimeFilter;
   private final List<IPageReader> pageReaderList;
 
   public MemAlignedChunkReader(AlignedReadOnlyMemChunk readableChunk, Filter globalTimeFilter) {
     this.readableChunk = readableChunk;
-    timeValuePairIterator = readableChunk.getMergeSortAlignedTVListIterator().clone();
+    timeValuePairIterator = readableChunk.getMultiAlignedTVListIterator().clone();
     this.globalTimeFilter = globalTimeFilter;
     this.pageReaderList = new ArrayList<>();
     initAllPageReaders(

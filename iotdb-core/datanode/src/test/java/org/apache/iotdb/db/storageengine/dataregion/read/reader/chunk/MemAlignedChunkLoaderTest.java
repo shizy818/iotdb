@@ -22,7 +22,8 @@ package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.memtable.AlignedReadOnlyMemChunk;
 import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
-import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MergeSortMultiAlignedTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiAlignedTVListIterator;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileConfig;
@@ -115,9 +116,9 @@ public class MemAlignedChunkLoaderTest {
     Mockito.when(chunk.getAligendTvListQueryMap()).thenReturn(alignedTvListMap);
     List<AlignedTVList> alignedTvLists =
         alignedTvListMap.keySet().stream().map(x -> (AlignedTVList) x).collect(Collectors.toList());
-    MergeSortAlignedTVListIterator timeValuePairIterator =
-        new MergeSortAlignedTVListIterator(alignedTvLists, dataTypes, null, null, null, false);
-    Mockito.when(chunk.getMergeSortAlignedTVListIterator()).thenReturn(timeValuePairIterator);
+    MultiAlignedTVListIterator timeValuePairIterator =
+        new MergeSortMultiAlignedTVListIterator(alignedTvLists, dataTypes, null, null, null, false);
+    Mockito.when(chunk.getMultiAlignedTVListIterator()).thenReturn(timeValuePairIterator);
 
     AlignedChunkMetadata chunkMetadata1 = Mockito.mock(AlignedChunkMetadata.class);
     Mockito.when(chunk.getChunkMetaData()).thenReturn(chunkMetadata1);

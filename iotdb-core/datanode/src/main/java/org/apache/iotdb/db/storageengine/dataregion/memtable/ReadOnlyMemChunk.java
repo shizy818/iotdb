@@ -23,8 +23,8 @@ import org.apache.iotdb.commons.utils.TestOnly;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.MemChunkLoader;
-import org.apache.iotdb.db.utils.MathUtils;
-import org.apache.iotdb.db.utils.datastructure.MergeSortTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIterator;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileDescriptor;
@@ -85,7 +85,7 @@ public class ReadOnlyMemChunk {
   // TVList and its rowCount during query
   private Map<TVList, Integer> tvListQueryMap;
 
-  private MergeSortTVListIterator timeValuePairIterator;
+  private MultiTVListIterator timeValuePairIterator;
 
   protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
       TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
@@ -145,21 +145,22 @@ public class ReadOnlyMemChunk {
   public void initChunkMetaFromTvLists() {
     // create chunk statistics
     Statistics<? extends Serializable> chunkStatistics = Statistics.getStatsByType(dataType);
+    Statistics<? extends Serializable> pageStatistics = null;
+
     int pointsInChunk = 0;
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
-    timeValuePairIterator = new MergeSortTVListIterator(tvLists, floatPrecision, encoding);
+    timeValuePairIterator = MultiTVListIteratorFactory.create(tvLists, floatPrecision, encoding);
     int[] tvListOffsets = timeValuePairIterator.getTVListOffsets();
+
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       if (pointsInChunk % MAX_NUMBER_OF_POINTS_IN_PAGE == 0) {
-        Statistics<? extends Serializable> stats = Statistics.getStatsByType(dataType);
-        pageStatisticsList.add(stats);
+        pageStatistics = Statistics.getStatsByType(dataType);
+        pageStatisticsList.add(pageStatistics);
         pageOffsetsList.add(Arrays.copyOf(tvListOffsets, tvListOffsets.length));
       }
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
       if (!isPointDeleted(tvPair.getTimestamp(), deletionList, deleteCursor)) {
-        Statistics<? extends Serializable> pageStatistics =
-            pageStatisticsList.get(pageStatisticsList.size() - 1);
         switch (dataType) {
           case BOOLEAN:
             chunkStatistics.update(tvPair.getTimestamp(), tvPair.getValue().getBoolean());
@@ -245,8 +246,8 @@ public class ReadOnlyMemChunk {
   private void writeValidValuesIntoTsBlock(TsBlockBuilder builder) throws IOException {
     int[] deleteCursor = {0};
     List<TVList> tvLists = new ArrayList<>(tvListQueryMap.keySet());
-    IPointReader timeValuePairIterator =
-        new MergeSortTVListIterator(tvLists, floatPrecision, encoding);
+    MultiTVListIterator timeValuePairIterator =
+        MultiTVListIteratorFactory.create(tvLists, floatPrecision, encoding);
 
     while (timeValuePairIterator.hasNextTimeValuePair()) {
       TimeValuePair tvPair = timeValuePairIterator.nextTimeValuePair();
@@ -265,20 +266,10 @@ public class ReadOnlyMemChunk {
             builder.getColumnBuilder(0).writeLong(tvPair.getValue().getLong());
             break;
           case FLOAT:
-            float fv = tvPair.getValue().getFloat();
-            if (!Float.isNaN(fv)
-                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-              fv = MathUtils.roundWithGivenPrecision(fv, floatPrecision);
-            }
-            builder.getColumnBuilder(0).writeFloat(fv);
+            builder.getColumnBuilder(0).writeFloat(tvPair.getValue().getFloat());
             break;
           case DOUBLE:
-            double dv = tvPair.getValue().getDouble();
-            if (!Double.isNaN(dv)
-                && (encoding == TSEncoding.RLE || encoding == TSEncoding.TS_2DIFF)) {
-              dv = MathUtils.roundWithGivenPrecision(dv, floatPrecision);
-            }
-            builder.getColumnBuilder(0).writeDouble(dv);
+            builder.getColumnBuilder(0).writeDouble(tvPair.getValue().getDouble());
             break;
           case TEXT:
           case STRING:
@@ -334,7 +325,7 @@ public class ReadOnlyMemChunk {
     return null;
   }
 
-  public MergeSortTVListIterator getMergeSortTVListIterator() {
+  public MultiTVListIterator getMultiTVListIterator() {
     return timeValuePairIterator;
   }
 

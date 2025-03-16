@@ -28,7 +28,8 @@ import org.apache.iotdb.db.queryengine.plan.planner.memory.MemoryReservationMana
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
 import org.apache.iotdb.db.storageengine.dataregion.wal.utils.WALWriteUtils;
 import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
-import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
+import org.apache.iotdb.db.utils.datastructure.MultiAlignedTVListIterator;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileDescriptor;
@@ -735,8 +736,8 @@ public class AlignedWritableMemChunk implements IWritableMemChunk {
     // create MergeSortAlignedTVListIterator.
     List<AlignedTVList> alignedTvLists = new ArrayList<>(sortedList);
     alignedTvLists.add(list);
-    MergeSortAlignedTVListIterator timeValuePairIterator =
-        new MergeSortAlignedTVListIterator(
+    MultiAlignedTVListIterator timeValuePairIterator =
+        MultiTVListIteratorFactory.create(
             alignedTvLists, dataTypes, null, null, null, ignoreAllNullRows);
 
     int pointNumInPage = 0;

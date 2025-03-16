@@ -22,22 +22,16 @@ package org.apache.iotdb.db.utils.datastructure;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.TimeValuePair;
-import org.apache.tsfile.read.reader.IPointReader;
 import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.utils.TsPrimitiveType;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class MergeSortAlignedTVListIterator implements IPointReader {
-  private List<AlignedTVList.AlignedTVListIterator> alignedTvListIterators;
-
-  private boolean probeNext = false;
-  private TimeValuePair currentTvPair;
+public class MergeSortMultiAlignedTVListIterator extends MultiAlignedTVListIterator {
 
   private List<Integer> probeIterators;
 
@@ -46,39 +40,31 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
       new PriorityQueue<>(
           (a, b) -> a.left.equals(b.left) ? b.right.compareTo(a.right) : a.left.compareTo(b.left));
 
-  private int[] alignedTvListOffsets;
+  private MergeSortMultiAlignedTVListIterator() {
+    super();
+  }
 
-  public MergeSortAlignedTVListIterator(
+  public MergeSortMultiAlignedTVListIterator(
       List<AlignedTVList> alignedTvLists,
       List<TSDataType> tsDataTypes,
       List<Integer> columnIndexList,
       Integer floatPrecision,
       List<TSEncoding> encodingList,
       boolean ignoreAllNullRows) {
-    this.alignedTvListIterators = new ArrayList<>(alignedTvLists.size());
-    for (AlignedTVList alignedTvList : alignedTvLists) {
-      alignedTvListIterators.add(
-          alignedTvList.iterator(
-              tsDataTypes, columnIndexList, ignoreAllNullRows, floatPrecision, encodingList));
-    }
-    this.alignedTvListOffsets = new int[alignedTvLists.size()];
+    super(
+        alignedTvLists,
+        tsDataTypes,
+        columnIndexList,
+        floatPrecision,
+        encodingList,
+        ignoreAllNullRows);
     this.probeIterators =
         IntStream.range(0, alignedTvListIterators.size()).boxed().collect(Collectors.toList());
   }
 
-  private MergeSortAlignedTVListIterator() {}
-
-  private void prepareNextRow() {
+  @Override
+  protected void prepareNextRow() {
     currentTvPair = null;
-    if (alignedTvListIterators.size() == 1) {
-      AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(0);
-      if (iterator.hasNext()) {
-        currentTvPair = iterator.current();
-      }
-      probeNext = true;
-      return;
-    }
-
     for (int i : probeIterators) {
       AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(i);
       if (iterator.hasNext()) {
@@ -112,76 +98,32 @@ public class MergeSortAlignedTVListIterator implements IPointReader {
   }
 
   @Override
-  public boolean hasNextTimeValuePair() {
-    if (!probeNext) {
-      prepareNextRow();
-    }
-    return currentTvPair != null;
-  }
-
-  @Override
-  public TimeValuePair nextTimeValuePair() {
-    if (!hasNextTimeValuePair()) {
-      return null;
-    }
-    step();
-    return currentTvPair;
-  }
-
-  @Override
-  public TimeValuePair currentTimeValuePair() {
-    if (!hasNextTimeValuePair()) {
-      return null;
-    }
-    return currentTvPair;
-  }
-
   public void step() {
-    if (alignedTvListIterators.size() == 1) {
-      AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(0);
+    for (int index : probeIterators) {
+      AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(index);
       iterator.step();
-      alignedTvListOffsets[0] = iterator.getIndex();
-    } else {
-      for (int index : probeIterators) {
-        AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(index);
-        iterator.step();
-        alignedTvListOffsets[index] = iterator.getIndex();
-      }
+      alignedTvListOffsets[index] = iterator.getIndex();
     }
     probeNext = false;
   }
 
   @Override
-  public long getUsedMemorySize() {
-    // not used
-    return 0;
-  }
-
-  @Override
-  public void close() throws IOException {}
-
-  public int[] getAlignedTVListOffsets() {
-    return alignedTvListOffsets;
-  }
-
   public void setAlignedTVListOffsets(int[] alignedTvListOffsets) {
     for (int i = 0; i < alignedTvListIterators.size(); i++) {
       alignedTvListIterators.get(i).setIndex(alignedTvListOffsets[i]);
       this.alignedTvListOffsets[i] = alignedTvListOffsets[i];
     }
-    if (alignedTvListIterators.size() > 1) {
-      minHeap.clear();
-      probeIterators.clear();
-      for (int i = 0; i < alignedTvListIterators.size(); i++) {
-        probeIterators.add(i);
-      }
+    minHeap.clear();
+    probeIterators.clear();
+    for (int i = 0; i < alignedTvListIterators.size(); i++) {
+      probeIterators.add(i);
     }
     probeNext = false;
   }
 
   @Override
-  public MergeSortAlignedTVListIterator clone() {
-    MergeSortAlignedTVListIterator cloneIterator = new MergeSortAlignedTVListIterator();
+  public MultiAlignedTVListIterator clone() {
+    MergeSortMultiAlignedTVListIterator cloneIterator = new MergeSortMultiAlignedTVListIterator();
     cloneIterator.alignedTvListIterators = new ArrayList<>(alignedTvListIterators.size());
     for (int i = 0; i < alignedTvListIterators.size(); i++) {
       cloneIterator.alignedTvListIterators.add(alignedTvListIterators.get(i).clone());

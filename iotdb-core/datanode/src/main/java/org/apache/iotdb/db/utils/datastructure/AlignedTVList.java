@@ -1522,11 +1522,11 @@ public abstract class AlignedTVList extends TVList {
   public AlignedTVListIterator iterator(
       List<TSDataType> dataTypeList,
       List<Integer> columnIndexList,
-      boolean ignoreAllNullRows,
       Integer floatPrecision,
-      List<TSEncoding> encodingList) {
+      List<TSEncoding> encodingList,
+      boolean ignoreAllNullRows) {
     return new AlignedTVListIterator(
-        dataTypeList, columnIndexList, ignoreAllNullRows, floatPrecision, encodingList);
+        dataTypeList, columnIndexList, floatPrecision, encodingList, ignoreAllNullRows);
   }
 
   /* AlignedTVList Iterator */
@@ -1550,9 +1550,9 @@ public abstract class AlignedTVList extends TVList {
     public AlignedTVListIterator(
         List<TSDataType> dataTypeList,
         List<Integer> columnIndexList,
-        boolean ignoreAllNullRows,
         Integer floatPrecision,
-        List<TSEncoding> encodingList) {
+        List<TSEncoding> encodingList,
+        boolean ignoreAllNullRows) {
       super(null, null);
       this.dataTypeList = dataTypeList;
       this.columnIndexList =
@@ -1706,10 +1706,6 @@ public abstract class AlignedTVList extends TVList {
           throw new UnSupportedDataTypeException(
               String.format("Data type %s is not supported.", dataTypeList.get(columnIndex)));
       }
-    }
-
-    public int getSelectedIndex(int columnIndex) {
-      return selectedIndex[columnIndex];
     }
 
     @Override

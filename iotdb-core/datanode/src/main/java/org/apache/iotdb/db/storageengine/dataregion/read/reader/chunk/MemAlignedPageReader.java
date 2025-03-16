@@ -20,7 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk;
 
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.metadata.AlignedPageMetadata;
-import org.apache.iotdb.db.utils.datastructure.MergeSortAlignedTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiAlignedTVListIterator;
 
 import org.apache.tsfile.block.column.Column;
 import org.apache.tsfile.block.column.ColumnBuilder;
@@ -51,7 +51,7 @@ public class MemAlignedPageReader implements IPageReader {
   private TsBlock tsBlock;
   private final AlignedPageMetadata pageMetadata;
 
-  private final MergeSortAlignedTVListIterator mergeSortAlignedTVListIterator;
+  private final MultiAlignedTVListIterator timeValuePairIterator;
   private final int[] pageStartOffsets;
   private final int[] pageEndOffsets;
   private final Supplier<TsBlock> tsBlockSupplier;
@@ -64,7 +64,7 @@ public class MemAlignedPageReader implements IPageReader {
 
   public MemAlignedPageReader(
       Supplier<TsBlock> tsBlockSupplier,
-      MergeSortAlignedTVListIterator mergeSortAlignedTVListIterator,
+      MultiAlignedTVListIterator timeValuePairIterator,
       int[] pageStartOffsets,
       int[] pageEndOffSets,
       List<TSDataType> tsDataTypes,
@@ -72,7 +72,7 @@ public class MemAlignedPageReader implements IPageReader {
       Statistics<? extends Serializable>[] valueStatistics,
       Filter recordFilter) {
     this.tsBlockSupplier = tsBlockSupplier;
-    this.mergeSortAlignedTVListIterator = mergeSortAlignedTVListIterator;
+    this.timeValuePairIterator = timeValuePairIterator;
     this.pageStartOffsets = pageStartOffsets;
     this.pageEndOffsets = pageEndOffSets;
     this.recordFilter = recordFilter;
@@ -234,7 +234,7 @@ public class MemAlignedPageReader implements IPageReader {
 
   private void initializeOffsets() {
     if (pageStartOffsets != null) {
-      mergeSortAlignedTVListIterator.setAlignedTVListOffsets(pageStartOffsets);
+      timeValuePairIterator.setAlignedTVListOffsets(pageStartOffsets);
     }
     if (tsBlockSupplier instanceof MemAlignedChunkReader.TsBlockSupplier) {
       ((MemAlignedChunkReader.TsBlockSupplier) tsBlockSupplier).setPageEndOffsets(pageEndOffsets);
@@ -262,7 +262,6 @@ public class MemAlignedPageReader implements IPageReader {
       for (int i = 0; i < tsBlock.getPositionCount(); i++) {
         timeStatistics.update(tsBlock.getTimeByIndex(i));
       }
-      //      timeStatistics.setEmpty(false);
 
       for (int column = 0; column < tsDataTypes.size(); column++) {
         switch (tsDataTypes.get(column)) {
