@@ -22,8 +22,8 @@ package org.apache.iotdb.db.storageengine.dataregion.memtable;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.read.reader.chunk.MemAlignedChunkLoader;
 import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
-import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
 import org.apache.iotdb.db.utils.datastructure.MultiAlignedTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.block.column.ColumnBuilder;

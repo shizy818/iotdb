@@ -1574,7 +1574,6 @@ public abstract class AlignedTVList extends TVList {
         if ((allValueColDeletedMap != null && allValueColDeletedMap.isMarked(rowIndex))
             || isTimeDeleted(rowIndex, false)) {
           index++;
-          currentTime = index < rows ? getTime(index) : Long.MIN_VALUE;
           continue;
         }
 
@@ -1588,7 +1587,7 @@ public abstract class AlignedTVList extends TVList {
       }
 
       // handle duplicated timestamp
-      while (index + 1 < rows && getTime(index + 1) == currentTime) {
+      while (index + 1 < rows && getTime(index + 1) == getTime(index)) {
         index++;
         // skip all-Null rows if allValueColDeletedMap exists
         int rowIndex = getValueIndex(index);
@@ -1628,7 +1627,7 @@ public abstract class AlignedTVList extends TVList {
         vector[columnIndex] = getPrimitiveObject(selectedIndex[columnIndex], columnIndex);
       }
       TimeValuePair tvPair =
-          new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
+          new TimeValuePair(getTime(index), TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
 
       step();
       return tvPair;
@@ -1643,7 +1642,8 @@ public abstract class AlignedTVList extends TVList {
       for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
         vector[columnIndex] = getPrimitiveObject(selectedIndex[columnIndex], columnIndex);
       }
-      return new TimeValuePair(currentTime, TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
+      return new TimeValuePair(
+          getTime(index), TsPrimitiveType.getByType(TSDataType.VECTOR, vector));
     }
 
     public boolean isNull(int rowIndex, int columnIndex) {

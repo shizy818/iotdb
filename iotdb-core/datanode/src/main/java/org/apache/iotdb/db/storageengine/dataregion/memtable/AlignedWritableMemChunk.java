@@ -28,8 +28,8 @@ import org.apache.iotdb.db.queryengine.plan.planner.memory.MemoryReservationMana
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
 import org.apache.iotdb.db.storageengine.dataregion.wal.utils.WALWriteUtils;
 import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
-import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
 import org.apache.iotdb.db.utils.datastructure.MultiAlignedTVListIterator;
+import org.apache.iotdb.db.utils.datastructure.MultiTVListIteratorFactory;
 import org.apache.iotdb.db.utils.datastructure.TVList;
 
 import org.apache.tsfile.common.conf.TSFileDescriptor;
