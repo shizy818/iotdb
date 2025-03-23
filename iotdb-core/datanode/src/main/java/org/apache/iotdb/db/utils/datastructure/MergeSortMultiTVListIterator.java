@@ -43,14 +43,14 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
       TSEncoding encoding) {
     super(tsDataType, tvLists, deletionList, floatPrecision, encoding);
     this.probeIterators =
-        IntStream.range(0, tvListIterators.size()).boxed().collect(Collectors.toList());
+        IntStream.range(0, tvListIterators.length).boxed().collect(Collectors.toList());
   }
 
   @Override
   protected void prepareNext() {
     hasNext = false;
     for (int i : probeIterators) {
-      TVList.TVListIterator iterator = tvListIterators.get(i);
+      TVList.TVListIterator iterator = tvListIterators[i];
       if (iterator.hasNextTimeValuePair()) {
         minHeap.add(new Pair<>(iterator.currentTime(), i));
       }
@@ -63,7 +63,7 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
       probeIterators.add(top.right);
 
       iteratorIndex = top.right;
-      rowIndex = tvListIterators.get(iteratorIndex).getIndex();
+      rowIndex = tvListIterators[iteratorIndex].getIndex();
       hasNext = true;
 
       // duplicated timestamps
@@ -78,7 +78,7 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
   @Override
   protected void next() {
     for (int index : probeIterators) {
-      tvListIterators.get(index).next();
+      tvListIterators[index].next();
     }
     probeNext = false;
   }

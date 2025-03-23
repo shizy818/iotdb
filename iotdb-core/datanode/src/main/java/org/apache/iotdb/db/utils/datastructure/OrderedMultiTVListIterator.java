@@ -38,8 +38,8 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
   @Override
   protected void prepareNext() {
     hasNext = false;
-    while (!hasNext && iteratorIndex < tvListIterators.size()) {
-      TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
+    while (!hasNext && iteratorIndex < tvListIterators.length) {
+      TVList.TVListIterator iterator = tvListIterators[iteratorIndex];
       if (!iterator.hasNextTimeValuePair()) {
         iteratorIndex++;
         continue;
@@ -53,7 +53,7 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
 
   @Override
   protected void next() {
-    tvListIterators.get(iteratorIndex).next();
+    tvListIterators[iteratorIndex].next();
     probeNext = false;
   }
 }

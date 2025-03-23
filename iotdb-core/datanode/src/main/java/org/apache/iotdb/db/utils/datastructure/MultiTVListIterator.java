@@ -43,7 +43,7 @@ import static org.apache.iotdb.db.utils.MemUtils.getBinarySize;
 
 public abstract class MultiTVListIterator implements MemPointIterator {
   protected TSDataType tsDataType;
-  protected List<TVList.TVListIterator> tvListIterators;
+  protected TVList.TVListIterator[] tvListIterators;
   protected List<TsBlock> tsBlocks;
   protected int floatPrecision;
   protected TSEncoding encoding;
@@ -68,9 +68,9 @@ public abstract class MultiTVListIterator implements MemPointIterator {
       Integer floatPrecision,
       TSEncoding encoding) {
     this.tsDataType = tsDataType;
-    this.tvListIterators = new ArrayList<>(tvLists.size());
-    for (TVList tvList : tvLists) {
-      tvListIterators.add(tvList.iterator(deletionList, null, null));
+    this.tvListIterators = new TVList.TVListIterator[tvLists.size()];
+    for (int i = 0; i < tvListIterators.length; i++) {
+      tvListIterators[i] = tvLists.get(i).iterator(deletionList, null, null);
     }
     this.floatPrecision = floatPrecision != null ? floatPrecision : 0;
     this.encoding = encoding;
@@ -90,9 +90,10 @@ public abstract class MultiTVListIterator implements MemPointIterator {
     if (!hasNextTimeValuePair()) {
       return null;
     }
-    TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
     TimeValuePair currentTvPair =
-        iterator.getTVList().getTimeValuePair(rowIndex, currentTime, floatPrecision, encoding);
+        tvListIterators[iteratorIndex]
+            .getTVList()
+            .getTimeValuePair(rowIndex, currentTime, floatPrecision, encoding);
     next();
     return currentTvPair;
   }
@@ -102,8 +103,9 @@ public abstract class MultiTVListIterator implements MemPointIterator {
     if (!hasNextTimeValuePair()) {
       return null;
     }
-    TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
-    return iterator.getTVList().getTimeValuePair(rowIndex, currentTime, floatPrecision, encoding);
+    return tvListIterators[iteratorIndex]
+        .getTVList()
+        .getTimeValuePair(rowIndex, currentTime, floatPrecision, encoding);
   }
 
   @Override
@@ -115,7 +117,7 @@ public abstract class MultiTVListIterator implements MemPointIterator {
   public TsBlock nextBatch() {
     TsBlockBuilder builder = new TsBlockBuilder(Collections.singletonList(tsDataType));
     while (hasNextTimeValuePair() && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE) {
-      TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
+      TVList.TVListIterator iterator = tvListIterators[iteratorIndex];
       builder.getTimeColumnBuilder().writeLong(currentTime);
       switch (tsDataType) {
         case BOOLEAN:
@@ -168,7 +170,7 @@ public abstract class MultiTVListIterator implements MemPointIterator {
     ChunkWriterImpl chunkWriterImpl = (ChunkWriterImpl) chunkWriter;
     while (hasNextTimeValuePair()) {
       // remember current iterator and row index
-      TVList.TVListIterator currIterator = tvListIterators.get(iteratorIndex);
+      TVList.TVListIterator currIterator = tvListIterators[iteratorIndex];
       int currRowIndex = rowIndex;
 
       // check if it is last point
