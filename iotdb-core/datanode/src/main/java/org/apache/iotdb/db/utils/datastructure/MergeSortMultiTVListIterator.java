@@ -59,13 +59,15 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
 
     if (!minHeap.isEmpty()) {
       Pair<Long, Integer> top = minHeap.poll();
+      currentTime = top.left;
+      probeIterators.add(top.right);
+
       iteratorIndex = top.right;
-      probeIterators.add(iteratorIndex);
       rowIndex = tvListIterators.get(iteratorIndex).getIndex();
       hasNext = true;
 
       // duplicated timestamps
-      while (!minHeap.isEmpty() && minHeap.peek().left.longValue() == top.left.longValue()) {
+      while (!minHeap.isEmpty() && minHeap.peek().left == currentTime) {
         Pair<Long, Integer> element = minHeap.poll();
         probeIterators.add(element.right);
       }

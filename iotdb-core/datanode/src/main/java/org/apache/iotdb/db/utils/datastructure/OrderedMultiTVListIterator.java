@@ -45,6 +45,7 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
     TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
     if (iterator.hasNextTimeValuePair()) {
       rowIndex = iterator.getIndex();
+      currentTime = iterator.currentTime();
       hasNext = true;
     }
     probeNext = true;
