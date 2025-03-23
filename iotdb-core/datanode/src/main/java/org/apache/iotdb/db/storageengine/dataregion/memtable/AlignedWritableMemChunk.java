@@ -64,6 +64,7 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
   private final List<IMeasurementSchema> schemaList;
   private AlignedTVList list;
   private List<AlignedTVList> sortedList;
+  private long sortedRowCount = 0;
   private final boolean ignoreAllNullRows;
 
   private static final IoTDBConfig CONFIG = IoTDBDescriptor.getInstance().getConfig();
@@ -196,6 +197,7 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
       list.sort();
     }
     sortedList.add(list);
+    this.sortedRowCount += list.rowCount();
     this.list = AlignedTVList.newAlignedList(new ArrayList<>(dataTypes));
   }
 
@@ -350,15 +352,11 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
 
   @Override
   public long rowCount() {
-    return alignedListSize();
+    return sortedRowCount + list.rowCount();
   }
 
   public int alignedListSize() {
-    int rowCount = list.rowCount();
-    for (AlignedTVList alignedTvList : sortedList) {
-      rowCount += alignedTvList.rowCount();
-    }
-    return rowCount;
+    return (int) rowCount();
   }
 
   @Override
