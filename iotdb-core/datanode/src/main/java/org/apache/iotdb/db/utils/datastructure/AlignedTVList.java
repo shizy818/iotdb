@@ -1774,10 +1774,10 @@ public abstract class AlignedTVList extends TVList {
                 || (isTimeDeleted(nextRowIndex)))) {
           nextRowIndex++;
         }
-        long timestamp = getTime(index);
-        if ((nextRowIndex == rows || timestamp != getTime(nextRowIndex))
-            && !isPointDeleted(timestamp, timeColumnDeletion, deleteCursor)) {
-          timeBuilder.writeLong(getTime(index));
+        long time = getTime(index);
+        if ((nextRowIndex == rows || time != getTime(nextRowIndex))
+            && !isPointDeleted(time, timeColumnDeletion, deleteCursor)) {
+          timeBuilder.writeLong(time);
           validRowCount++;
         } else {
           if (Objects.isNull(timeInvalidInfo)) {

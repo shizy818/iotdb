@@ -734,10 +734,11 @@ public abstract class TVList implements WALEntryValue {
       switch (dataType) {
         case BOOLEAN:
           while (index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE) {
+            long time = getTime(index);
             if (!isNullValue(getValueIndex(index))
-                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
-                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
-              builder.getTimeColumnBuilder().writeLong(getTime(index));
+                && !isPointDeleted(time, deletionList, deleteCursor)
+                && (index == rows - 1 || time != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(time);
               builder.getColumnBuilder(0).writeBoolean(getBoolean(index));
               builder.declarePosition();
             }
@@ -747,10 +748,11 @@ public abstract class TVList implements WALEntryValue {
         case INT32:
         case DATE:
           while (index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE) {
+            long time = getTime(index);
             if (!isNullValue(getValueIndex(index))
-                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
-                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
-              builder.getTimeColumnBuilder().writeLong(getTime(index));
+                && !isPointDeleted(time, deletionList, deleteCursor)
+                && (index == rows - 1 || time != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(time);
               builder.getColumnBuilder(0).writeInt(getInt(index));
               builder.declarePosition();
             }
@@ -760,10 +762,11 @@ public abstract class TVList implements WALEntryValue {
         case INT64:
         case TIMESTAMP:
           while (index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE) {
+            long time = getTime(index);
             if (!isNullValue(getValueIndex(index))
-                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
-                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
-              builder.getTimeColumnBuilder().writeLong(getTime(index));
+                && !isPointDeleted(time, deletionList, deleteCursor)
+                && (index == rows - 1 || time != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(time);
               builder.getColumnBuilder(0).writeLong(getLong(index));
               builder.declarePosition();
             }
@@ -772,10 +775,11 @@ public abstract class TVList implements WALEntryValue {
           break;
         case FLOAT:
           while (index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE) {
+            long time = getTime(index);
             if (!isNullValue(getValueIndex(index))
-                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
-                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
-              builder.getTimeColumnBuilder().writeLong(getTime(index));
+                && !isPointDeleted(time, deletionList, deleteCursor)
+                && (index == rows - 1 || time != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(time);
               builder
                   .getColumnBuilder(0)
                   .writeFloat(
@@ -787,10 +791,11 @@ public abstract class TVList implements WALEntryValue {
           break;
         case DOUBLE:
           while (index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE) {
+            long time = getTime(index);
             if (!isNullValue(getValueIndex(index))
-                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
-                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
-              builder.getTimeColumnBuilder().writeLong(getTime(index));
+                && !isPointDeleted(time, deletionList, deleteCursor)
+                && (index == rows - 1 || time != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(time);
               builder
                   .getColumnBuilder(0)
                   .writeDouble(
@@ -804,10 +809,11 @@ public abstract class TVList implements WALEntryValue {
         case BLOB:
         case STRING:
           while (index < rows && builder.getPositionCount() < MAX_NUMBER_OF_POINTS_IN_PAGE) {
+            long time = getTime(index);
             if (!isNullValue(getValueIndex(index))
-                && !isPointDeleted(getTime(index), deletionList, deleteCursor)
-                && (index == rows - 1 || getTime(index) != getTime(index + 1))) {
-              builder.getTimeColumnBuilder().writeLong(getTime(index));
+                && !isPointDeleted(time, deletionList, deleteCursor)
+                && (index == rows - 1 || time != getTime(index + 1))) {
+              builder.getTimeColumnBuilder().writeLong(time);
               builder.getColumnBuilder(0).writeBinary(getBinary(index));
               builder.declarePosition();
             }
