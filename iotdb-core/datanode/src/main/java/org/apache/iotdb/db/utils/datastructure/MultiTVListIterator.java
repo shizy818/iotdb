@@ -19,9 +19,6 @@
 
 package org.apache.iotdb.db.utils.datastructure;
 
-import org.apache.iotdb.db.conf.IoTDBConfig;
-import org.apache.iotdb.db.conf.IoTDBDescriptor;
-
 import org.apache.tsfile.common.conf.TSFileDescriptor;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
@@ -29,17 +26,12 @@ import org.apache.tsfile.read.TimeValuePair;
 import org.apache.tsfile.read.common.TimeRange;
 import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.read.common.block.TsBlockBuilder;
-import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
-import org.apache.tsfile.write.chunk.ChunkWriterImpl;
-import org.apache.tsfile.write.chunk.IChunkWriter;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import static org.apache.iotdb.db.utils.MemUtils.getBinarySize;
 
 public abstract class MultiTVListIterator implements MemPointIterator {
   protected TSDataType tsDataType;
@@ -56,10 +48,6 @@ public abstract class MultiTVListIterator implements MemPointIterator {
 
   protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
       TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
-
-  private static final IoTDBConfig CONFIG = IoTDBDescriptor.getInstance().getConfig();
-  private final long TARGET_CHUNK_SIZE = CONFIG.getTargetChunkSize();
-  private final long MAX_NUMBER_OF_POINTS_IN_CHUNK = CONFIG.getTargetChunkPointNum();
 
   protected MultiTVListIterator(
       TSDataType tsDataType,
@@ -161,71 +149,6 @@ public abstract class MultiTVListIterator implements MemPointIterator {
     TsBlock tsBlock = builder.build();
     tsBlocks.add(tsBlock);
     return tsBlock;
-  }
-
-  @Override
-  public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
-    ChunkWriterImpl chunkWriterImpl = (ChunkWriterImpl) chunkWriter;
-    while (hasNextTimeValuePair()) {
-      // remember current iterator and row index
-      TVList.TVListIterator currIterator = tvListIterators.get(iteratorIndex);
-      int currRowIndex = rowIndex;
-
-      // check if it is last point
-      next();
-      if (!hasNextTimeValuePair()) {
-        chunkWriterImpl.setLastPoint(true);
-      }
-
-      switch (tsDataType) {
-        case BOOLEAN:
-          chunkWriterImpl.write(currentTime, currIterator.getTVList().getBoolean(currRowIndex));
-          encodeInfo.dataSizeInChunk += 8L + 1L;
-          break;
-        case INT32:
-        case DATE:
-          chunkWriterImpl.write(currentTime, currIterator.getTVList().getInt(currRowIndex));
-          encodeInfo.dataSizeInChunk += 8L + 4L;
-          break;
-        case INT64:
-        case TIMESTAMP:
-          chunkWriterImpl.write(currentTime, currIterator.getTVList().getLong(currRowIndex));
-          encodeInfo.dataSizeInChunk += 8L + 8L;
-          break;
-        case FLOAT:
-          TVList floatTvList = currIterator.getTVList();
-          chunkWriterImpl.write(
-              currentTime,
-              floatTvList.roundValueWithGivenPrecision(
-                  floatTvList.getFloat(currRowIndex), floatPrecision, encoding));
-          encodeInfo.dataSizeInChunk += 8L + 4L;
-          break;
-        case DOUBLE:
-          TVList doubleTvList = currIterator.getTVList();
-          chunkWriterImpl.write(
-              currentTime,
-              doubleTvList.roundValueWithGivenPrecision(
-                  doubleTvList.getDouble(currRowIndex), floatPrecision, encoding));
-          encodeInfo.dataSizeInChunk += 8L + 8L;
-          break;
-        case TEXT:
-        case BLOB:
-        case STRING:
-          Binary value = currIterator.getTVList().getBinary(currRowIndex);
-          chunkWriterImpl.write(currentTime, value);
-          encodeInfo.dataSizeInChunk += 8L + getBinarySize(value);
-          break;
-        default:
-          throw new UnSupportedDataTypeException(
-              String.format("Data type %s is not supported.", tsDataType));
-      }
-      encodeInfo.pointNumInChunk++;
-
-      if (encodeInfo.pointNumInChunk >= MAX_NUMBER_OF_POINTS_IN_CHUNK
-          || encodeInfo.dataSizeInChunk >= TARGET_CHUNK_SIZE) {
-        break;
-      }
-    }
   }
 
   @Override

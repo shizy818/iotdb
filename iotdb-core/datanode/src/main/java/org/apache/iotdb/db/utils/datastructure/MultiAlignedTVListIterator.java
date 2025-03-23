@@ -270,22 +270,16 @@ public abstract class MultiAlignedTVListIterator implements MemPointIterator {
                 false);
             break;
           case FLOAT:
-            float valueF = alignedTVList.getFloatByValueIndex(valueIndex, validColumnIndex);
-            if (encodingList != null) {
-              valueF =
-                  alignedTVList.roundValueWithGivenPrecision(
-                      valueF, floatPrecision, encodingList.get(columnIndex));
-            }
-            valueChunkWriter.write(currentTime, valueF, false);
+            valueChunkWriter.write(
+                currentTime,
+                alignedTVList.getFloatByValueIndex(valueIndex, validColumnIndex),
+                false);
             break;
           case DOUBLE:
-            double valueD = alignedTVList.getDoubleByValueIndex(valueIndex, validColumnIndex);
-            if (encodingList != null) {
-              valueD =
-                  alignedTVList.roundValueWithGivenPrecision(
-                      valueD, floatPrecision, encodingList.get(columnIndex));
-            }
-            valueChunkWriter.write(currentTime, valueD, false);
+            valueChunkWriter.write(
+                currentTime,
+                alignedTVList.getDoubleByValueIndex(valueIndex, validColumnIndex),
+                false);
             break;
           case TEXT:
           case BLOB:

@@ -22,6 +22,7 @@ package org.apache.iotdb.db.utils.datastructure;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.tsfile.read.common.TimeRange;
+import org.apache.tsfile.write.chunk.IChunkWriter;
 
 import java.util.List;
 
@@ -54,6 +55,24 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
   @Override
   protected void next() {
     tvListIterators.get(iteratorIndex).next();
+    probeNext = false;
+  }
+
+  @Override
+  public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
+    boolean encoded = false;
+    while (!encoded && iteratorIndex < tvListIterators.size()) {
+      TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
+      if (!iterator.hasNextTimeValuePair()) {
+        iteratorIndex++;
+        continue;
+      }
+      if (iteratorIndex == tvListIterators.size() - 1) {
+        encodeInfo.lastBatch = true;
+      }
+      iterator.batchEncode(chunkWriter, encodeInfo, times);
+      encoded = true;
+    }
     probeNext = false;
   }
 }

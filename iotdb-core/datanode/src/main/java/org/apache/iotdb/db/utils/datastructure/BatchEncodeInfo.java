@@ -24,16 +24,19 @@ public class BatchEncodeInfo {
   public int pointNumInPage;
   public int pointNumInChunk;
   public long dataSizeInChunk;
+  public boolean lastBatch;
 
   public BatchEncodeInfo(int pointNumInPage, int pointNumInChunk, long dataSizeInChunk) {
     this.pointNumInPage = pointNumInPage;
     this.pointNumInChunk = pointNumInChunk;
     this.dataSizeInChunk = dataSizeInChunk;
+    this.lastBatch = false;
   }
 
   public void reset() {
     this.pointNumInPage = 0;
     this.pointNumInChunk = 0;
     this.dataSizeInChunk = 0;
+    this.lastBatch = false;
   }
 }

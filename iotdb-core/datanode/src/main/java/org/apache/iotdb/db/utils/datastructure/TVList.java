@@ -21,6 +21,7 @@ package org.apache.iotdb.db.utils.datastructure;
 
 import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.commons.utils.TestOnly;
+import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.WALEntryValue;
 import org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager;
@@ -36,6 +37,8 @@ import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
+import org.apache.tsfile.write.UnSupportedDataTypeException;
+import org.apache.tsfile.write.chunk.ChunkWriterImpl;
 import org.apache.tsfile.write.chunk.IChunkWriter;
 
 import java.io.DataInputStream;
@@ -50,6 +53,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.iotdb.db.storageengine.rescon.memory.PrimitiveArrayManager.ARRAY_SIZE;
+import static org.apache.iotdb.db.utils.MemUtils.getBinarySize;
 import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_ARRAY_HEADER;
 import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_OBJECT_REF;
@@ -661,6 +665,10 @@ public abstract class TVList implements WALEntryValue {
 
     private final int MAX_NUMBER_OF_POINTS_IN_PAGE =
         TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
+    private final long TARGET_CHUNK_SIZE =
+        IoTDBDescriptor.getInstance().getConfig().getTargetChunkSize();
+    private final long MAX_NUMBER_OF_POINTS_IN_CHUNK =
+        IoTDBDescriptor.getInstance().getConfig().getTargetChunkPointNum();
 
     public TVListIterator(
         List<TimeRange> deletionList, Integer floatPrecision, TSEncoding encoding) {
@@ -820,6 +828,9 @@ public abstract class TVList implements WALEntryValue {
             index++;
           }
           break;
+        default:
+          throw new UnSupportedDataTypeException(
+              String.format("Data type %s is not supported.", dataType));
       }
       TsBlock tsBlock = builder.build();
       tsBlocks.add(tsBlock);
@@ -828,7 +839,63 @@ public abstract class TVList implements WALEntryValue {
 
     @Override
     public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
-      throw new UnsupportedOperationException("TVList Iterator does not support batch encode");
+      TSDataType dataType = getDataType();
+      ChunkWriterImpl chunkWriterImpl = (ChunkWriterImpl) chunkWriter;
+      for (; index < rows; index++) {
+        if (isNullValue(getValueIndex(index))) {
+          continue;
+        }
+        long time = getTime(index);
+        while (index + 1 < rows && time == getTime(index + 1)) {
+          index++;
+        }
+        // store last point for SDT
+        if (encodeInfo.lastBatch && index + 1 == rows) {
+          chunkWriterImpl.setLastPoint(true);
+        }
+
+        switch (dataType) {
+          case BOOLEAN:
+            chunkWriterImpl.write(time, getBoolean(index));
+            encodeInfo.dataSizeInChunk += 8L + 1L;
+            break;
+          case INT32:
+          case DATE:
+            chunkWriterImpl.write(time, getInt(index));
+            encodeInfo.dataSizeInChunk += 8L + 4L;
+            break;
+          case INT64:
+          case TIMESTAMP:
+            chunkWriterImpl.write(time, getLong(index));
+            encodeInfo.dataSizeInChunk += 8L + 8L;
+            break;
+          case FLOAT:
+            chunkWriterImpl.write(time, getFloat(index));
+            encodeInfo.dataSizeInChunk += 8L + 4L;
+            break;
+          case DOUBLE:
+            chunkWriterImpl.write(time, getDouble(index));
+            encodeInfo.dataSizeInChunk += 8L + 8L;
+            break;
+          case TEXT:
+          case BLOB:
+          case STRING:
+            Binary value = getBinary(index);
+            chunkWriterImpl.write(time, value);
+            encodeInfo.dataSizeInChunk += 8L + getBinarySize(value);
+            break;
+          default:
+            throw new UnSupportedDataTypeException(
+                String.format("Data type %s is not supported.", dataType));
+        }
+        encodeInfo.pointNumInChunk++;
+
+        if (encodeInfo.pointNumInChunk >= MAX_NUMBER_OF_POINTS_IN_CHUNK
+            || encodeInfo.dataSizeInChunk >= TARGET_CHUNK_SIZE) {
+          next();
+          break;
+        }
+      }
     }
 
     @Override
