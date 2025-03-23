@@ -635,7 +635,7 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
 
   @Override
   public synchronized void encode(BlockingQueue<Object> ioTaskQueue) {
-    if (TVLIST_SORT_THRESHOLD == 0) {
+    if (sortedList.isEmpty()) {
       encodeWorkingAlignedTVList(ioTaskQueue);
       return;
     }
