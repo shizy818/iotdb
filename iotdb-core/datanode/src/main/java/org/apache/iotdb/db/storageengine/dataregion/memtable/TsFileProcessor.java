@@ -652,17 +652,16 @@ public class TsFileProcessor {
       if (dataTypes[i] == null || measurements[i] == null) {
         continue;
       }
-      if (workMemTable.chunkNotExist(deviceId, measurements[i])) {
+      IWritableMemChunk memChunk = workMemTable.getWritableMemChunk(deviceId, measurements[i]);
+      if (memChunk == null) {
         // ChunkMetadataIncrement
         chunkMetadataIncrement += ChunkMetadata.calculateRamSize(measurements[i], dataTypes[i]);
         memTableIncrement += TVList.tvListArrayMemCost(dataTypes[i]);
       } else {
         // here currentChunkPointNum >= 1
-        IWritableMemChunk memChunk = workMemTable.getWritableMemChunk(deviceId, measurements[i]);
-        long currentChunkPointNum = memChunk != null ? memChunk.rowCount() : 0;
+        long currentChunkPointNum = memChunk.rowCount();
         if (currentChunkPointNum % PrimitiveArrayManager.ARRAY_SIZE == 0) {
-          memTableIncrement +=
-              memChunk != null ? memChunk.getWorkingTVList().tvListArrayMemCost() : 0;
+          memTableIncrement += memChunk.getWorkingTVList().tvListArrayMemCost();
         }
       }
       // TEXT data mem size
@@ -693,7 +692,8 @@ public class TsFileProcessor {
         if (dataTypes[i] == null || measurements[i] == null) {
           continue;
         }
-        if (workMemTable.chunkNotExist(deviceId, measurements[i])
+        IWritableMemChunk memChunk = workMemTable.getWritableMemChunk(deviceId, measurements[i]);
+        if (memChunk == null
             && (!increasingMemTableInfo.containsKey(deviceId)
                 || !increasingMemTableInfo.get(deviceId).containsKey(measurements[i]))) {
           // ChunkMetadataIncrement
@@ -704,7 +704,6 @@ public class TsFileProcessor {
               .putIfAbsent(measurements[i], 1);
         } else {
           // here currentChunkPointNum >= 1
-          IWritableMemChunk memChunk = workMemTable.getWritableMemChunk(deviceId, measurements[i]);
           int addingPointNum =
               increasingMemTableInfo
                   .computeIfAbsent(deviceId, k -> new HashMap<>())
@@ -969,21 +968,19 @@ public class TsFileProcessor {
       Object column) {
     // memIncrements = [memTable, text, chunk metadata] respectively
 
-    if (workMemTable.chunkNotExist(deviceId, measurement)) {
+    IWritableMemChunk memChunk = workMemTable.getWritableMemChunk(deviceId, measurement);
+    if (memChunk == null) {
       // ChunkMetadataIncrement
       memIncrements[2] += ChunkMetadata.calculateRamSize(measurement, dataType);
       memIncrements[0] +=
           ((end - start) / PrimitiveArrayManager.ARRAY_SIZE + 1)
               * TVList.tvListArrayMemCost(dataType);
     } else {
-      IWritableMemChunk memChunk = workMemTable.getWritableMemChunk(deviceId, measurement);
-      long currentChunkPointNum = memChunk != null ? memChunk.rowCount() : 0;
+      long currentChunkPointNum = memChunk.rowCount();
       if (currentChunkPointNum % PrimitiveArrayManager.ARRAY_SIZE == 0) {
         memIncrements[0] +=
             ((end - start) / PrimitiveArrayManager.ARRAY_SIZE + 1)
-                * (memChunk != null
-                    ? memChunk.getWorkingTVList().tvListArrayMemCost()
-                    : TVList.tvListArrayMemCost(dataType));
+                * memChunk.getWorkingTVList().tvListArrayMemCost();
       } else {
         long acquireArray =
             (end - start - 1 + (currentChunkPointNum % PrimitiveArrayManager.ARRAY_SIZE))
