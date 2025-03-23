@@ -65,7 +65,7 @@ public class OrderedMultiAlignedTVListIterator extends MultiAlignedTVListIterato
   protected void prepareNext() {
     hasNext = false;
 
-    while (iteratorIndex < alignedTvListIterators.size() && !hasNext) {
+    while (!hasNext && iteratorIndex < alignedTvListIterators.size()) {
       AlignedTVList.AlignedTVListIterator iterator = alignedTvListIterators.get(iteratorIndex);
       if (!iterator.hasNextTimeValuePair()) {
         iteratorIndex++;

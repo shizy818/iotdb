@@ -38,12 +38,12 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
   @Override
   protected void prepareNext() {
     hasNext = false;
-    while (iteratorIndex < tvListIterators.size() - 1
-        && !tvListIterators.get(iteratorIndex).hasNextTimeValuePair()) {
-      iteratorIndex++;
-    }
-    TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
-    if (iterator.hasNextTimeValuePair()) {
+    while (!hasNext && iteratorIndex < tvListIterators.size()) {
+      TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
+      if (!iterator.hasNextTimeValuePair()) {
+        iteratorIndex++;
+        continue;
+      }
       rowIndex = iterator.getIndex();
       currentTime = iterator.currentTime();
       hasNext = true;
