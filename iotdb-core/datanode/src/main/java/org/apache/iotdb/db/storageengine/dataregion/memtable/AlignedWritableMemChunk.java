@@ -25,6 +25,7 @@ import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
 import org.apache.iotdb.db.storageengine.dataregion.wal.utils.WALWriteUtils;
 import org.apache.iotdb.db.utils.datastructure.AlignedTVList;
+import org.apache.iotdb.db.utils.datastructure.BatchEncodeInfo;
 import org.apache.iotdb.db.utils.datastructure.MemPointIterator;
 import org.apache.iotdb.db.utils.datastructure.MemPointIteratorFactory;
 import org.apache.iotdb.db.utils.datastructure.TVList;
@@ -32,14 +33,12 @@ import org.apache.iotdb.db.utils.datastructure.TVList;
 import org.apache.tsfile.common.conf.TSFileDescriptor;
 import org.apache.tsfile.enums.TSDataType;
 import org.apache.tsfile.read.common.TimeRange;
-import org.apache.tsfile.read.common.block.TsBlock;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 import org.apache.tsfile.write.chunk.AlignedChunkWriterImpl;
 import org.apache.tsfile.write.chunk.IChunkWriter;
-import org.apache.tsfile.write.chunk.ValueChunkWriter;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
 import org.apache.tsfile.write.schema.MeasurementSchema;
 
@@ -644,92 +643,34 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
     }
 
     AlignedChunkWriterImpl alignedChunkWriter = new AlignedChunkWriterImpl(schemaList);
+    BatchEncodeInfo encodeInfo = new BatchEncodeInfo(0, 0, 0);
+    long[] times = new long[MAX_NUMBER_OF_POINTS_IN_PAGE];
+
     // create MergeSortAlignedTVListIterator.
     List<AlignedTVList> alignedTvLists = new ArrayList<>(sortedList);
     alignedTvLists.add(list);
     MemPointIterator timeValuePairIterator =
         MemPointIteratorFactory.create(dataTypes, null, alignedTvLists, ignoreAllNullRows);
 
-    int pointNumInPage = 0;
-    int pointNumInChunk = 0;
-    long[] times = new long[MAX_NUMBER_OF_POINTS_IN_PAGE];
-
     while (timeValuePairIterator.hasNextBatch()) {
-      TsBlock tsBlock = timeValuePairIterator.nextBatch();
-      if (tsBlock == null) {
-        continue;
-      }
-      for (int rowIndex = 0; rowIndex < tsBlock.getPositionCount(); rowIndex++) {
-        long time = tsBlock.getTimeByIndex(rowIndex);
-        times[pointNumInPage] = time;
-
-        for (int columnIndex = 0; columnIndex < dataTypes.size(); columnIndex++) {
-          ValueChunkWriter valueChunkWriter =
-              alignedChunkWriter.getValueChunkWriterByIndex(columnIndex);
-          if (tsBlock.getColumn(columnIndex).isNull(rowIndex)) {
-            valueChunkWriter.write(time, null, true);
-            continue;
-          }
-          switch (schemaList.get(columnIndex).getType()) {
-            case BOOLEAN:
-              valueChunkWriter.write(
-                  time, tsBlock.getColumn(columnIndex).getBoolean(rowIndex), false);
-              break;
-            case INT32:
-            case DATE:
-              valueChunkWriter.write(time, tsBlock.getColumn(columnIndex).getInt(rowIndex), false);
-              break;
-            case INT64:
-            case TIMESTAMP:
-              valueChunkWriter.write(time, tsBlock.getColumn(columnIndex).getLong(rowIndex), false);
-              break;
-            case FLOAT:
-              valueChunkWriter.write(
-                  time, tsBlock.getColumn(columnIndex).getFloat(rowIndex), false);
-              break;
-            case DOUBLE:
-              valueChunkWriter.write(
-                  time, tsBlock.getColumn(columnIndex).getDouble(rowIndex), false);
-              break;
-            case TEXT:
-            case BLOB:
-            case STRING:
-              valueChunkWriter.write(
-                  time, tsBlock.getColumn(columnIndex).getBinary(rowIndex), false);
-              break;
-            default:
-              break;
-          }
+      timeValuePairIterator.batchEncode(alignedChunkWriter, encodeInfo, times);
+      if (encodeInfo.pointNumInChunk >= maxNumberOfPointsInChunk) {
+        alignedChunkWriter.sealCurrentPage();
+        alignedChunkWriter.clearPageWriter();
+        try {
+          ioTaskQueue.put(alignedChunkWriter);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
         }
-        pointNumInPage++;
-        pointNumInChunk++;
-
-        // new page
-        if (pointNumInPage == MAX_NUMBER_OF_POINTS_IN_PAGE
-            || pointNumInChunk >= maxNumberOfPointsInChunk) {
-          alignedChunkWriter.write(times, pointNumInPage, 0);
-          pointNumInPage = 0;
-        }
-
-        // new chunk
-        if (pointNumInChunk >= maxNumberOfPointsInChunk) {
-          alignedChunkWriter.sealCurrentPage();
-          alignedChunkWriter.clearPageWriter();
-          try {
-            ioTaskQueue.put(alignedChunkWriter);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
-          alignedChunkWriter = new AlignedChunkWriterImpl(schemaList);
-          pointNumInChunk = 0;
-        }
+        alignedChunkWriter = new AlignedChunkWriterImpl(schemaList);
+        encodeInfo.reset();
       }
     }
 
     // last batch of points
-    if (pointNumInChunk > 0) {
-      if (pointNumInPage > 0) {
-        alignedChunkWriter.write(times, pointNumInPage, 0);
+    if (encodeInfo.pointNumInChunk > 0) {
+      if (encodeInfo.pointNumInPage > 0) {
+        alignedChunkWriter.write(times, encodeInfo.pointNumInPage, 0);
         alignedChunkWriter.sealCurrentPage();
         alignedChunkWriter.clearPageWriter();
       }

@@ -44,6 +44,7 @@ import org.apache.tsfile.utils.ReadWriteForEncodingUtils;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
 import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
+import org.apache.tsfile.write.chunk.IChunkWriter;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -1935,6 +1936,12 @@ public abstract class AlignedTVList extends TVList {
         }
       }
       return builder.build();
+    }
+
+    @Override
+    public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
+      throw new UnsupportedOperationException(
+          "AlignedTVList Iterator does not support batch encode");
     }
 
     public int[] getSelectedIndices() {

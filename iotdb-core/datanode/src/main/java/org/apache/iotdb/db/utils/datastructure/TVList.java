@@ -36,6 +36,7 @@ import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BitMap;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
+import org.apache.tsfile.write.chunk.IChunkWriter;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -817,6 +818,11 @@ public abstract class TVList implements WALEntryValue {
       TsBlock tsBlock = builder.build();
       tsBlocks.add(tsBlock);
       return tsBlock;
+    }
+
+    @Override
+    public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
+      throw new UnsupportedOperationException("TVList Iterator does not support batch encode");
     }
 
     @Override
