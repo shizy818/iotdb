@@ -54,13 +54,14 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
+import java.util.stream.Collectors;
 
 import static org.apache.iotdb.db.utils.ModificationUtils.isPointDeleted;
 
 public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
 
   private final Map<String, Integer> measurementIndexMap;
-  private final List<TSDataType> dataTypes;
+  private List<TSDataType> dataTypes;
   private final List<IMeasurementSchema> schemaList;
   private AlignedTVList list;
   private List<AlignedTVList> sortedList;
@@ -255,6 +256,7 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
           this.measurementIndexMap.put(schemaListInInsertPlan.get(i).getMeasurementName(), index);
           this.schemaList.add(schemaListInInsertPlan.get(i));
           this.list.extendColumn(schemaListInInsertPlan.get(i).getType());
+          this.dataTypes = new ArrayList<>(list.getTsDataTypes());
           reorderedColumnValues =
               Arrays.copyOf(reorderedColumnValues, reorderedColumnValues.length + 1);
           if (reorderedBitMaps != null) {
@@ -647,8 +649,12 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
     // create MergeSortAlignedTVListIterator.
     List<AlignedTVList> alignedTvLists = new ArrayList<>(sortedList);
     alignedTvLists.add(list);
+    List<Integer> columnIndexList = buildColumnIndexList(schemaList);
+    List<TSDataType> tsDataTypes =
+        schemaList.stream().map(IMeasurementSchema::getType).collect(Collectors.toList());
     MemPointIterator timeValuePairIterator =
-        MemPointIteratorFactory.create(dataTypes, null, alignedTvLists, ignoreAllNullRows);
+        MemPointIteratorFactory.create(
+            tsDataTypes, columnIndexList, alignedTvLists, ignoreAllNullRows);
 
     while (timeValuePairIterator.hasNextBatch()) {
       timeValuePairIterator.encodeBatch(alignedChunkWriter, encodeInfo, times);

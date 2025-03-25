@@ -102,7 +102,8 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
     while (hasNextTimeValuePair()) {
       // remember current iterator and row index
       TVList.TVListIterator currIterator = tvListIterators.get(iteratorIndex);
-      int currRowIndex = rowIndex;
+      int row = rowIndex;
+      long time = currentTime;
 
       // check if it is last point
       next();
@@ -112,32 +113,32 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
 
       switch (tsDataType) {
         case BOOLEAN:
-          chunkWriterImpl.write(currentTime, currIterator.getTVList().getBoolean(currRowIndex));
+          chunkWriterImpl.write(time, currIterator.getTVList().getBoolean(row));
           encodeInfo.dataSizeInChunk += 8L + 1L;
           break;
         case INT32:
         case DATE:
-          chunkWriterImpl.write(currentTime, currIterator.getTVList().getInt(currRowIndex));
+          chunkWriterImpl.write(time, currIterator.getTVList().getInt(row));
           encodeInfo.dataSizeInChunk += 8L + 4L;
           break;
         case INT64:
         case TIMESTAMP:
-          chunkWriterImpl.write(currentTime, currIterator.getTVList().getLong(currRowIndex));
+          chunkWriterImpl.write(time, currIterator.getTVList().getLong(row));
           encodeInfo.dataSizeInChunk += 8L + 8L;
           break;
         case FLOAT:
-          chunkWriterImpl.write(currentTime, currIterator.getTVList().getFloat(currRowIndex));
+          chunkWriterImpl.write(time, currIterator.getTVList().getFloat(row));
           encodeInfo.dataSizeInChunk += 8L + 4L;
           break;
         case DOUBLE:
-          chunkWriterImpl.write(currentTime, currIterator.getTVList().getDouble(currRowIndex));
+          chunkWriterImpl.write(time, currIterator.getTVList().getDouble(row));
           encodeInfo.dataSizeInChunk += 8L + 8L;
           break;
         case TEXT:
         case BLOB:
         case STRING:
-          Binary value = currIterator.getTVList().getBinary(currRowIndex);
-          chunkWriterImpl.write(currentTime, value);
+          Binary value = currIterator.getTVList().getBinary(row);
+          chunkWriterImpl.write(time, value);
           encodeInfo.dataSizeInChunk += 8L + getBinarySize(value);
           break;
         default:

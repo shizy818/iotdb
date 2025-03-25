@@ -841,8 +841,9 @@ public abstract class TVList implements WALEntryValue {
     public void encodeBatch(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
       TSDataType dataType = getDataType();
       ChunkWriterImpl chunkWriterImpl = (ChunkWriterImpl) chunkWriter;
-      for (; index < rows; index++) {
+      while (index < rows) {
         if (isNullValue(getValueIndex(index))) {
+          index++;
           continue;
         }
         long time = getTime(index);
@@ -850,8 +851,13 @@ public abstract class TVList implements WALEntryValue {
           index++;
         }
         // store last point for SDT
-        if (encodeInfo.lastIterator && index + 1 == rows) {
-          chunkWriterImpl.setLastPoint(true);
+        if (encodeInfo.lastIterator) {
+          while (index < rows && isNullValue(getValueIndex(index))) {
+            index++;
+          }
+          if (index == rows) {
+            chunkWriterImpl.setLastPoint(true);
+          }
         }
 
         switch (dataType) {
@@ -889,10 +895,11 @@ public abstract class TVList implements WALEntryValue {
                 String.format("Data type %s is not supported.", dataType));
         }
         encodeInfo.pointNumInChunk++;
+        index++;
 
         if (encodeInfo.pointNumInChunk >= MAX_NUMBER_OF_POINTS_IN_CHUNK
             || encodeInfo.dataSizeInChunk >= TARGET_CHUNK_SIZE) {
-          next();
+          probeNext = false;
           break;
         }
       }
