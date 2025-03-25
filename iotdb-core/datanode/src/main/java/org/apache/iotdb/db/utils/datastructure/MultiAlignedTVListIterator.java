@@ -19,9 +19,6 @@
 
 package org.apache.iotdb.db.utils.datastructure;
 
-import org.apache.iotdb.db.conf.IoTDBConfig;
-import org.apache.iotdb.db.conf.IoTDBDescriptor;
-
 import org.apache.tsfile.block.column.ColumnBuilder;
 import org.apache.tsfile.common.conf.TSFileDescriptor;
 import org.apache.tsfile.enums.TSDataType;
@@ -33,9 +30,6 @@ import org.apache.tsfile.read.common.block.TsBlockBuilder;
 import org.apache.tsfile.read.common.block.column.TimeColumnBuilder;
 import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
-import org.apache.tsfile.write.chunk.AlignedChunkWriterImpl;
-import org.apache.tsfile.write.chunk.IChunkWriter;
-import org.apache.tsfile.write.chunk.ValueChunkWriter;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -58,8 +52,6 @@ public abstract class MultiAlignedTVListIterator implements MemPointIterator {
 
   protected final int MAX_NUMBER_OF_POINTS_IN_PAGE =
       TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
-  private static final IoTDBConfig CONFIG = IoTDBDescriptor.getInstance().getConfig();
-  private long maxNumberOfPointsInChunk = CONFIG.getTargetChunkPointNum();
 
   protected MultiAlignedTVListIterator(
       List<TSDataType> tsDataTypeList,
@@ -89,13 +81,6 @@ public abstract class MultiAlignedTVListIterator implements MemPointIterator {
     this.encodingList = encodingList;
     this.ignoreAllNullRows = ignoreAllNullRows;
     this.tsBlocks = new ArrayList<>();
-    if (!alignedTvLists.isEmpty()) {
-      int avgPointSizeOfLargestColumn =
-          alignedTvLists.get(alignedTvLists.size() - 1).getAvgPointSizeOfLargestColumn();
-      long TARGET_CHUNK_SIZE = CONFIG.getTargetChunkSize();
-      maxNumberOfPointsInChunk =
-          Math.min(maxNumberOfPointsInChunk, (TARGET_CHUNK_SIZE / avgPointSizeOfLargestColumn));
-    }
   }
 
   @Override
@@ -222,90 +207,6 @@ public abstract class MultiAlignedTVListIterator implements MemPointIterator {
     TsBlock tsBlock = builder.build();
     tsBlocks.add(tsBlock);
     return tsBlock;
-  }
-
-  @Override
-  public void encodeBatch(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
-    AlignedChunkWriterImpl alignedChunkWriterImpl = (AlignedChunkWriterImpl) chunkWriter;
-    while (hasNextTimeValuePair()) {
-      times[encodeInfo.pointNumInPage] = currentTime;
-      for (int columnIndex = 0; columnIndex < tsDataTypeList.size(); columnIndex++) {
-        ValueChunkWriter valueChunkWriter =
-            alignedChunkWriterImpl.getValueChunkWriterByIndex(columnIndex);
-        AlignedTVList alignedTVList =
-            alignedTvListIterators.get(currentIteratorIndex(columnIndex)).getAlignedTVList();
-
-        // sanity check
-        int validColumnIndex =
-            columnIndexList != null ? columnIndexList.get(columnIndex) : columnIndex;
-        if (validColumnIndex < 0 || validColumnIndex >= alignedTVList.dataTypes.size()) {
-          valueChunkWriter.write(currentTime, null, true);
-          continue;
-        }
-        int valueIndex = alignedTVList.getValueIndex(currentRowIndex(columnIndex));
-
-        // null value
-        if (alignedTVList.isNullValue(valueIndex, validColumnIndex)) {
-          valueChunkWriter.write(currentTime, null, true);
-          continue;
-        }
-
-        switch (tsDataTypeList.get(columnIndex)) {
-          case BOOLEAN:
-            valueChunkWriter.write(
-                currentTime,
-                alignedTVList.getBooleanByValueIndex(valueIndex, validColumnIndex),
-                false);
-            break;
-          case INT32:
-          case DATE:
-            valueChunkWriter.write(
-                currentTime, alignedTVList.getIntByValueIndex(valueIndex, validColumnIndex), false);
-            break;
-          case INT64:
-          case TIMESTAMP:
-            valueChunkWriter.write(
-                currentTime,
-                alignedTVList.getLongByValueIndex(valueIndex, validColumnIndex),
-                false);
-            break;
-          case FLOAT:
-            valueChunkWriter.write(
-                currentTime,
-                alignedTVList.getFloatByValueIndex(valueIndex, validColumnIndex),
-                false);
-            break;
-          case DOUBLE:
-            valueChunkWriter.write(
-                currentTime,
-                alignedTVList.getDoubleByValueIndex(valueIndex, validColumnIndex),
-                false);
-            break;
-          case TEXT:
-          case BLOB:
-          case STRING:
-            valueChunkWriter.write(
-                currentTime,
-                alignedTVList.getBinaryByValueIndex(valueIndex, validColumnIndex),
-                false);
-            break;
-          default:
-            throw new UnSupportedDataTypeException(
-                String.format("Data type %s is not supported.", tsDataTypeList.get(columnIndex)));
-        }
-      }
-      next();
-      encodeInfo.pointNumInPage++;
-      encodeInfo.pointNumInChunk++;
-
-      // new page
-      if (encodeInfo.pointNumInPage >= MAX_NUMBER_OF_POINTS_IN_PAGE
-          || encodeInfo.pointNumInChunk >= maxNumberOfPointsInChunk) {
-        alignedChunkWriterImpl.write(times, encodeInfo.pointNumInPage, 0);
-        encodeInfo.pointNumInPage = 0;
-        break;
-      }
-    }
   }
 
   @Override

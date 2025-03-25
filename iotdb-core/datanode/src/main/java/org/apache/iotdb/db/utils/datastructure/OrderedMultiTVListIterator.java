@@ -70,6 +70,7 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
         encodeInfo.lastIterator = true;
       }
       iterator.encodeBatch(chunkWriter, encodeInfo, times);
+      break;
     }
     probeNext = false;
   }

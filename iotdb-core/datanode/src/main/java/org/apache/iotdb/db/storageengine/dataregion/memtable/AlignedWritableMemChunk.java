@@ -637,7 +637,7 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
 
   @Override
   public synchronized void encode(BlockingQueue<Object> ioTaskQueue) {
-    if (sortedList.isEmpty()) {
+    if (TVLIST_SORT_THRESHOLD == 0) {
       encodeWorkingAlignedTVList(ioTaskQueue);
       return;
     }
@@ -658,6 +658,11 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
 
     while (timeValuePairIterator.hasNextBatch()) {
       timeValuePairIterator.encodeBatch(alignedChunkWriter, encodeInfo, times);
+      if (encodeInfo.pointNumInPage >= MAX_NUMBER_OF_POINTS_IN_PAGE) {
+        alignedChunkWriter.write(times, encodeInfo.pointNumInPage, 0);
+        encodeInfo.pointNumInPage = 0;
+      }
+
       if (encodeInfo.pointNumInChunk >= maxNumberOfPointsInChunk) {
         alignedChunkWriter.sealCurrentPage();
         alignedChunkWriter.clearPageWriter();
@@ -675,9 +680,9 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
     if (encodeInfo.pointNumInChunk > 0) {
       if (encodeInfo.pointNumInPage > 0) {
         alignedChunkWriter.write(times, encodeInfo.pointNumInPage, 0);
-        alignedChunkWriter.sealCurrentPage();
-        alignedChunkWriter.clearPageWriter();
       }
+      alignedChunkWriter.sealCurrentPage();
+      alignedChunkWriter.clearPageWriter();
       try {
         ioTaskQueue.put(alignedChunkWriter);
       } catch (InterruptedException e) {
