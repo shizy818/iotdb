@@ -225,7 +225,7 @@ public abstract class MultiAlignedTVListIterator implements MemPointIterator {
   }
 
   @Override
-  public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
+  public void encodeBatch(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
     AlignedChunkWriterImpl alignedChunkWriterImpl = (AlignedChunkWriterImpl) chunkWriter;
     while (hasNextTimeValuePair()) {
       times[encodeInfo.pointNumInPage] = currentTime;

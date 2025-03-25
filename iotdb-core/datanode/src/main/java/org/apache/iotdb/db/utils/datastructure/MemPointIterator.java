@@ -30,5 +30,5 @@ public interface MemPointIterator extends IPointReader {
 
   TsBlock nextBatch();
 
-  void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times);
+  void encodeBatch(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times);
 }

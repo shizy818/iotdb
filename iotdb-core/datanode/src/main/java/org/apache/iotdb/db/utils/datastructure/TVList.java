@@ -838,7 +838,7 @@ public abstract class TVList implements WALEntryValue {
     }
 
     @Override
-    public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
+    public void encodeBatch(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
       TSDataType dataType = getDataType();
       ChunkWriterImpl chunkWriterImpl = (ChunkWriterImpl) chunkWriter;
       for (; index < rows; index++) {
@@ -850,7 +850,7 @@ public abstract class TVList implements WALEntryValue {
           index++;
         }
         // store last point for SDT
-        if (encodeInfo.lastBatch && index + 1 == rows) {
+        if (encodeInfo.lastIterator && index + 1 == rows) {
           chunkWriterImpl.setLastPoint(true);
         }
 

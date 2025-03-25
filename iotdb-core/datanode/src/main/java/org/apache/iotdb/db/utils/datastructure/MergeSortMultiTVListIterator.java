@@ -97,7 +97,7 @@ public class MergeSortMultiTVListIterator extends MultiTVListIterator {
   }
 
   @Override
-  public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
+  public void encodeBatch(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
     ChunkWriterImpl chunkWriterImpl = (ChunkWriterImpl) chunkWriter;
     while (hasNextTimeValuePair()) {
       // remember current iterator and row index

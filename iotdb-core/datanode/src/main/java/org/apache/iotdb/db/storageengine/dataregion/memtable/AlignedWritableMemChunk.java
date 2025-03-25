@@ -651,7 +651,7 @@ public class AlignedWritableMemChunk extends AbstractWritableMemChunk {
         MemPointIteratorFactory.create(dataTypes, null, alignedTvLists, ignoreAllNullRows);
 
     while (timeValuePairIterator.hasNextBatch()) {
-      timeValuePairIterator.batchEncode(alignedChunkWriter, encodeInfo, times);
+      timeValuePairIterator.encodeBatch(alignedChunkWriter, encodeInfo, times);
       if (encodeInfo.pointNumInChunk >= maxNumberOfPointsInChunk) {
         alignedChunkWriter.sealCurrentPage();
         alignedChunkWriter.clearPageWriter();

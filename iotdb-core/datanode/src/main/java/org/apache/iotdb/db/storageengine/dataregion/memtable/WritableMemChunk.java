@@ -455,13 +455,16 @@ public class WritableMemChunk extends AbstractWritableMemChunk {
 
   @Override
   public synchronized void encode(BlockingQueue<Object> ioTaskQueue) {
-    if (sortedList.isEmpty()) {
+    if (TVLIST_SORT_THRESHOLD == 0) {
       encodeWorkingTVList(ioTaskQueue);
       return;
     }
 
     ChunkWriterImpl chunkWriterImpl = createIChunkWriter();
     BatchEncodeInfo encodeInfo = new BatchEncodeInfo(0, 0, 0);
+    if (sortedList.isEmpty()) {
+      encodeInfo.lastIterator = true;
+    }
 
     // create MultiTvListIterator. It need not handle float/double precision here.
     List<TVList> tvLists = new ArrayList<>(sortedList);
@@ -470,7 +473,7 @@ public class WritableMemChunk extends AbstractWritableMemChunk {
         MemPointIteratorFactory.create(schema.getType(), tvLists);
 
     while (timeValuePairIterator.hasNextBatch()) {
-      timeValuePairIterator.batchEncode(chunkWriterImpl, encodeInfo, null);
+      timeValuePairIterator.encodeBatch(chunkWriterImpl, encodeInfo, null);
       if (encodeInfo.pointNumInChunk >= MAX_NUMBER_OF_POINTS_IN_CHUNK
           || encodeInfo.dataSizeInChunk >= TARGET_CHUNK_SIZE) {
         chunkWriterImpl.sealCurrentPage();

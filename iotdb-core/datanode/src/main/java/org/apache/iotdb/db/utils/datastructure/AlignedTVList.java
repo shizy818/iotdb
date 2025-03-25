@@ -1939,7 +1939,7 @@ public abstract class AlignedTVList extends TVList {
     }
 
     @Override
-    public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
+    public void encodeBatch(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
       throw new UnsupportedOperationException(
           "AlignedTVList Iterator does not support batch encode");
     }

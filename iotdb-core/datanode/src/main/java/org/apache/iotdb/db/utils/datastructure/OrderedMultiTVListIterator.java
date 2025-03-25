@@ -59,19 +59,17 @@ public class OrderedMultiTVListIterator extends MultiTVListIterator {
   }
 
   @Override
-  public void batchEncode(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
-    boolean encoded = false;
-    while (!encoded && iteratorIndex < tvListIterators.size()) {
+  public void encodeBatch(IChunkWriter chunkWriter, BatchEncodeInfo encodeInfo, long[] times) {
+    while (iteratorIndex < tvListIterators.size()) {
       TVList.TVListIterator iterator = tvListIterators.get(iteratorIndex);
       if (!iterator.hasNextTimeValuePair()) {
         iteratorIndex++;
         continue;
       }
       if (iteratorIndex == tvListIterators.size() - 1) {
-        encodeInfo.lastBatch = true;
+        encodeInfo.lastIterator = true;
       }
-      iterator.batchEncode(chunkWriter, encodeInfo, times);
-      encoded = true;
+      iterator.encodeBatch(chunkWriter, encodeInfo, times);
     }
     probeNext = false;
   }
