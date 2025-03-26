@@ -58,7 +58,6 @@ public class WritableMemChunk extends AbstractWritableMemChunk {
   private TVList list;
   private List<TVList> sortedList;
   private long sortedRowCount = 0;
-  private long sortedCount = 0;
   private static final String UNSUPPORTED_TYPE = "Unsupported data type:";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(WritableMemChunk.class);
@@ -82,7 +81,6 @@ public class WritableMemChunk extends AbstractWritableMemChunk {
     }
     sortedList.add(list);
     this.sortedRowCount += list.rowCount();
-    this.sortedCount += list.count();
     this.list = TVList.newList(schema.getType());
   }
 
@@ -267,7 +265,11 @@ public class WritableMemChunk extends AbstractWritableMemChunk {
 
   @Override
   public long count() {
-    return sortedCount + list.count();
+    long count = list.count();
+    for (TVList tvList : sortedList) {
+      count += tvList.count();
+    }
+    return count;
   }
 
   @Override
