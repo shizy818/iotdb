@@ -44,6 +44,8 @@ import org.apache.tsfile.utils.ReadWriteForEncodingUtils;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
 import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -62,6 +64,7 @@ import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_ARRAY_HEADER;
 import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_OBJECT_REF;
 
 public abstract class AlignedTVList extends TVList {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AlignedTVList.class);
 
   // Data types of this aligned tvList
   protected List<TSDataType> dataTypes;
@@ -169,9 +172,19 @@ public abstract class AlignedTVList extends TVList {
         }
         if (cloneList.bitMaps.get(i) == null) {
           List<BitMap> cloneColumnBitMaps = new ArrayList<>();
+          boolean hasNull = false;
           for (BitMap bitMap : columnBitMaps) {
+            if (bitMap == null) {
+              hasNull = true;
+            }
             cloneColumnBitMaps.add(bitMap == null ? null : bitMap.clone());
           }
+          LOGGER.info(
+              "AlignedTVList {} Set bitmaps of column index {} when clone - size: {}, hasNull {} ",
+              this,
+              i,
+              columnBitMaps.size(),
+              hasNull);
           cloneList.bitMaps.set(i, cloneColumnBitMaps);
         }
       }
@@ -398,6 +411,11 @@ public abstract class AlignedTVList extends TVList {
       } else {
         bitMap.markAll();
       }
+      LOGGER.info(
+          "AlignedTVList {} initialize bitmap (column index {}, array index {}) when extend",
+          this,
+          this.bitMaps.size(),
+          i);
       columnBitMaps.add(bitMap);
     }
     this.bitMaps.add(columnBitMaps);
@@ -626,9 +644,11 @@ public abstract class AlignedTVList extends TVList {
       bitMaps.set(columnIndex, columnBitMaps);
     }
     for (int i = 0; i < bitMaps.get(columnIndex).size(); i++) {
-      if (bitMaps.get(columnIndex).get(i) == null) {
-        bitMaps.get(columnIndex).set(i, new BitMap(ARRAY_SIZE));
-      }
+      LOGGER.info(
+          "AlignedTVList {} access bitmap (column index {}, array index {}) when deleteColumn",
+          this,
+          columnIndex,
+          i);
       bitMaps.get(columnIndex).get(i).markAll();
     }
   }
@@ -890,6 +910,11 @@ public abstract class AlignedTVList extends TVList {
 
     // if the bitmap in arrayIndex is null, init the bitmap
     if (bitMaps.get(columnIndex).get(arrayIndex) == null) {
+      LOGGER.info(
+          "AlignedTVList {} initialize bitmap (column index {}, array index {}) when markNullValue",
+          this,
+          columnIndex,
+          arrayIndex);
       bitMaps.get(columnIndex).set(arrayIndex, new BitMap(ARRAY_SIZE));
     }
 
