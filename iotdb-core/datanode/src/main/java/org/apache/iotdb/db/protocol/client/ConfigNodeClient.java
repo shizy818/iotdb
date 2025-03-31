@@ -67,6 +67,7 @@ import org.apache.iotdb.confignode.rpc.thrift.TCountTimeSlotListReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCountTimeSlotListResp;
 import org.apache.iotdb.confignode.rpc.thrift.TCreateCQReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCreateConsumerReq;
+import org.apache.iotdb.confignode.rpc.thrift.TCreateFlowReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCreateFunctionReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCreateModelReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCreatePipePluginReq;
@@ -1056,6 +1057,12 @@ public class ConfigNodeClient implements IConfigNodeRPCService.Iface, ThriftClie
   public TSStatus alterLogicalView(TAlterLogicalViewReq req) throws TException {
     return executeRemoteCallWithRetry(
         () -> client.alterLogicalView(req), status -> !updateConfigNodeLeader(status));
+  }
+
+  @Override
+  public TSStatus createFlow(TCreateFlowReq req) throws TException {
+    return executeRemoteCallWithRetry(
+        () -> client.createFlow(req), status -> !updateConfigNodeLeader(status));
   }
 
   @Override

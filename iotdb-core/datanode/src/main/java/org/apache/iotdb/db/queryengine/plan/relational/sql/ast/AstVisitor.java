@@ -553,6 +553,10 @@ public abstract class AstVisitor<R, C> {
     return visitStatement(node, context);
   }
 
+  protected R visitCreateFlow(CreateFlow node, C context) {
+    return visitStatement(node, context);
+  }
+
   protected R visitCreatePipe(CreatePipe node, C context) {
     return visitStatement(node, context);
   }

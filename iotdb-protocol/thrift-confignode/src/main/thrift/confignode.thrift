@@ -773,6 +773,14 @@ struct TShowPipePluginReq {
   1: optional bool isTableModel
 }
 
+// Flow
+
+struct TCreateFlowReq {
+    1: required string flowName
+    2: optional bool ifNotExistsCondition
+    3: optional bool needManuallyStart
+}
+
 // Pipe
 
 struct TShowPipeInfo {
@@ -1785,6 +1793,9 @@ service IConfigNodeRPCService {
   // ======================================================
   // Sync
   // ======================================================
+
+  /** Create Flow */
+  common.TSStatus createFlow(TCreateFlowReq req)
 
   /** Create Pipe */
   common.TSStatus createPipe(TCreatePipeReq req)

@@ -76,6 +76,9 @@ statement
     // Load Statement
     | loadTsFileStatement
 
+    // flow Statement
+    | createFlowStatement
+
     // Pipe Statement
     | createPipeStatement
     | alterPipeStatement
@@ -305,6 +308,13 @@ loadFileWithAttributeClause
     : loadFileWithKey=string EQ loadFileWithValue=string
     ;
 
+
+// -------------------------------------------- Flow Statement ---------------------------------------------------------
+createFlowStatement
+    : CREATE FLOW (IF NOT EXISTS)? flowName=identifier
+      queryNoWith
+      INTO tableName=qualifiedName
+    ;
 
 
 // -------------------------------------------- Pipe Statement ---------------------------------------------------------
@@ -1167,7 +1177,7 @@ nonReserved
     | CACHE | CALL | CALLED | CASCADE | CATALOG | CATALOGS | CHAR | CHARACTER | CHARSET | CLEAR | CLUSTER | CLUSTERID | COLUMN | COLUMNS | COMMENT | COMMIT | COMMITTED | CONDITION | CONDITIONAL | CONFIGNODES | CONFIGNODE | CONFIGURATION | CONNECTOR | CONSTANT | COPARTITION | COUNT | CURRENT
     | DATA | DATABASE | DATABASES | DATANODE | DATANODES | DATASET | DATE | DAY | DECLARE | DEFAULT | DEFINE | DEFINER | DENY | DESC | DESCRIPTOR | DETAILS| DETERMINISTIC | DEVICES | DISTRIBUTED | DO | DOUBLE
     | ELSEIF | EMPTY | ENCODING | ERROR | EXCLUDING | EXPLAIN | EXTRACTOR
-    | FETCH | FIELD | FILTER | FINAL | FIRST | FLUSH | FOLLOWING | FORMAT | FUNCTION | FUNCTIONS
+    | FETCH | FIELD | FILTER | FINAL | FIRST | FLOW | FLOWS | FLUSH | FOLLOWING | FORMAT | FUNCTION | FUNCTIONS
     | GRACE | GRANT | GRANTED | GRANTS | GRAPHVIZ | GROUPS
     | HOUR | HYPERPARAMETERS
     | INDEX | INDEXES | IF | IGNORE | IMMEDIATE | INCLUDING | INITIAL | INPUT | INTERVAL | INVOKER | IO | ITERATE | ISOLATION
@@ -1306,6 +1316,8 @@ FILL_GROUP: 'FILL_GROUP';
 FILTER: 'FILTER';
 FINAL: 'FINAL';
 FIRST: 'FIRST';
+FLOW: 'FLOW';
+FLOWS: 'FLOWS';
 FLUSH: 'FLUSH';
 FOLLOWING: 'FOLLOWING';
 FOR: 'FOR';

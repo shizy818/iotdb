@@ -62,6 +62,7 @@ import org.apache.iotdb.db.queryengine.plan.statement.metadata.ShowClusterStatem
 import org.apache.iotdb.db.queryengine.plan.statement.metadata.ShowDatabaseStatement;
 import org.apache.iotdb.db.queryengine.plan.statement.metadata.ShowRegionStatement;
 import org.apache.iotdb.db.queryengine.plan.statement.metadata.ShowTTLStatement;
+import org.apache.iotdb.db.queryengine.plan.statement.metadata.flow.CreateFlowStatement;
 import org.apache.iotdb.db.queryengine.plan.statement.metadata.model.CreateModelStatement;
 import org.apache.iotdb.db.queryengine.plan.statement.metadata.pipe.AlterPipeStatement;
 import org.apache.iotdb.db.queryengine.plan.statement.metadata.pipe.CreatePipePluginStatement;
@@ -209,6 +210,8 @@ public interface IConfigTaskExecutor {
       String queryId, AlterSchemaTemplateStatement alterSchemaTemplateStatement);
 
   SettableFuture<ConfigTaskResult> dropPipe(DropPipeStatement dropPipeStatement);
+
+  SettableFuture<ConfigTaskResult> createFlow(CreateFlowStatement createFlowStatement);
 
   SettableFuture<ConfigTaskResult> createPipe(CreatePipeStatement createPipeStatement);
 

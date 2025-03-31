@@ -54,6 +54,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ComparisonExpress
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CountDevice;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CountStatement;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateDB;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateFlow;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateFunction;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateIndex;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreatePipe;
@@ -833,6 +834,14 @@ public class AstBuilder extends RelationalSqlBaseVisitor<Node> {
           ((StringLiteral) visit(context.loadFileWithValue)).getValue());
     }
     return withAttributesMap;
+  }
+
+  @Override
+  public Node visitCreateFlowStatement(RelationalSqlParser.CreateFlowStatementContext ctx) {
+    final String flowName = ((Identifier) visit(ctx.identifier())).getValue();
+    final boolean hasIfNotExistsCondition =
+        ctx.IF() != null && ctx.NOT() != null && ctx.EXISTS() != null;
+    return new CreateFlow(flowName, hasIfNotExistsCondition);
   }
 
   @Override

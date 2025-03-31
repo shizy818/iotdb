@@ -93,6 +93,7 @@ import org.apache.iotdb.db.queryengine.plan.execution.config.sys.SetConfiguratio
 import org.apache.iotdb.db.queryengine.plan.execution.config.sys.SetSystemStatusTask;
 import org.apache.iotdb.db.queryengine.plan.execution.config.sys.StartRepairDataTask;
 import org.apache.iotdb.db.queryengine.plan.execution.config.sys.StopRepairDataTask;
+import org.apache.iotdb.db.queryengine.plan.execution.config.sys.flow.CreateFlowTask;
 import org.apache.iotdb.db.queryengine.plan.execution.config.sys.pipe.AlterPipeTask;
 import org.apache.iotdb.db.queryengine.plan.execution.config.sys.pipe.CreatePipeTask;
 import org.apache.iotdb.db.queryengine.plan.execution.config.sys.pipe.DropPipeTask;
@@ -116,6 +117,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.AstVisitor;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ClearCache;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ColumnDefinition;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateDB;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateFlow;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateFunction;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreatePipe;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreatePipePlugin;
@@ -885,6 +887,15 @@ public class TableConfigTaskVisitor extends AstVisitor<IConfigTask, MPPQueryCont
           name + " value must be lower than " + Integer.MAX_VALUE + ", but now is: " + value);
     }
     return (int) parsedValue;
+  }
+
+  @Override
+  protected IConfigTask visitCreateFlow(final CreateFlow node, final MPPQueryContext context) {
+    context.setQueryType(QueryType.WRITE);
+    final String userName = context.getSession().getUserName();
+    accessControl.checkUserIsAdmin(userName);
+
+    return new CreateFlowTask(node);
   }
 
   @Override
