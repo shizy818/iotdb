@@ -66,6 +66,11 @@ public class PipeExtractorConstant {
   public static final String EXTRACTOR_TABLE_KEY = "extractor.table";
   public static final String SOURCE_TABLE_KEY = "source.table";
 
+  public static final String CONNECTOR_DATABASE_KEY = "connector.database";
+  public static final String SINK_DATABASE_KEY = "sink.database";
+  public static final String CONNECTOR_TABLE_KEY = "connector.table";
+  public static final String SINK_TABLE_KEY = "sink.table";
+
   public static final String EXTRACTOR_FORWARDING_PIPE_REQUESTS_KEY =
       "extractor.forwarding-pipe-requests";
   public static final String SOURCE_FORWARDING_PIPE_REQUESTS_KEY =

@@ -62,6 +62,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.AddColumn;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.AlterDB;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ClearCache;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateDB;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateFlow;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateFunction;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateTable;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CreateTraining;
@@ -447,7 +448,8 @@ public class Coordinator {
         || statement instanceof ExtendRegion
         || statement instanceof CreateTraining
         || statement instanceof ShowModels
-        || statement instanceof RemoveRegion) {
+        || statement instanceof RemoveRegion
+        || statement instanceof CreateFlow) {
       return new ConfigExecution(
           queryContext,
           null,

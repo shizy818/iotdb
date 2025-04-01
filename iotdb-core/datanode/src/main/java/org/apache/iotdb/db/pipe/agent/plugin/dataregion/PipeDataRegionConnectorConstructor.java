@@ -32,6 +32,7 @@ import org.apache.iotdb.db.pipe.connector.protocol.thrift.async.IoTDBDataRegionA
 import org.apache.iotdb.db.pipe.connector.protocol.thrift.sync.IoTDBDataRegionSyncConnector;
 import org.apache.iotdb.db.pipe.connector.protocol.websocket.WebSocketConnector;
 import org.apache.iotdb.db.pipe.connector.protocol.writeback.WriteBackConnector;
+import org.apache.iotdb.db.pipe.connector.protocol.writeback.WriteToTableConnector;
 
 class PipeDataRegionConnectorConstructor extends PipeConnectorConstructor {
 
@@ -72,6 +73,8 @@ class PipeDataRegionConnectorConstructor extends PipeConnectorConstructor {
         BuiltinPipePlugin.DO_NOTHING_CONNECTOR.getPipePluginName(), DoNothingConnector::new);
     pluginConstructors.put(
         BuiltinPipePlugin.WRITE_BACK_CONNECTOR.getPipePluginName(), WriteBackConnector::new);
+    pluginConstructors.put(
+        BuiltinPipePlugin.WRITE_TO_TABLE_CONNECTOR.getPipePluginName(), WriteToTableConnector::new);
 
     pluginConstructors.put(
         BuiltinPipePlugin.IOTDB_THRIFT_SINK.getPipePluginName(),
@@ -99,6 +102,8 @@ class PipeDataRegionConnectorConstructor extends PipeConnectorConstructor {
         BuiltinPipePlugin.DO_NOTHING_SINK.getPipePluginName(), DoNothingConnector::new);
     pluginConstructors.put(
         BuiltinPipePlugin.WRITE_BACK_SINK.getPipePluginName(), WriteBackConnector::new);
+    pluginConstructors.put(
+        BuiltinPipePlugin.WRITE_TO_TABLE_SINK.getPipePluginName(), WriteToTableConnector::new);
     pluginConstructors.put(
         BuiltinPipePlugin.SUBSCRIPTION_SINK.getPipePluginName(), DoNothingConnector::new);
     pluginConstructors.put(

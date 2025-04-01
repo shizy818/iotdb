@@ -31,6 +31,7 @@ import org.apache.iotdb.commons.pipe.agent.plugin.builtin.connector.opcda.OpcDaC
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.connector.opcua.OpcUaConnector;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.connector.websocket.WebSocketConnector;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.connector.writeback.WriteBackConnector;
+import org.apache.iotdb.commons.pipe.agent.plugin.builtin.connector.writeback.WriteToTableConnector;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.extractor.donothing.DoNothingExtractor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.extractor.iotdb.IoTDBExtractor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.aggregate.AggregateProcessor;
@@ -91,6 +92,7 @@ public enum BuiltinPipePlugin {
   OPC_UA_CONNECTOR("opc-ua-connector", OpcUaConnector.class),
   OPC_DA_CONNECTOR("opc-da-connector", OpcDaConnector.class),
   WRITE_BACK_CONNECTOR("write-back-connector", WriteBackConnector.class),
+  WRITE_TO_TABLE_CONNECTOR("write-to-table-connector", WriteToTableConnector.class),
 
   DO_NOTHING_SINK("do-nothing-sink", DoNothingConnector.class),
   IOTDB_THRIFT_SINK("iotdb-thrift-sink", IoTDBThriftConnector.class),
@@ -103,6 +105,7 @@ public enum BuiltinPipePlugin {
   OPC_UA_SINK("opc-ua-sink", OpcUaConnector.class),
   OPC_DA_SINK("opc-da-sink", OpcDaConnector.class),
   WRITE_BACK_SINK("write-back-sink", WriteBackConnector.class),
+  WRITE_TO_TABLE_SINK("write-to-table-sink", WriteToTableConnector.class),
   SUBSCRIPTION_SINK("subscription-sink", DoNothingConnector.class),
   PIPE_CONSENSUS_ASYNC_SINK("pipe-consensus-async-sink", PipeConsensusAsyncConnector.class),
   ;

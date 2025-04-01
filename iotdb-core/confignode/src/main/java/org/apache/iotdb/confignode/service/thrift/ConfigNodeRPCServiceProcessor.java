@@ -1196,8 +1196,9 @@ public class ConfigNodeRPCServiceProcessor implements IConfigNodeRPCService.Ifac
     // fake source
     Map<String, String> extractorAttributes = new HashMap<>();
     extractorAttributes.put("source", "iotdb-source");
-    extractorAttributes.put("database-name", "testdb");
-    extractorAttributes.put("table-name", "t1");
+    extractorAttributes.put("source.database", "db1");
+    extractorAttributes.put("source.table", "t1");
+    extractorAttributes.put("realtime.mode", "forced-log");
     createPipeReq.setExtractorAttributes(extractorAttributes);
 
     // do nothing processor
@@ -1207,7 +1208,9 @@ public class ConfigNodeRPCServiceProcessor implements IConfigNodeRPCService.Ifac
 
     // sink
     Map<String, String> connectorAttributes = new HashMap<>();
-    connectorAttributes.put("sink", "write-back-sink");
+    connectorAttributes.put("sink", "write-to-table-sink");
+    connectorAttributes.put("sink.database", "db2");
+    connectorAttributes.put("sink.table", "t2");
     createPipeReq.setConnectorAttributes(connectorAttributes);
 
     return configManager.createPipe(createPipeReq);
