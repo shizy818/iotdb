@@ -108,6 +108,7 @@ import org.apache.iotdb.confignode.rpc.thrift.TCountTimeSlotListReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCountTimeSlotListResp;
 import org.apache.iotdb.confignode.rpc.thrift.TCreateCQReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCreateConsumerReq;
+import org.apache.iotdb.confignode.rpc.thrift.TCreateFlowReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCreateFunctionReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCreateModelReq;
 import org.apache.iotdb.confignode.rpc.thrift.TCreatePipePluginReq;
@@ -233,6 +234,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1185,6 +1187,30 @@ public class ConfigNodeRPCServiceProcessor implements IConfigNodeRPCService.Ifac
   @Override
   public TSStatus alterLogicalView(TAlterLogicalViewReq req) {
     return configManager.alterLogicalView(req);
+  }
+
+  @Override
+  public TSStatus createFlow(TCreateFlowReq req) {
+    TCreatePipeReq createPipeReq = new TCreatePipeReq(req.getFlowName(), null);
+    createPipeReq.setIfNotExistsCondition(req.isIfNotExistsCondition());
+    // fake source
+    Map<String, String> extractorAttributes = new HashMap<>();
+    extractorAttributes.put("source", "iotdb-source");
+    extractorAttributes.put("database-name", "testdb");
+    extractorAttributes.put("table-name", "t1");
+    createPipeReq.setExtractorAttributes(extractorAttributes);
+
+    // do nothing processor
+    Map<String, String> processorAttributes = new HashMap<>();
+    processorAttributes.put("processor", "do-nothing-processor");
+    createPipeReq.setProcessorAttributes(processorAttributes);
+
+    // sink
+    Map<String, String> connectorAttributes = new HashMap<>();
+    connectorAttributes.put("sink", "write-back-sink");
+    createPipeReq.setConnectorAttributes(connectorAttributes);
+
+    return configManager.createPipe(createPipeReq);
   }
 
   @Override
