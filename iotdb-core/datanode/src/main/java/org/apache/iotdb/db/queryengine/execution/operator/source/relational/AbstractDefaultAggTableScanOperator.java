@@ -55,15 +55,28 @@ public abstract class AbstractDefaultAggTableScanOperator extends AbstractAggTab
       return getResultFromRetainedTsBlock();
     }
 
-    // optimize for sql: select count(*) from (select count(s1), sum(s1) from table)
     if (tableAggregators.isEmpty()
-        && timeIterator.getType() == ITableTimeRangeIterator.TimeIteratorType.SINGLE_TIME_ITERATOR
-        && resultTsBlockBuilder.getValueColumnBuilders().length == 0) {
+        && timeIterator.getType()
+            == ITableTimeRangeIterator.TimeIteratorType.SINGLE_TIME_ITERATOR) {
       resultTsBlockBuilder.reset();
-      currentDeviceIndex = deviceCount;
-      timeIterator.setFinished();
-      Column[] valueColumns = new Column[0];
-      return new TsBlock(1, new RunLengthEncodedColumn(TIME_COLUMN_TEMPLATE, 1), valueColumns);
+
+      if (resultTsBlockBuilder.getValueColumnBuilders().length == 0) {
+        // optimize for sql: select count(*) from (select count(s1), sum(s1) from table)
+        currentDeviceIndex = deviceCount;
+        timeIterator.setFinished();
+        Column[] valueColumns = new Column[0];
+        return new TsBlock(1, new RunLengthEncodedColumn(TIME_COLUMN_TEMPLATE, 1), valueColumns);
+      } else {
+        // optimize for sql: select distinct(tagCol) / distinct(attrCol) from table
+        timeIterator.updateCurTimeRange(Long.MIN_VALUE);
+        for (currentDeviceIndex = 0; currentDeviceIndex < deviceCount; currentDeviceIndex++) {
+          updateResultTsBlock();
+          constructAlignedSeriesScanUtil();
+        }
+        timeIterator.setFinished();
+        buildResultTsBlock();
+        return resultTsBlock;
+      }
     }
 
     // start stopwatch, reset leftRuntimeOfOneNextCall
