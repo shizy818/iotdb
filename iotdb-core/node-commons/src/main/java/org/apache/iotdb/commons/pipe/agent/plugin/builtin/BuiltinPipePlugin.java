@@ -42,6 +42,7 @@ import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.downsampling
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.downsampling.SwingingDoorTrendingSamplingProcessor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.downsampling.TumblingTimeSamplingProcessor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.pipeconsensus.PipeConsensusProcessor;
+import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.reactive.ExpressionProcessor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.schemachange.RenameDatabaseProcessor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.throwing.ThrowingExceptionProcessor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.twostage.TwoStageCountProcessor;
@@ -76,6 +77,8 @@ public enum BuiltinPipePlugin {
   TUMBLING_WINDOWING_PROCESSOR("tumbling-windowing-processor", TumblingWindowingProcessor.class),
   PIPE_CONSENSUS_PROCESSOR("pipe-consensus-processor", PipeConsensusProcessor.class),
   RENAME_DATABASE_PROCESSOR("rename-database-processor", RenameDatabaseProcessor.class),
+
+  EXPRESSION_PROCESSOR("expression-processor", ExpressionProcessor.class),
 
   // connectors
   DO_NOTHING_CONNECTOR("do-nothing-connector", DoNothingConnector.class),
