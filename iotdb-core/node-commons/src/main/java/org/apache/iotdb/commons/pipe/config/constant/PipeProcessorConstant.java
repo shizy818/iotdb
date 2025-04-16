@@ -83,6 +83,7 @@ public class PipeProcessorConstant {
   public static final String PROCESSOR_RENAME_DATABASE_NEW_DB_NAME = "processor.new-db-name";
 
   public static final String PROCESSOR_EXPR = "processor.expr";
+  public static final String PROCESSOR_SOURCE_PATH = "processor.source.path";
 
   private PipeProcessorConstant() {
     throw new IllegalStateException("Utility class");

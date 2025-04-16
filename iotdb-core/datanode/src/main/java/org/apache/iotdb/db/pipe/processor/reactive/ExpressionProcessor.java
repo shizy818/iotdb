@@ -81,6 +81,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_EXPR;
+import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_SOURCE_PATH;
 
 @TreeModel
 @TableModel
@@ -95,7 +96,7 @@ public class ExpressionProcessor implements PipeProcessor {
 
   private String expr;
   private String databaseName;
-  private String inputTimeSeries = "t1";
+  private String inputTimeSeries;
   private String outputTimeSeries;
 
   private MeasurementSchema[] measurementSchemaList;
@@ -109,9 +110,13 @@ public class ExpressionProcessor implements PipeProcessor {
   @Override
   public void validate(PipeParameterValidator validator) throws Exception {
     validator.validateRequiredAttribute(PROCESSOR_EXPR);
+    validator.validateRequiredAttribute(PROCESSOR_SOURCE_PATH);
 
     final PipeParameters parameters = validator.getParameters();
-    expr = parameters.getString(PROCESSOR_EXPR).toLowerCase();
+    expr = parameters.getString(PROCESSOR_EXPR).toLowerCase().trim();
+    String pathKey = parameters.getString(PROCESSOR_SOURCE_PATH).toLowerCase().trim();
+    String[] pathNodes = pathKey.split("[.]");
+    inputTimeSeries = pathNodes[pathNodes.length - 2];
   }
 
   @Override

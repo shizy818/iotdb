@@ -44,6 +44,10 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import static org.apache.iotdb.commons.pipe.config.constant.PipeExtractorConstant.EXTRACTOR_PATH_KEY;
+import static org.apache.iotdb.commons.pipe.config.constant.PipeExtractorConstant.SOURCE_PATH_KEY;
+import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_SOURCE_PATH;
+
 public abstract class PipePluginAgent {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PipePluginAgent.class);
@@ -88,7 +92,7 @@ public abstract class PipePluginAgent {
       Map<String, String> connectorAttributes)
       throws Exception {
     validateExtractor(extractorAttributes);
-    validateProcessor(processorAttributes);
+    validateProcessor(extractorAttributes, processorAttributes);
     validateConnector(pipeName, connectorAttributes);
   }
 
@@ -108,8 +112,14 @@ public abstract class PipePluginAgent {
     return temporaryExtractor;
   }
 
-  protected PipeProcessor validateProcessor(Map<String, String> processorAttributes)
+  protected PipeProcessor validateProcessor(Map<String, String> extractorAttributes, Map<String, String> processorAttributes)
       throws Exception {
+    if (extractorAttributes.containsKey(EXTRACTOR_PATH_KEY)) {
+      processorAttributes.put(PROCESSOR_SOURCE_PATH, extractorAttributes.get(EXTRACTOR_PATH_KEY));
+    } else if (extractorAttributes.containsKey(SOURCE_PATH_KEY)) {
+      processorAttributes.put(PROCESSOR_SOURCE_PATH, extractorAttributes.get(SOURCE_PATH_KEY));
+    }
+
     final PipeParameters processorParameters = new PipeParameters(processorAttributes);
     final PipeProcessor temporaryProcessor = reflectProcessor(processorParameters);
     try {

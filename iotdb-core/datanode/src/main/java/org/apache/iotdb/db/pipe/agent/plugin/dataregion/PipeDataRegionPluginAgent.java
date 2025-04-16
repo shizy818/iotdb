@@ -70,7 +70,7 @@ public class PipeDataRegionPluginAgent extends PipePluginAgent {
       Map<String, String> connectorAttributes)
       throws Exception {
     PipeExtractor temporaryExtractor = validateExtractor(extractorAttributes);
-    PipeProcessor temporaryProcessor = validateProcessor(processorAttributes);
+    PipeProcessor temporaryProcessor = validateProcessor(extractorAttributes, processorAttributes);
     PipeConnector temporaryConnector = validateConnector(pipeName, connectorAttributes);
 
     // validate visibility
