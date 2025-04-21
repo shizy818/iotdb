@@ -59,7 +59,11 @@ public class SessionTableFunction implements TableFunction {
             .name(TIMECOL_PARAMETER_NAME)
             .type(Type.STRING)
             .build(),
-        ScalarParameterSpecification.builder().name(GAP_PARAMETER_NAME).type(Type.INT64).build());
+        ScalarParameterSpecification.builder()
+            .name(GAP_PARAMETER_NAME)
+            .type(Type.INT64)
+            .addChecker(ScalarParameterSpecification.POSITIVE_INTEGER_CHECKER)
+            .build());
   }
 
   @Override

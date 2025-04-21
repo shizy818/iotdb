@@ -34,6 +34,10 @@
             <artifactId>common</artifactId>
             <version>${tsfile.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
     </dependencies>
     <profiles>
         <profile>

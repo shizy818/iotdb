@@ -62,7 +62,11 @@ public class TumbleTableFunction implements TableFunction {
             .type(Type.STRING)
             .defaultValue("time")
             .build(),
-        ScalarParameterSpecification.builder().name(SIZE_PARAMETER_NAME).type(Type.INT64).build(),
+        ScalarParameterSpecification.builder()
+            .name(SIZE_PARAMETER_NAME)
+            .type(Type.INT64)
+            .addChecker(ScalarParameterSpecification.POSITIVE_INTEGER_CHECKER)
+            .build(),
         ScalarParameterSpecification.builder()
             .name(ORIGIN_PARAMETER_NAME)
             .type(Type.TIMESTAMP)

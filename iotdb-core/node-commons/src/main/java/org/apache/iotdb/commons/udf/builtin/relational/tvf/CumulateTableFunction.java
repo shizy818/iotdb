@@ -64,8 +64,16 @@ public class CumulateTableFunction implements TableFunction {
             .type(Type.STRING)
             .defaultValue("time")
             .build(),
-        ScalarParameterSpecification.builder().name(SIZE_PARAMETER_NAME).type(Type.INT64).build(),
-        ScalarParameterSpecification.builder().name(STEP_PARAMETER_NAME).type(Type.INT64).build(),
+        ScalarParameterSpecification.builder()
+            .name(SIZE_PARAMETER_NAME)
+            .type(Type.INT64)
+            .addChecker(ScalarParameterSpecification.POSITIVE_INTEGER_CHECKER)
+            .build(),
+        ScalarParameterSpecification.builder()
+            .name(STEP_PARAMETER_NAME)
+            .type(Type.INT64)
+            .addChecker(ScalarParameterSpecification.POSITIVE_INTEGER_CHECKER)
+            .build(),
         ScalarParameterSpecification.builder()
             .name(ORIGIN_PARAMETER_NAME)
             .type(Type.TIMESTAMP)
@@ -81,7 +89,7 @@ public class CumulateTableFunction implements TableFunction {
 
     if (size % step != 0) {
       throw new UDFException(
-          "Cumulative table function requires size must be an integral multiple of step.");
+          "Cumulative table function requires size must be an integral multiple of step");
     }
 
     TableArgument tableArgument = (TableArgument) arguments.get(DATA_PARAMETER_NAME);

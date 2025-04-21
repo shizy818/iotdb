@@ -51,15 +51,15 @@ public class CapacityTableFunction implements TableFunction {
             .name(DATA_PARAMETER_NAME)
             .passThroughColumns()
             .build(),
-        ScalarParameterSpecification.builder().name(SIZE_PARAMETER_NAME).type(Type.INT64).build());
+        ScalarParameterSpecification.builder()
+            .name(SIZE_PARAMETER_NAME)
+            .type(Type.INT64)
+            .addChecker(ScalarParameterSpecification.POSITIVE_INTEGER_CHECKER)
+            .build());
   }
 
   @Override
   public TableFunctionAnalysis analyze(Map<String, Argument> arguments) throws UDFException {
-    long size = (long) ((ScalarArgument) arguments.get(SIZE_PARAMETER_NAME)).getValue();
-    if (size <= 0) {
-      throw new UDFException("Size must be greater than 0");
-    }
     return TableFunctionAnalysis.builder()
         .properColumnSchema(
             new DescribedSchema.Builder().addField("window_index", Type.INT64).build())

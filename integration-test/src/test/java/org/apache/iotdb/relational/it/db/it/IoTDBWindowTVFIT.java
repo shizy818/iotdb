@@ -130,6 +130,12 @@ public class IoTDBWindowTVFIT {
         expectedHeader,
         retArray,
         DATABASE_NAME);
+
+    String errMsg = "scalar parameters SLIDE must be greater than 0";
+    tableAssertTestFail(
+        "SELECT * FROM HOP(DATA => bid, TIMECOL => 'time', SLIDE => -300000, SIZE => 600000) ORDER BY stock_id, time",
+        errMsg,
+        DATABASE_NAME);
   }
 
   @Test
@@ -161,6 +167,12 @@ public class IoTDBWindowTVFIT {
         "SELECT window_start, window_end, stock_id, sum(price) as sum FROM SESSION(DATA => bid PARTITION BY stock_id ORDER BY time, TIMECOL => 'time', GAP => 2m) GROUP BY window_start, window_end, stock_id ORDER BY stock_id, window_start",
         expectedHeader,
         retArray,
+        DATABASE_NAME);
+
+    String errMsg = "scalar parameters GAP must be greater than 0";
+    tableAssertTestFail(
+        "SELECT * FROM SESSION(DATA => bid PARTITION BY stock_id ORDER BY time, TIMECOL => 'time', GAP => -120000) ORDER BY stock_id, time",
+        errMsg,
         DATABASE_NAME);
   }
 
@@ -226,6 +238,12 @@ public class IoTDBWindowTVFIT {
         expectedHeader,
         retArray,
         DATABASE_NAME);
+
+    String errMsg = "scalar parameters SIZE must be greater than 0";
+    tableAssertTestFail(
+        "SELECT * FROM CAPACITY(DATA => bid PARTITION BY stock_id ORDER BY time, SIZE => -2) ORDER BY stock_id, time",
+        errMsg,
+        DATABASE_NAME);
   }
 
   @Test
@@ -273,6 +291,12 @@ public class IoTDBWindowTVFIT {
         "SELECT window_start, window_end, stock_id, sum(price) as sum FROM TUMBLE(DATA => bid, TIMECOL => 'time', SIZE => 1h) GROUP BY window_start, window_end, stock_id ORDER BY stock_id, window_start",
         expectedHeader,
         retArray,
+        DATABASE_NAME);
+
+    String errMsg = "scalar parameters SIZE must be greater than 0";
+    tableAssertTestFail(
+        "SELECT * FROM TUMBLE(DATA => bid, TIMECOL => 'time', SIZE => -600000) ORDER BY stock_id, time",
+        errMsg,
         DATABASE_NAME);
   }
 
@@ -324,10 +348,15 @@ public class IoTDBWindowTVFIT {
         retArray,
         DATABASE_NAME);
 
-    // test UDFException
-    String errMsg = "Cumulative table function requires size must be an integral multiple of step.";
+    String errMsg = "scalar parameters STEP must be greater than 0";
     tableAssertTestFail(
-        "SELECT window_start, window_end, stock_id, sum(price) as sum FROM CUMULATE(DATA => bid, TIMECOL => 'time', STEP => 4m, SIZE => 10m) GROUP BY window_start, window_end, stock_id ORDER BY stock_id, window_start",
+        "SELECT * FROM CUMULATE(DATA => bid, TIMECOL => 'time', STEP => -300000, SIZE => 600000) ORDER BY stock_id, time",
+        errMsg,
+        DATABASE_NAME);
+
+    errMsg = "Cumulative table function requires size must be an integral multiple of step";
+    tableAssertTestFail(
+        "SELECT * FROM CUMULATE(DATA => bid, TIMECOL => 'time', STEP => 4m, SIZE => 10m) ORDER BY stock_id, time",
         errMsg,
         DATABASE_NAME);
   }

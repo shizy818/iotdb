@@ -61,6 +61,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ArithmeticBinaryE
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ArithmeticUnaryExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.AstVisitor;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.BetweenPredicate;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.BooleanLiteral;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Cast;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.CoalesceExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Columns;
@@ -77,6 +78,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Delete;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.DeleteDevice;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.DereferenceExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.DescribeTable;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.DoubleLiteral;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.DropColumn;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.DropDB;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.DropFunction;
@@ -155,6 +157,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SortItem;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.StartPipe;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Statement;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.StopPipe;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.StringLiteral;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SubqueryExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SymbolReference;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Table;
@@ -198,6 +201,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Streams;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.tsfile.common.conf.TSFileConfig;
 import org.apache.tsfile.read.common.type.RowType;
 import org.apache.tsfile.read.common.type.Type;
@@ -218,6 +222,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -4243,6 +4248,43 @@ public class StatementAnalyzer {
         actualType = "table";
       } else if (argument.getValue() instanceof Expression) {
         actualType = "expression";
+        ScalarParameterSpecification scalarParameterSpecification =
+            (ScalarParameterSpecification) parameterSpecification;
+        List<BiFunction<String, Object, Pair<Boolean, String>>> checkers =
+            scalarParameterSpecification.getCheckers();
+        Iterator<BiFunction<String, Object, Pair<Boolean, String>>> iterator = checkers.iterator();
+        if (iterator.hasNext()) {
+          BiFunction<String, Object, Pair<Boolean, String>> checker = iterator.next();
+          Object value = null;
+          switch (scalarParameterSpecification.getType()) {
+            case BOOLEAN:
+              value = ((BooleanLiteral) argument.getValue()).getValue();
+              break;
+            case INT32:
+            case INT64:
+              value = ((LongLiteral) argument.getValue()).getParsedValue();
+              break;
+            case FLOAT:
+            case DOUBLE:
+              value = ((DoubleLiteral) argument.getValue()).getValue();
+              break;
+            case TEXT:
+            case BLOB:
+            case STRING:
+              value = ((StringLiteral) argument.getValue()).getValue();
+              break;
+            default:
+              throw new SemanticException(
+                  String.format(
+                      "Unsupported data type %s of scalar parameter %s",
+                      scalarParameterSpecification.getType(),
+                      scalarParameterSpecification.getName()));
+          }
+          Pair<Boolean, String> result = checker.apply(parameterSpecification.getName(), value);
+          if (!result.getLeft()) {
+            throw new SemanticException(result.getRight());
+          }
+        }
       } else {
         throw new SemanticException(
             String.format(

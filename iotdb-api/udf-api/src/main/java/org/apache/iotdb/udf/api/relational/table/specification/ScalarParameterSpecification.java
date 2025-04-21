@@ -21,13 +21,24 @@ package org.apache.iotdb.udf.api.relational.table.specification;
 
 import org.apache.iotdb.udf.api.type.Type;
 
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.BiFunction;
 
 public class ScalarParameterSpecification extends ParameterSpecification {
   private final Type type;
+  // return false and error message when sanity check fails
+  private final List<BiFunction<String, Object, Pair<Boolean, String>>> checkers;
 
   private ScalarParameterSpecification(
-      String name, Type type, boolean required, Object defaultValue) {
+      String name,
+      Type type,
+      boolean required,
+      Object defaultValue,
+      List<BiFunction<String, Object, Pair<Boolean, String>>> checkers) {
     super(name, required, Optional.ofNullable(defaultValue));
     this.type = type;
     if (defaultValue != null && !type.checkObjectType(defaultValue)) {
@@ -35,10 +46,15 @@ public class ScalarParameterSpecification extends ParameterSpecification {
           String.format(
               "default value %s does not match the declared type: %s", defaultValue, type));
     }
+    this.checkers = checkers;
   }
 
   public Type getType() {
     return type;
+  }
+
+  public List<BiFunction<String, Object, Pair<Boolean, String>>> getCheckers() {
+    return checkers;
   }
 
   public static Builder builder() {
@@ -50,6 +66,8 @@ public class ScalarParameterSpecification extends ParameterSpecification {
     private Type type;
     private boolean required = true;
     private Object defaultValue;
+    private final List<BiFunction<String, Object, Pair<Boolean, String>>> checkers =
+        new ArrayList<>();
 
     private Builder() {}
 
@@ -69,8 +87,21 @@ public class ScalarParameterSpecification extends ParameterSpecification {
       return this;
     }
 
+    public Builder addChecker(BiFunction<String, Object, Pair<Boolean, String>> checker) {
+      this.checkers.add(checker);
+      return this;
+    }
+
     public ScalarParameterSpecification build() {
-      return new ScalarParameterSpecification(name, type, required, defaultValue);
+      return new ScalarParameterSpecification(name, type, required, defaultValue, checkers);
     }
   }
+
+  public static final BiFunction<String, Object, Pair<Boolean, String>> POSITIVE_INTEGER_CHECKER =
+      (name, value) -> {
+        if (value instanceof Long && (long) value > 0) {
+          return Pair.of(true, null);
+        }
+        return Pair.of(false, String.format("scalar parameters %s must be greater than 0", name));
+      };
 }
