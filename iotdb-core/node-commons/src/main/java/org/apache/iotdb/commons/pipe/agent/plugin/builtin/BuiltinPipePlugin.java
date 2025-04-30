@@ -44,6 +44,7 @@ import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.pipeconsensu
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.schemachange.RenameDatabaseProcessor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.throwing.ThrowingExceptionProcessor;
 import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.twostage.TwoStageCountProcessor;
+import org.apache.iotdb.commons.pipe.agent.plugin.builtin.processor.winagg.WindowAggregateProcessor;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -69,6 +70,8 @@ public enum BuiltinPipePlugin {
   THROWING_EXCEPTION_PROCESSOR("throwing-exception-processor", ThrowingExceptionProcessor.class),
   AGGREGATE_PROCESSOR("aggregate-processor", AggregateProcessor.class),
   COUNT_POINT_PROCESSOR("count-point-processor", TwoStageCountProcessor.class),
+
+  WINDOW_AGGREGATE_PROCESSOR("window-aggregate-processor", WindowAggregateProcessor.class),
 
   // Hidden-processors, which are plugins of the processors
   STANDARD_STATISTICS_PROCESSOR("standard-statistics-processor", StandardStatisticsProcessor.class),
@@ -144,6 +147,7 @@ public enum BuiltinPipePlugin {
                   CHANGING_VALUE_SAMPLING_PROCESSOR.getPipePluginName().toUpperCase(),
                   THROWING_EXCEPTION_PROCESSOR.getPipePluginName().toUpperCase(),
                   AGGREGATE_PROCESSOR.getPipePluginName().toUpperCase(),
+                  WINDOW_AGGREGATE_PROCESSOR.getPipePluginName().toUpperCase(),
                   COUNT_POINT_PROCESSOR.getPipePluginName().toUpperCase(),
                   STANDARD_STATISTICS_PROCESSOR.getPipePluginName().toUpperCase(),
                   TUMBLING_WINDOWING_PROCESSOR.getPipePluginName().toUpperCase(),

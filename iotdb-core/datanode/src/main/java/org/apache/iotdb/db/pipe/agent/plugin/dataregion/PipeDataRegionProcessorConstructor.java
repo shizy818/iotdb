@@ -33,6 +33,7 @@ import org.apache.iotdb.db.pipe.processor.downsampling.tumbling.TumblingTimeSamp
 import org.apache.iotdb.db.pipe.processor.pipeconsensus.PipeConsensusProcessor;
 import org.apache.iotdb.db.pipe.processor.schemachange.RenameDatabaseProcessor;
 import org.apache.iotdb.db.pipe.processor.twostage.plugin.TwoStageCountProcessor;
+import org.apache.iotdb.db.pipe.processor.winagg.WindowAggregateProcessor;
 
 class PipeDataRegionProcessorConstructor extends PipeProcessorConstructor {
 
@@ -72,5 +73,8 @@ class PipeDataRegionProcessorConstructor extends PipeProcessorConstructor {
     pluginConstructors.put(
         BuiltinPipePlugin.RENAME_DATABASE_PROCESSOR.getPipePluginName(),
         RenameDatabaseProcessor::new);
+    pluginConstructors.put(
+        BuiltinPipePlugin.WINDOW_AGGREGATE_PROCESSOR.getPipePluginName(),
+        WindowAggregateProcessor::new);
   }
 }
