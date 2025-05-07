@@ -4,6 +4,7 @@ import org.apache.iotdb.db.pipe.processor.winagg.AggregateState;
 import org.apache.iotdb.db.pipe.processor.winagg.IncrementalAggregateState;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.tsfile.enums.TSDataType;
 
 public class AggregateLongAvg implements AggregateFunction<Long, Pair<Long, Integer>, Double> {
   @Override
@@ -24,5 +25,14 @@ public class AggregateLongAvg implements AggregateFunction<Long, Pair<Long, Inte
   @Override
   public Double getResult(Pair<Long, Integer> accumulator) {
     return (double) accumulator.getLeft() / accumulator.getRight();
+  }
+
+  @Override
+  public TSDataType getTsDataType() {
+    return TSDataType.DOUBLE;
+  }
+
+  public String name() {
+    return "avg";
   }
 }

@@ -20,21 +20,13 @@
 package org.apache.iotdb.db.pipe.processor.winagg;
 
 public abstract class Window implements Comparable<Window> {
-  protected State state;
-
-  public abstract String uniqueId();
-
   public abstract long startTime();
 
   public abstract long endTime();
 
+  public abstract long maxTimestamp();
+
   public abstract int hashCode();
 
   public abstract boolean equals(Object obj);
-
-  public enum State {
-    INIT,
-    CONTINUE,
-    PURGE
-  }
 }

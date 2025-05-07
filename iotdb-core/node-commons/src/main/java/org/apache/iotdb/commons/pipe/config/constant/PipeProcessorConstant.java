@@ -52,8 +52,8 @@ public class PipeProcessorConstant {
   public static final String PROCESSOR_SLIDING_SECONDS_KEY = "processor.sliding.seconds";
   public static final long PROCESSOR_SLIDING_SECONDS_DEFAULT_VALUE = 120;
 
-  public static final String PROCESSOR_WATERMARK = "processor.watermark";
-  public static final long PROCESSOR_WATERMAKR_SECONDS_DEFAULT_VALUE = 0;
+  public static final String PROCESSOR_WATERMARK = "processor.watermark.interval";
+  public static final long PROCESSOR_WATERMAKR_INTERVAL_SECONDS_DEFAULT_VALUE = 0;
 
   public static final String PROCESSOR_TUMBLING_SIZE = "processor.tumbling.size";
   public static final long PROCESSOR_TUMBLING_SIZE_SECONDS_DEFAULT_VALUE = 60;

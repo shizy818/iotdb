@@ -31,11 +31,6 @@ public class TimeWindow extends Window {
   }
 
   @Override
-  public String uniqueId() {
-    return String.format("%s#%s#%s", start, end, partitionKey);
-  }
-
-  @Override
   public long startTime() {
     return start;
   }
@@ -43,6 +38,11 @@ public class TimeWindow extends Window {
   @Override
   public long endTime() {
     return end;
+  }
+
+  @Override
+  public long maxTimestamp() {
+    return end - 1;
   }
 
   @Override

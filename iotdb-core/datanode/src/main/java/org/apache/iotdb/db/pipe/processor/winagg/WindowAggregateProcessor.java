@@ -3,7 +3,11 @@ package org.apache.iotdb.db.pipe.processor.winagg;
 import org.apache.iotdb.commons.consensus.DataRegionId;
 import org.apache.iotdb.commons.exception.IllegalPathException;
 import org.apache.iotdb.commons.pipe.agent.task.meta.PipeTaskMeta;
+import org.apache.iotdb.commons.pipe.config.plugin.env.PipeTaskProcessorRuntimeEnvironment;
 import org.apache.iotdb.commons.utils.PathUtils;
+import org.apache.iotdb.db.pipe.event.common.row.PipeResetTabletRow;
+import org.apache.iotdb.db.pipe.event.common.row.PipeRow;
+import org.apache.iotdb.db.pipe.event.common.row.PipeRowCollector;
 import org.apache.iotdb.db.pipe.event.common.tablet.PipeInsertNodeTabletInsertionEvent;
 import org.apache.iotdb.db.pipe.event.common.tablet.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.db.pipe.processor.winagg.function.AggregateAvgFactory;
@@ -21,10 +25,16 @@ import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameters;
 import org.apache.iotdb.pipe.api.event.Event;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.tsfile.common.constant.TsFileConstant;
 import org.apache.tsfile.enums.TSDataType;
+import org.apache.tsfile.utils.BitMap;
+import org.apache.tsfile.write.schema.MeasurementSchema;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -44,7 +55,7 @@ import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstan
 import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_OUTPUT_MEASUREMENTS_KEY;
 import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_TUMBLING_SIZE;
 import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_TUMBLING_SIZE_SECONDS_DEFAULT_VALUE;
-import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_WATERMAKR_SECONDS_DEFAULT_VALUE;
+import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_WATERMAKR_INTERVAL_SECONDS_DEFAULT_VALUE;
 import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_WATERMARK;
 import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_WINDOWING_STRATEGY_DEFAULT_VALUE;
 import static org.apache.iotdb.commons.pipe.config.constant.PipeProcessorConstant.PROCESSOR_WINDOWING_STRATEGY_KEY;
@@ -55,14 +66,20 @@ public class WindowAggregateProcessor implements PipeProcessor {
   private String databaseWithPathSeparator;
   private PipeTaskMeta pipeTaskMeta;
   private long outputMaxDelayMilliseconds;
+  private TimeContext timeContext;
 
-  private final Map<String, Set<AggregateFunction>> aggregateFunctionMap = new HashMap<>();
-  private final Map<String, Map<String, Set<AggregateState>>> windowStateMap = new HashMap<>();
+  private final Map<String, Set<AggregateFunction>> aggregateFunctionMap =
+      new ConcurrentHashMap<>();
+  private final Map<Window, Map<String, Set<AggregateState>>> windowStateMap =
+      new ConcurrentHashMap<>();
 
   private String dataBaseName;
   private Boolean isTableModel;
 
   WindowAssigner<Object, ? extends Window> windowAssigner;
+  Trigger<Window> windowTrigger;
+
+  String[] columnNameStringList;
 
   @Override
   public void validate(PipeParameterValidator validator) throws Exception {
@@ -111,6 +128,10 @@ public class WindowAggregateProcessor implements PipeProcessor {
                 .getDatabaseName()
             + TsFileConstant.PATH_SEPARATOR;
 
+    pipeTaskMeta =
+        ((PipeTaskProcessorRuntimeEnvironment) configuration.getRuntimeEnvironment())
+            .getPipeTaskMeta();
+
     // Load parameters
     final long outputMaxDelaySeconds =
         parameters.getLongOrDefault(
@@ -129,22 +150,26 @@ public class WindowAggregateProcessor implements PipeProcessor {
                     .replace(" ", "")
                     .split(","))
             .collect(Collectors.toList());
-    System.out.println(operatorList);
     translateToAggregateFunctionMap(operatorList);
 
     final String outputMeasurementString =
         parameters.getStringOrDefault(
             PROCESSOR_OUTPUT_MEASUREMENTS_KEY, PROCESSOR_OUTPUT_MEASUREMENTS_DEFAULT_VALUE);
-    final List<String> outputMeasurementNameList =
+    List<String> outputMeasurementStringList =
         outputMeasurementString.isEmpty()
             ? Collections.emptyList()
             : Arrays.stream(outputMeasurementString.replace(" ", "").split(","))
                 .collect(Collectors.toList());
-    System.out.println(outputMeasurementNameList);
 
-    // watermark
-    final long watermark =
-        parameters.getLongOrDefault(PROCESSOR_WATERMARK, PROCESSOR_WATERMAKR_SECONDS_DEFAULT_VALUE);
+    // Set up column name strings
+    columnNameStringList = outputMeasurementStringList.toArray(new String[0]);
+
+    // watermarkInterval
+    final long watermarkIntervalInMs =
+        parameters.getLongOrDefault(
+                PROCESSOR_WATERMARK, PROCESSOR_WATERMAKR_INTERVAL_SECONDS_DEFAULT_VALUE)
+            * 1000;
+    timeContext = new TimeContext(watermarkIntervalInMs);
 
     // get window type
     final String windowType =
@@ -154,8 +179,11 @@ public class WindowAggregateProcessor implements PipeProcessor {
       long tumblingSize =
           parameters.getLongOrDefault(
               PROCESSOR_TUMBLING_SIZE, PROCESSOR_TUMBLING_SIZE_SECONDS_DEFAULT_VALUE);
-      windowAssigner = new TumblingTimeWindows(tumblingSize);
+      windowAssigner = new TumblingTimeWindows(tumblingSize * 1000);
     }
+
+    // get trigger type
+    windowTrigger = new EventTimeTrigger();
 
     // Restore window state (TODO)
   }
@@ -199,7 +227,69 @@ public class WindowAggregateProcessor implements PipeProcessor {
   }
 
   @Override
-  public void process(Event event, EventCollector eventCollector) throws Exception {}
+  public void process(
+      final TsFileInsertionEvent tsFileInsertionEvent, final EventCollector eventCollector)
+      throws Exception {
+    try {
+      for (final TabletInsertionEvent tabletInsertionEvent :
+          tsFileInsertionEvent.toTabletInsertionEvents()) {
+        System.out.println("### tabletInsertionEvent ###");
+        tabletInsertionEvent.processRowByRow(
+            (row, rowCollector) -> System.out.println(row.getTime()));
+        process(tabletInsertionEvent, eventCollector);
+      }
+    } finally {
+      tsFileInsertionEvent.close();
+    }
+  }
+
+  @Override
+  public void process(Event event, EventCollector eventCollector) throws Exception {
+    long currentTs = System.currentTimeMillis();
+    Map<String, List<Pair<Window, List<AggregateState>>>> outputMap = new HashMap<>();
+
+    windowStateMap
+        .entrySet()
+        .removeIf(
+            entry -> {
+              Window w = entry.getKey();
+              long lastEventTime = timeContext.lastProcessTime(w);
+              if (currentTs - lastEventTime >= outputMaxDelayMilliseconds) {
+                for (Map.Entry<String, Set<AggregateState>> e : entry.getValue().entrySet()) {
+                  String timeSeries = e.getKey();
+                  if (!outputMap.containsKey(timeSeries)) {
+                    outputMap.put(timeSeries, new ArrayList<>());
+                  }
+                  outputMap.get(timeSeries).add(Pair.of(w, new ArrayList<>(e.getValue())));
+                }
+                return true;
+              } else {
+                timeContext.advanceLastProcessTime(w, currentTs);
+                return false;
+              }
+            });
+
+    final AtomicReference<Exception> exception = new AtomicReference<>();
+    final PipeRowCollector rowCollector =
+        new PipeRowCollector(pipeTaskMeta, null, dataBaseName, isTableModel);
+
+    for (Map.Entry<String, List<Pair<Window, List<AggregateState>>>> entry : outputMap.entrySet()) {
+      collectWindowAggregateResult(entry.getValue(), entry.getKey(), rowCollector);
+    }
+
+    rowCollector
+        .convertToTabletInsertionEvents(false)
+        .forEach(
+            tabletEvent -> {
+              try {
+                eventCollector.collect(tabletEvent);
+              } catch (Exception e) {
+                exception.set(e);
+              }
+            });
+
+    eventCollector.collect(event);
+  }
 
   @Override
   public void close() throws Exception {}
@@ -253,35 +343,150 @@ public class WindowAggregateProcessor implements PipeProcessor {
       RowCollector rowCollector,
       String deviceSuffix,
       AtomicReference<Exception> exception) {
-    System.out.println(row.getTime());
     final long timestamp = row.getTime();
+
+    // advance watermark
+    timeContext.advanceWatermark(timestamp);
 
     // assign windows
     List<? extends Window> windows = windowAssigner.assignWindows(row, timestamp);
     for (Window w : windows) {
-      if (timestamp >= w.startTime() && timestamp < w.endTime()) {
-        String windowId = w.uniqueId();
-        if (!windowStateMap.containsKey(windowId)) {
-          windowStateMap.put(windowId, new HashMap<>());
-          aggregateFunctionMap.forEach(
-              (arg, funcSet) -> {
-                windowStateMap.get(windowId).put(arg, new HashSet<>());
-                funcSet.forEach(
-                    func -> windowStateMap.get(windowId).get(arg).add(func.createState()));
-              });
+      // drop if the window is already late
+      if (isWindowLate(w, timeContext)) {
+        continue;
+      }
+
+      if (!windowStateMap.containsKey(w)) {
+        windowStateMap.put(w, new HashMap<>());
+        aggregateFunctionMap.forEach(
+            (arg, funcSet) -> {
+              windowStateMap.get(w).put(arg, new HashSet<>());
+              funcSet.forEach(func -> windowStateMap.get(w).get(arg).add(func.createState()));
+            });
+      }
+
+      for (int index = 0, size = row.size(); index < size; ++index) {
+        // Do not calculate null values
+        if (row.isNull(index)) {
+          continue;
         }
 
-        for (int index = 0, size = row.size(); index < size; ++index) {
-          // Do not calculate null values
-          if (row.isNull(index)) {
-            continue;
-          }
+        String columnName = row.getColumnName(index);
+        Object columnValue = row.getObject(index);
 
-          String columnName = row.getColumnName(index);
-          Object columnValue = row.getObject(index);
-          Set<AggregateState> stateSet = windowStateMap.get(windowId).get(columnName);
+        if (windowStateMap.get(w).containsKey(columnName)) {
+          Set<AggregateState> stateSet = windowStateMap.get(w).get(columnName);
           stateSet.forEach(aggState -> aggState.add(columnValue));
         }
+      }
+
+      Trigger.Action winAction = windowTrigger.onElement(timestamp, w, timeContext.watermark());
+      if (winAction == Trigger.Action.FIRE) {
+        // write out
+        windowStateMap.remove(w);
+      }
+    }
+  }
+
+  private boolean isWindowLate(Window window, TimeContext timeContext) {
+    return window.maxTimestamp() <= timeContext.watermark();
+  }
+
+  private void collectWindowAggregateResult(
+      List<Pair<Window, List<AggregateState>>> outputs,
+      final String timeSeries,
+      final RowCollector collector) {
+    if (Objects.isNull(outputs) || outputs.isEmpty()) {
+      return;
+    }
+
+    int columnSize = outputs.get(0).getRight().size();
+
+    final MeasurementSchema[] measurementSchemaList = new MeasurementSchema[columnSize];
+    final TSDataType[] valueColumnTypes = new TSDataType[columnSize];
+    final Object[] valueColumns = new Object[columnSize];
+    final BitMap[] bitMaps = new BitMap[columnSize];
+
+    // Setup timestamps
+    final long[] timestampColumn = new long[outputs.size()];
+    for (int i = 0; i < outputs.size(); ++i) {
+      timestampColumn[i] = outputs.get(i).getLeft().startTime();
+    }
+
+    for (int columnIndex = 0; columnIndex < columnSize; ++columnIndex) {
+      bitMaps[columnIndex] = new BitMap(outputs.size());
+      for (int rowIndex = 0; rowIndex < outputs.size(); ++rowIndex) {
+        List<AggregateState> aggStates = outputs.get(rowIndex).getRight();
+
+        if (Objects.isNull(valueColumnTypes[columnIndex])) {
+          valueColumnTypes[columnIndex] = aggStates.get(columnIndex).getTsDataType();
+          measurementSchemaList[columnIndex] =
+              new MeasurementSchema(
+                  timeSeries + "_" + aggStates.get(columnIndex).name(),
+                  valueColumnTypes[columnIndex]);
+          switch (valueColumnTypes[columnIndex]) {
+            case INT64:
+              valueColumns[columnIndex] = new long[outputs.size()];
+              break;
+            case INT32:
+              valueColumns[columnIndex] = new int[outputs.size()];
+              break;
+            case DOUBLE:
+              valueColumns[columnIndex] = new double[outputs.size()];
+              break;
+            default:
+              break;
+          }
+        }
+
+        // Fill in values
+        switch (valueColumnTypes[columnIndex]) {
+          case INT64:
+            ((long[]) valueColumns[columnIndex])[rowIndex] =
+                (long) aggStates.get(columnIndex).get();
+            break;
+          case INT32:
+            ((int[]) valueColumns[columnIndex])[rowIndex] = (int) aggStates.get(columnIndex).get();
+            break;
+          case DOUBLE:
+            ((double[]) valueColumns[columnIndex])[rowIndex] =
+                (double) aggStates.get(columnIndex).get();
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
+    final String outputTimeSeries = "root.db2" + TsFileConstant.PATH_SEPARATOR + timeSeries;
+
+    // Collect rows
+    for (int rowIndex = 0; rowIndex < outputs.size(); rowIndex++) {
+      try {
+        collector.collectRow(
+            rowIndex == 0
+                ? new PipeResetTabletRow(
+                    rowIndex,
+                    outputTimeSeries,
+                    false,
+                    measurementSchemaList,
+                    timestampColumn,
+                    valueColumnTypes,
+                    valueColumns,
+                    bitMaps,
+                    columnNameStringList)
+                : new PipeRow(
+                    rowIndex,
+                    outputTimeSeries,
+                    false,
+                    measurementSchemaList,
+                    timestampColumn,
+                    valueColumnTypes,
+                    valueColumns,
+                    bitMaps,
+                    columnNameStringList));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
     }
   }
