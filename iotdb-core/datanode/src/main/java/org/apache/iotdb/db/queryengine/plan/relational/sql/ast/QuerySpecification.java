@@ -31,6 +31,7 @@ import static java.util.Objects.requireNonNull;
 public class QuerySpecification extends QueryBody {
 
   private final Select select;
+  private final Optional<QualifiedName> into;
   private final Optional<Relation> from;
   private final Optional<Expression> where;
   private final Optional<GroupBy> groupBy;
@@ -42,6 +43,7 @@ public class QuerySpecification extends QueryBody {
 
   public QuerySpecification(
       Select select,
+      Optional<QualifiedName> into,
       Optional<Relation> from,
       Optional<Expression> where,
       Optional<GroupBy> groupBy,
@@ -50,12 +52,13 @@ public class QuerySpecification extends QueryBody {
       Optional<OrderBy> orderBy,
       Optional<Offset> offset,
       Optional<Node> limit) {
-    this(null, select, from, where, groupBy, having, fill, orderBy, offset, limit);
+    this(null, select, into, from, where, groupBy, having, fill, orderBy, offset, limit);
   }
 
   public QuerySpecification(
       NodeLocation location,
       Select select,
+      Optional<QualifiedName> into,
       Optional<Relation> from,
       Optional<Expression> where,
       Optional<GroupBy> groupBy,
@@ -67,6 +70,7 @@ public class QuerySpecification extends QueryBody {
     super(location);
 
     this.select = requireNonNull(select, "select is null");
+    this.into = requireNonNull(into, "into is null");
     this.from = requireNonNull(from, "from is null");
     this.where = requireNonNull(where, "where is null");
     this.groupBy = requireNonNull(groupBy, "groupBy is null");
@@ -79,6 +83,10 @@ public class QuerySpecification extends QueryBody {
 
   public Select getSelect() {
     return select;
+  }
+
+  public Optional<QualifiedName> getInto() {
+    return into;
   }
 
   public Optional<Relation> getFrom() {

@@ -98,6 +98,7 @@ public final class ShowRewrite implements StatementRewrite.Rewrite {
     protected Node visitShowStatement(final ShowStatement showStatement, final Void context) {
       return simpleQuery(
           selectList(new AllColumns()),
+          Optional.empty(),
           from(INFORMATION_DATABASE, showStatement.getTableName()),
           showStatement.getWhere(),
           Optional.empty(),
@@ -119,6 +120,7 @@ public final class ShowRewrite implements StatementRewrite.Rewrite {
                           QualifiedName.of(Collections.singletonList(new Identifier("count"))),
                           Collections.emptyList()),
                       new Identifier("count(devices)")))),
+          Optional.empty(),
           from(INFORMATION_DATABASE, countStatement.getTableName()),
           countStatement.getWhere(),
           Optional.empty(),

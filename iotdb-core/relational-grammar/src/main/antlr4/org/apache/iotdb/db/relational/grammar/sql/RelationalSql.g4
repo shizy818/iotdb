@@ -907,6 +907,7 @@ sortItem
 
 querySpecification
     : SELECT setQuantifier? selectItem (',' selectItem)*
+      (INTO into=qualifiedName)?
       (FROM relation (',' relation)*)?
       (WHERE where=booleanExpression)?
       (GROUP BY groupBy)?

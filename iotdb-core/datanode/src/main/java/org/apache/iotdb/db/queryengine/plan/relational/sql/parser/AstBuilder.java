@@ -1988,6 +1988,7 @@ public class AstBuilder extends RelationalSqlBaseVisitor<Node> {
           new QuerySpecification(
               getLocation(ctx),
               query.getSelect(),
+              query.getInto(),
               query.getFrom(),
               query.getWhere(),
               query.getGroupBy(),
@@ -2111,9 +2112,15 @@ public class AstBuilder extends RelationalSqlBaseVisitor<Node> {
       from = Optional.of(relation);
     }
 
+    Optional<QualifiedName> into = Optional.empty();
+    if (ctx.into != null) {
+      into = Optional.of(QualifiedName.of(visit(ctx.into.identifier(), Identifier.class)));
+    }
+
     return new QuerySpecification(
         getLocation(ctx),
         new Select(getLocation(ctx.SELECT()), isDistinct(ctx.setQuantifier()), selectItems),
+        into,
         from,
         visitIfPresent(ctx.where, Expression.class),
         visitIfPresent(ctx.groupBy(), GroupBy.class),

@@ -978,6 +978,11 @@ public class StatementAnalyzer {
       // to pass down to analyzeFrom
       hasFillInParentScope = node.getFill().isPresent() || hasFillInParentScope;
 
+      // SELECT INTO is not allowed in subquery
+      if (!isTopLevel && node.getInto().isPresent()) {
+        throw new SemanticException("SELECT INTO is not allowed in subquery");
+      }
+
       Scope sourceScope = analyzeFrom(node, scope);
 
       node.getWhere().ifPresent(where -> analyzeWhere(node, sourceScope, where));
