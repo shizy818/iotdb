@@ -687,6 +687,11 @@ public abstract class PlanVisitor<R, C> {
     return visitTableScan(node, context);
   }
 
+  public R visitInto(
+      org.apache.iotdb.db.queryengine.plan.relational.planner.node.IntoNode node, C context) {
+    return visitSingleChildProcess(node, context);
+  }
+
   public R visitProject(
       org.apache.iotdb.db.queryengine.plan.relational.planner.node.ProjectNode node, C context) {
     return visitSingleChildProcess(node, context);

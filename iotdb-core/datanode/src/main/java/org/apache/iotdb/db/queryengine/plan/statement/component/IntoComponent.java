@@ -45,6 +45,8 @@ public class IntoComponent extends StatementNode {
       "select into: alignment property must be the same for the same device.";
   public static final String ILLEGAL_NODE_NAME_ERROR_MSG =
       "is illegal, unquoted node name can only consist of digits, characters and underscore, or start or end with wildcard";
+  public static final String DUPLICATE_TARGET_COLUMN_ERROR_MSG =
+          "select into: target columns in into clause should be different.";
 
   private final List<IntoItem> intoItems;
 

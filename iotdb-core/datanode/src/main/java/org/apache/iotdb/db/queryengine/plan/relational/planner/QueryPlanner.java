@@ -33,6 +33,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.planner.node.AggregationN
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.AggregationNode.Aggregation;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.FilterNode;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.GapFillNode;
+import org.apache.iotdb.db.queryengine.plan.relational.planner.node.IntoNode;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.LimitNode;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.LinearFillNode;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.OffsetNode;
@@ -50,6 +51,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.LongLiteral;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Node;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Offset;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.OrderBy;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QualifiedName;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Query;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QueryBody;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QuerySpecification;
@@ -270,6 +272,7 @@ public class QueryPlanner {
     builder = limit(builder, node.getLimit(), orderingScheme);
 
     builder = builder.appendProjections(outputs, symbolAllocator, queryContext);
+    builder = into(builder, node.getInto());
 
     return new RelationPlan(
         builder.getRoot(), analysis.getScope(node), computeOutputs(builder, outputs), outerContext);
@@ -861,6 +864,13 @@ public class QueryPlanner {
       }
     }
     return Optional.of(new OrderingScheme(orderBySymbols.build(), orderings));
+  }
+
+  private PlanBuilder into(PlanBuilder subPlan, Optional<QualifiedName> into) {
+    if (!into.isPresent()) {
+      return subPlan;
+    }
+    return subPlan.withNewRoot(new IntoNode(queryIdAllocator.genPlanNodeId(), subPlan.getRoot()));
   }
 
   private PlanBuilder sort(PlanBuilder subPlan, Optional<OrderingScheme> orderingScheme) {
