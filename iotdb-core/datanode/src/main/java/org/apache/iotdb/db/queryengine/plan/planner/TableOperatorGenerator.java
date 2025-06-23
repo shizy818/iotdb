@@ -3411,24 +3411,25 @@ public class TableOperatorGenerator extends PlanVisitor<Operator, LocalExecution
       List<TsTableColumnCategory> inputColumnCategories = new ArrayList<>();
       List<Pair<String, PartialPath>> sourceTargetPathPairList = new ArrayList<>();
 
-      List<ColumnSchema> inputColumns = node.getColumns();
-      for (int i = 0; i < inputColumns.size(); i++) {
-        String columnName = inputColumns.get(i).getName();
-        inputLocationMap.put(columnName, new InputLocation(0, i));
+      List<Pair<ColumnSchema, Integer>> inputColumns = node.getColumns();
+      for (Pair<ColumnSchema, Integer> inputColumn : inputColumns) {
+        ColumnSchema column = inputColumn.left;
+        inputLocationMap.put(column.getName(), new InputLocation(0, inputColumn.right));
 
-        TsTableColumnCategory columnCategory = inputColumns.get(i).getColumnCategory();
+        TsTableColumnCategory columnCategory = column.getColumnCategory();
         if (columnCategory == TIME) {
           continue;
         }
 
-        TSDataType columnType = InternalTypeManager.getTSDataType(inputColumns.get(i).getType());
-        tsDataTypeMap.put(columnName, columnType);
+        TSDataType columnType = InternalTypeManager.getTSDataType(column.getType());
+        tsDataTypeMap.put(column.getName(), columnType);
         inputColumnTypes.add(columnType);
         inputColumnCategories.add(columnCategory);
         sourceTargetPathPairList.add(
             new Pair<>(
-                columnName,
-                new MeasurementPath(String.format("%s.%s", tableName, columnName), columnType)));
+                column.getName(),
+                new MeasurementPath(
+                    String.format("%s.%s", tableName, column.getName()), columnType)));
       }
 
       Map<PartialPath, Map<String, InputLocation>> targetPathToSourceInputLocationMap =

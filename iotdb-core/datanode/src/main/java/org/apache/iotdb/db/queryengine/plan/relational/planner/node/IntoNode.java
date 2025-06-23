@@ -31,6 +31,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import org.apache.tsfile.read.common.type.IntType;
 import org.apache.tsfile.read.common.type.Type;
+import org.apache.tsfile.utils.Pair;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
 
 import java.io.DataOutputStream;
@@ -43,7 +44,8 @@ import java.util.Objects;
 public class IntoNode extends SingleChildProcessNode {
   private final String database;
   private final String table;
-  private final List<ColumnSchema> columns;
+  // Pair<ColumnSchema, Integer> represents the schema and location index of source table
+  private final List<Pair<ColumnSchema, Integer>> columns;
   private final Symbol rowCountSymbol;
 
   public IntoNode(
@@ -51,7 +53,7 @@ public class IntoNode extends SingleChildProcessNode {
       PlanNode child,
       String database,
       String table,
-      List<ColumnSchema> columns,
+      List<Pair<ColumnSchema, Integer>> columns,
       Symbol rowCountSymbol) {
     super(id, child);
     this.database = database;
@@ -87,8 +89,9 @@ public class IntoNode extends SingleChildProcessNode {
     ReadWriteIOUtils.write(table, byteBuffer);
     Symbol.serialize(rowCountSymbol, byteBuffer);
     ReadWriteIOUtils.write(columns.size(), byteBuffer);
-    for (ColumnSchema tableColumn : columns) {
-      ColumnSchema.serialize(tableColumn, byteBuffer);
+    for (Pair<ColumnSchema, Integer> column : columns) {
+      ColumnSchema.serialize(column.left, byteBuffer);
+      ReadWriteIOUtils.write(column.right, byteBuffer);
     }
   }
 
@@ -99,8 +102,9 @@ public class IntoNode extends SingleChildProcessNode {
     ReadWriteIOUtils.write(table, stream);
     Symbol.serialize(rowCountSymbol, stream);
     ReadWriteIOUtils.write(columns.size(), stream);
-    for (ColumnSchema tableColumn : columns) {
-      ColumnSchema.serialize(tableColumn, stream);
+    for (Pair<ColumnSchema, Integer> column : columns) {
+      ColumnSchema.serialize(column.left, stream);
+      ReadWriteIOUtils.write(column.right, stream);
     }
   }
 
@@ -109,10 +113,12 @@ public class IntoNode extends SingleChildProcessNode {
     String table = ReadWriteIOUtils.readString(byteBuffer);
     Symbol rowCountSymbol = Symbol.deserialize(byteBuffer);
     int columnSize = ReadWriteIOUtils.readInt(byteBuffer);
-    List<ColumnSchema> columns = new ArrayList<>(columnSize);
+    List<Pair<ColumnSchema, Integer>> columns = new ArrayList<>(columnSize);
     for (int i = 0; i < columnSize; i++) {
-      columns.add(ColumnSchema.deserialize(byteBuffer));
+      columns.add(
+          new Pair<>(ColumnSchema.deserialize(byteBuffer), ReadWriteIOUtils.readInt(byteBuffer)));
     }
+
     PlanNodeId planNodeId = PlanNodeId.deserialize(byteBuffer);
     return new IntoNode(planNodeId, null, database, table, columns, rowCountSymbol);
   }
@@ -163,7 +169,7 @@ public class IntoNode extends SingleChildProcessNode {
     return table;
   }
 
-  public List<ColumnSchema> getColumns() {
+  public List<Pair<ColumnSchema, Integer>> getColumns() {
     return columns;
   }
 }
