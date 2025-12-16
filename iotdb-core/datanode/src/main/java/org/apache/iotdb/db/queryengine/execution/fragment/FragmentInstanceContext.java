@@ -38,6 +38,7 @@ import org.apache.iotdb.db.queryengine.metric.DriverSchedulerMetricSet;
 import org.apache.iotdb.db.queryengine.metric.QueryRelatedResourceMetricSet;
 import org.apache.iotdb.db.queryengine.metric.QueryResourceMetricSet;
 import org.apache.iotdb.db.queryengine.metric.SeriesScanCostMetricSet;
+import org.apache.iotdb.db.queryengine.plan.planner.LocalExecutionPlanner;
 import org.apache.iotdb.db.queryengine.plan.planner.memory.MemoryReservationManager;
 import org.apache.iotdb.db.queryengine.plan.planner.memory.ThreadSafeMemoryReservationManager;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.TimePredicate;
@@ -906,7 +907,8 @@ public class FragmentInstanceContext extends QueryContext {
                 "TVList {} is released by the query, FragmentInstance Id is {}",
                 tvList,
                 this.getId());
-            memoryReservationManager.releaseMemoryCumulatively(tvList.calculateRamSize());
+            LocalExecutionPlanner.getInstance()
+                .releaseToFreeMemoryForOperators(tvList.calculateRamSize());
             tvList.clear();
           } else {
             FragmentInstanceContext queryContext =

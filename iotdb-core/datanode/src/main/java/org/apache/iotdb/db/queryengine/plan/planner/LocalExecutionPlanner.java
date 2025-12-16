@@ -316,6 +316,17 @@ public class LocalExecutionPlanner {
     }
   }
 
+  public void allocateMemoryForOperators(final long memoryInBytes) {
+    if (!OPERATORS_MEMORY_BLOCK.allocate(memoryInBytes)) {
+      throw new MemoryNotEnoughException(
+          String.format(
+              "There is not enough memory,"
+                  + "current remaining free memory is %dB, "
+                  + "the memory requested this time is %dB",
+              OPERATORS_MEMORY_BLOCK.getFreeMemoryInBytes(), memoryInBytes));
+    }
+  }
+
   public void releaseToFreeMemoryForOperators(final long memoryInBytes) {
     OPERATORS_MEMORY_BLOCK.release(memoryInBytes);
   }
