@@ -53,7 +53,11 @@ public abstract class IMemoryBlock implements AutoCloseable {
    *
    * @param sizeInByte the size of memory to be allocated, should be positive
    */
-  public abstract boolean allocate(final long sizeInByte);
+  public abstract boolean allocate(final long sizeInByte, Object obj, String caller);
+
+  public boolean allocate(final long sizeInByte) {
+    return allocate(sizeInByte, null, null);
+  }
 
   /**
    * Allocate memory managed by this memory block. if the currently used ratio is already above
@@ -79,7 +83,11 @@ public abstract class IMemoryBlock implements AutoCloseable {
    * @param sizeInByte the size of memory to be released, should be positive
    * @return the used size after release, zero if the release fails
    */
-  public abstract long release(final long sizeInByte);
+  public abstract long release(final long sizeInByte, final Object obj, String caller);
+
+  public long release(final long sizeInByte) {
+    return release(sizeInByte, null, null);
+  }
 
   /**
    * Try to set memory usage in byte of this memory block (for test only)

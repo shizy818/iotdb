@@ -902,9 +902,10 @@ public class FragmentInstanceContext extends QueryContext {
         queryContextSet.remove(this);
         if (tvList.getOwnerQuery() == this) {
           if (queryContextSet.isEmpty()) {
-            LOGGER.debug(
-                "TVList {} is released by the query, FragmentInstance Id is {}",
+            LOGGER.info(
+                "TVList {} release memory {}, FragmentInstance Id is {}",
                 tvList,
+                tvList.calculateRamSize(),
                 this.getId());
             memoryReservationManager.releaseMemoryCumulatively(tvList.calculateRamSize());
             tvList.clear();

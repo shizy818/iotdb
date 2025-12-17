@@ -204,7 +204,7 @@ public class LocalExecutionPlanner {
 
     QueryRelatedResourceMetricSet.getInstance().updateEstimatedMemory(estimatedMemorySize);
 
-    if (OPERATORS_MEMORY_BLOCK.allocate(estimatedMemorySize)) {
+    if (OPERATORS_MEMORY_BLOCK.allocate(estimatedMemorySize, this, "checkMemory")) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug(
             "[ConsumeMemory] consume: {}, current remaining memory: {}",
@@ -224,7 +224,7 @@ public class LocalExecutionPlanner {
           if (newState.isDone()) {
             try (SetThreadName fragmentInstanceName =
                 new SetThreadName(stateMachine.getFragmentInstanceId().getFullId())) {
-              OPERATORS_MEMORY_BLOCK.release(estimatedMemorySize);
+              OPERATORS_MEMORY_BLOCK.release(estimatedMemorySize, this, "checkMemory");
               if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug(
                     "[ReleaseMemory] release: {}, current remaining memory: {}",
@@ -294,7 +294,7 @@ public class LocalExecutionPlanner {
       final long reservedBytes,
       final String queryId,
       final String contextHolder) {
-    if (OPERATORS_MEMORY_BLOCK.allocate(memoryInBytes)) {
+    if (OPERATORS_MEMORY_BLOCK.allocate(memoryInBytes, this, "reserveFromFreeMemoryForOperators")) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug(
             "[ConsumeMemory] consume: {}, current remaining memory: {}",
@@ -317,7 +317,7 @@ public class LocalExecutionPlanner {
   }
 
   public void releaseToFreeMemoryForOperators(final long memoryInBytes) {
-    OPERATORS_MEMORY_BLOCK.release(memoryInBytes);
+    OPERATORS_MEMORY_BLOCK.release(memoryInBytes, this, "releaseToFreeMemoryForOperators");
   }
 
   public long getAllocateMemoryForOperators() {

@@ -57,7 +57,10 @@ public class AtomicLongMemoryBlock extends IMemoryBlock {
   }
 
   @Override
-  public boolean allocate(long sizeInByte) {
+  public boolean allocate(long sizeInByte, Object obj, String caller) {
+    if (obj != null) {
+      LOGGER.info("{} try to allocate {} by {}", caller, sizeInByte, obj);
+    }
     AtomicBoolean result = new AtomicBoolean(false);
     usedMemoryInBytes.updateAndGet(
         memCost -> {
@@ -100,13 +103,17 @@ public class AtomicLongMemoryBlock extends IMemoryBlock {
   }
 
   @Override
-  public long release(long sizeInByte) {
+  public long release(long sizeInByte, Object obj, String caller) {
+    if (obj != null) {
+      LOGGER.info("{} try to release {} by {}", caller, sizeInByte, obj);
+    }
     return usedMemoryInBytes.updateAndGet(
         memCost -> {
           if (sizeInByte > memCost) {
             LOGGER.warn(
-                "The memory cost to be released is larger than the memory cost of memory block {}",
-                this);
+                "The memory cost to be released is larger than the memory cost of memory block {}, {}",
+                this,
+                obj);
             return 0;
           }
           return memCost - sizeInByte;
