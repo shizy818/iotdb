@@ -65,7 +65,8 @@ public class PriorityMergeReader implements IPointReader {
       long size = element.getReader().getUsedMemorySize();
       usedMemorySize += size;
       if (memoryReservationManager != null) {
-        memoryReservationManager.reserveMemoryCumulatively(size);
+        memoryReservationManager.reserveMemoryCumulatively(
+            size, "PriorityMergeReader::reserveMemoryCumulatively");
       }
     } else {
       reader.close();
@@ -102,7 +103,8 @@ public class PriorityMergeReader implements IPointReader {
       long size = top.getReader().getUsedMemorySize();
       usedMemorySize -= size;
       if (memoryReservationManager != null) {
-        memoryReservationManager.releaseMemoryCumulatively(size);
+        memoryReservationManager.releaseMemoryCumulatively(
+            size, "PriorityMergeReader::releaseMemoryCumulatively");
       }
     }
     return ret;
@@ -131,7 +133,8 @@ public class PriorityMergeReader implements IPointReader {
         long size = e.getReader().getUsedMemorySize();
         usedMemorySize -= size;
         if (memoryReservationManager != null) {
-          memoryReservationManager.releaseMemoryCumulatively(size);
+          memoryReservationManager.releaseMemoryCumulatively(
+              size, "PriorityMergeReader::releaseMemoryCumulatively");
         }
         e.getReader().close();
         continue;
@@ -147,7 +150,8 @@ public class PriorityMergeReader implements IPointReader {
           long size = e.getReader().getUsedMemorySize();
           usedMemorySize -= size;
           if (memoryReservationManager != null) {
-            memoryReservationManager.releaseMemoryCumulatively(size);
+            memoryReservationManager.releaseMemoryCumulatively(
+                size, "PriorityMergeReader::releaseMemoryCumulatively");
           }
           // the chunk is end
           e.close();
@@ -175,7 +179,8 @@ public class PriorityMergeReader implements IPointReader {
       e.close();
     }
     if (memoryReservationManager != null) {
-      memoryReservationManager.releaseMemoryCumulatively(usedMemorySize);
+      memoryReservationManager.releaseMemoryCumulatively(
+          usedMemorySize, "PriorityMergeReader::releaseMemoryCumulatively");
     }
     usedMemorySize = 0;
   }

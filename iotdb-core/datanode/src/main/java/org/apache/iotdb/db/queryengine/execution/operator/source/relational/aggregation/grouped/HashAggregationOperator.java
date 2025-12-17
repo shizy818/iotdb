@@ -157,9 +157,11 @@ public class HashAggregationOperator extends AbstractOperator {
     operatorContext.recordSpecifiedInfo(CURRENT_USED_MEMORY, Long.toString(memorySize));
     long delta = memorySize - previousRetainedSize;
     if (delta > 0) {
-      memoryReservationManager.reserveMemoryCumulatively(delta);
+      memoryReservationManager.reserveMemoryCumulatively(
+          delta, "HashAggregationOperator::reserveMemoryCumulatively");
     } else if (delta < 0) {
-      memoryReservationManager.releaseMemoryCumulatively(-delta);
+      memoryReservationManager.releaseMemoryCumulatively(
+          -delta, "HashAggregationOperator::releaseMemoryCumulatively");
     }
     previousRetainedSize = memorySize;
   }

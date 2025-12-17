@@ -134,7 +134,8 @@ public class TemplatedAnalyze {
                 new TimeSeriesOperand(
                     new PartialPath(new String[] {measurementName}), entry.getValue().getType());
             // reserve memory for this expression
-            context.reserveMemoryForFrontEnd(measurementPath.ramBytesUsed());
+            context.reserveMemoryForFrontEnd(
+                measurementPath.ramBytesUsed(), "TemplatedAnalyze::reserveMemoryForFrontEnd");
             outputExpressions.add(new Pair<>(measurementPath, null));
             paginationController.consumeLimit();
           } else {
@@ -157,7 +158,8 @@ public class TemplatedAnalyze {
                     new PartialPath(new String[] {measurementName}),
                     template.getSchemaMap().get(measurementName).getType());
             // reserve memory for this expression
-            context.reserveMemoryForFrontEnd(measurementPath.ramBytesUsed());
+            context.reserveMemoryForFrontEnd(
+                measurementPath.ramBytesUsed(), "TemplatedAnalyze::reserveMemoryForFrontEnd");
             outputExpressions.add(new Pair<>(measurementPath, resultColumn.getAlias()));
           } else {
             break;

@@ -592,7 +592,8 @@ public class AggregationPushDown implements PlanOptimizer {
         context
             .getContext()
             .reserveMemoryForFrontEnd(
-                MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(node));
+                MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(node),
+                "AggregationPushDown::reserveMemoryForFrontEnd");
         return node;
       } else if (selectPath instanceof AlignedPath) { // aligned series
         AlignedSeriesAggregationScanNode aggScanNode =
@@ -606,7 +607,8 @@ public class AggregationPushDown implements PlanOptimizer {
         context
             .getContext()
             .reserveMemoryForFrontEnd(
-                MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(aggScanNode));
+                MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(aggScanNode),
+                "AggregationPushDown::reserveMemoryForFrontEnd");
         return aggScanNode;
       } else {
         throw new IllegalArgumentException("unexpected path type");
@@ -683,7 +685,8 @@ public class AggregationPushDown implements PlanOptimizer {
     }
 
     public void releaseMemoryForFrontEnd(final long bytes) {
-      this.context.releaseMemoryReservedForFrontEnd(bytes);
+      this.context.releaseMemoryReservedForFrontEnd(
+          bytes, "AggregationPushDown::releaseMemoryForFrontEnd");
     }
   }
 }

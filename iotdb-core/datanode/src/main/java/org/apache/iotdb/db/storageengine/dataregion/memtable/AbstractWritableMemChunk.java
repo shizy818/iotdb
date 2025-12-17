@@ -113,7 +113,8 @@ public abstract class AbstractWritableMemChunk implements IWritableMemChunk {
           MemoryReservationManager memoryReservationManager =
               ((FragmentInstanceContext) firstQuery).getMemoryReservationContext();
           LOGGER.info("TvList {} allocate memory {}", tvList, tvList.calculateRamSize());
-          memoryReservationManager.reserveMemoryCumulatively(tvList.calculateRamSize());
+          memoryReservationManager.reserveMemoryCumulatively(
+              tvList.calculateRamSize(), "AbstractWritableMemChunk::reserveMemoryCumulatively");
         }
         // update current TVList owner to first query in the list
         tvList.setOwnerQuery(firstQuery);

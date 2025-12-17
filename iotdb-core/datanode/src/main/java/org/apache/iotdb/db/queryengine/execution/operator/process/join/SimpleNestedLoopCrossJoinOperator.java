@@ -108,7 +108,9 @@ public class SimpleNestedLoopCrossJoinOperator extends AbstractOperator {
         TsBlock block = buildSource.nextWithTimer();
         if (block != null && !block.isEmpty()) {
           buildBlocks.add(block);
-          memoryReservationManager.reserveMemoryCumulatively(block.getRetainedSizeInBytes());
+          memoryReservationManager.reserveMemoryCumulatively(
+              block.getRetainedSizeInBytes(),
+              "SimpleNestedLoopCrossJoinOperator::reserveMemoryCumulatively");
         }
       }
       // probeSource could still be blocked by now, so we need to check it again
@@ -197,7 +199,9 @@ public class SimpleNestedLoopCrossJoinOperator extends AbstractOperator {
       buildSource.close();
     }
     for (TsBlock block : buildBlocks) {
-      memoryReservationManager.releaseMemoryCumulatively(block.getRetainedSizeInBytes());
+      memoryReservationManager.releaseMemoryCumulatively(
+          block.getRetainedSizeInBytes(),
+          "SimpleNestedLoopCrossJoinOperator::releaseMemoryCumulatively");
     }
     buildBlocks.clear();
     cachedProbeBlock = null;

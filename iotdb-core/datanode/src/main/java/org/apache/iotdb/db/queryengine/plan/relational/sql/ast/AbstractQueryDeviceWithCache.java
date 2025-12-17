@@ -67,7 +67,8 @@ public abstract class AbstractQueryDeviceWithCache extends AbstractTraverseDevic
     final boolean needFetch = super.parseWhere(entries, tableInstance, attributeColumns, context);
     if (!needFetch) {
       context.reserveMemoryForFrontEnd(
-          entries.get(database).stream().map(DeviceEntry::ramBytesUsed).reduce(0L, Long::sum));
+          entries.get(database).stream().map(DeviceEntry::ramBytesUsed).reduce(0L, Long::sum),
+          "AbstractQueryDeviceWithCache::reserveMemoryForFrontEnd");
       results =
           entries.get(database).stream()
               .map(

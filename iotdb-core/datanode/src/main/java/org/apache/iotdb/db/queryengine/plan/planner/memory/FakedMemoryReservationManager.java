@@ -22,14 +22,14 @@ package org.apache.iotdb.db.queryengine.plan.planner.memory;
 public class FakedMemoryReservationManager implements MemoryReservationManager {
 
   @Override
-  public void reserveMemoryCumulatively(long size) {}
+  public void reserveMemoryCumulatively(long size, String caller) {}
 
   @Override
-  public void reserveMemoryImmediately() {}
+  public void reserveMemoryImmediately(String caller) {}
 
   @Override
-  public void releaseMemoryCumulatively(long size) {}
+  public void releaseMemoryCumulatively(long size, String caller) {}
 
   @Override
-  public void releaseAllReservedMemory() {}
+  public void releaseAllReservedMemory(String caller) {}
 }

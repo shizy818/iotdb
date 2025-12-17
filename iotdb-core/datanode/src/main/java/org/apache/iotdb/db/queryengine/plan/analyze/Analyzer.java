@@ -47,9 +47,10 @@ public class Analyzer {
     Analysis analysis = null;
     context.setReserveMemoryForSchemaTreeFunc(
         mem -> {
-          context.reserveMemoryForFrontEnd(mem);
+          context.reserveMemoryForFrontEnd(mem, "Analyzer::reserveMemoryForFrontEnd");
           // For temporary and independently counted memory, we need process it immediately
-          context.reserveMemoryForFrontEndImmediately();
+          context.reserveMemoryForFrontEndImmediately(
+              "Analyzer::reserveMemoryForFrontEndImmediately");
         });
     try {
       analysis = visitor.process(statement, context);

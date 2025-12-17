@@ -226,12 +226,13 @@ public class SchemaFetchScanOperator implements SourceOperator {
         operatorContext
             .getInstanceContext()
             .getMemoryReservationContext()
-            .reserveMemoryCumulatively(ramBytesUsed);
+            .reserveMemoryCumulatively(
+                ramBytesUsed, "SchemaFetchScanOperator::reserveMemoryCumulatively");
         // For temporary and independently counted memory, we need process it immediately
         operatorContext
             .getInstanceContext()
             .getMemoryReservationContext()
-            .reserveMemoryImmediately();
+            .reserveMemoryImmediately("SchemaFetchScanOperator::reserveMemoryImmediately");
         this.schemaTreeMemCost = ramBytesUsed;
       }
     } catch (MetadataException e) {
@@ -270,7 +271,8 @@ public class SchemaFetchScanOperator implements SourceOperator {
     operatorContext
         .getInstanceContext()
         .getMemoryReservationContext()
-        .releaseMemoryCumulatively(schemaTreeMemCost);
+        .releaseMemoryCumulatively(
+            schemaTreeMemCost, "SchemaFetchScanOperator::releaseMemoryCumulatively");
     schemaTreeMemCost = 0;
     schemaNodeIteratorForSerialize = null;
   }

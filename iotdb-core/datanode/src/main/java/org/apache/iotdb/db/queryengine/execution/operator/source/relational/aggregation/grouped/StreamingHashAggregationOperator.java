@@ -298,9 +298,11 @@ public class StreamingHashAggregationOperator extends AbstractOperator {
     }
     long delta = memorySize - previousRetainedSize;
     if (delta > 0) {
-      memoryReservationManager.reserveMemoryCumulatively(delta);
+      memoryReservationManager.reserveMemoryCumulatively(
+          delta, "StreamingHashAggregationOperator::reserveMemoryCumulatively");
     } else if (delta < 0) {
-      memoryReservationManager.releaseMemoryCumulatively(-delta);
+      memoryReservationManager.releaseMemoryCumulatively(
+          -delta, "StreamingHashAggregationOperator::releaseMemoryCumulatively");
     }
     previousRetainedSize = memorySize;
   }

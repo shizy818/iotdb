@@ -79,7 +79,7 @@ public class ExpressionUtils {
         memCost = expression.ramBytesUsed();
         queryContext.calculateAvgTimeseriesOperandMemCost(memCost);
       }
-      queryContext.reserveMemoryForFrontEnd(memCost);
+      queryContext.reserveMemoryForFrontEnd(memCost, "ExpressionUtils::reserveMemoryForFrontEnd");
 
       resultExpressions.add(expression);
     }
@@ -316,7 +316,9 @@ public class ExpressionUtils {
 
   private static Expression reserveMemoryForExpression(
       MPPQueryContext queryContext, Expression expression) {
-    queryContext.reserveMemoryForFrontEnd(expression == null ? 0 : expression.ramBytesUsed());
+    queryContext.reserveMemoryForFrontEnd(
+        expression == null ? 0 : expression.ramBytesUsed(),
+        "ExpressionUtils::reserveMemoryForFrontEnd");
     return expression;
   }
 

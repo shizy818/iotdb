@@ -192,7 +192,8 @@ public class QueryExecution implements IQueryExecution {
     schedule();
 
     // The last batch of memory reserved by the front end
-    context.reserveMemoryForFrontEndImmediately();
+    context.reserveMemoryForFrontEndImmediately(
+        "QueryExecution::reserveMemoryForFrontEndImmediately");
 
     // friendly for gc
     logicalPlan.clearUselessMemory();

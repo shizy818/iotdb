@@ -22,10 +22,16 @@ package org.apache.iotdb.db.queryengine.plan.planner.memory;
 import org.apache.iotdb.db.queryengine.common.QueryId;
 import org.apache.iotdb.db.queryengine.plan.planner.LocalExecutionPlanner;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.concurrent.NotThreadSafe;
 
 @NotThreadSafe
 public class NotThreadSafeMemoryReservationManager implements MemoryReservationManager {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(NotThreadSafeMemoryReservationManager.class);
+
   // To avoid reserving memory too frequently, we choose to do it in batches. This is the lower
   // bound for each batch.
   private static final long MEMORY_BATCH_THRESHOLD = 1024L * 1024L;
@@ -48,25 +54,45 @@ public class NotThreadSafeMemoryReservationManager implements MemoryReservationM
   }
 
   @Override
-  public void reserveMemoryCumulatively(final long size) {
+  public void reserveMemoryCumulatively(final long size, String caller) {
     bytesToBeReserved += size;
     if (bytesToBeReserved >= MEMORY_BATCH_THRESHOLD) {
-      reserveMemoryImmediately();
-    }
-  }
-
-  @Override
-  public void reserveMemoryImmediately() {
-    if (bytesToBeReserved != 0) {
       LOCAL_EXECUTION_PLANNER.reserveFromFreeMemoryForOperators(
-          bytesToBeReserved, reservedBytesInTotal, queryId.getId(), contextHolder);
+          bytesToBeReserved, reservedBytesInTotal, queryId.getId(), contextHolder, caller);
       reservedBytesInTotal += bytesToBeReserved;
       bytesToBeReserved = 0;
     }
+    LOGGER.info(
+        "reserveMemoryCumulatively by {}, size {}, bytesToBeReserved {}, bytesToBeReleased {}, reservedBytesInTotal {}, MemoryReservationManager {}, AtomicLongMemoryBlock {}",
+        caller,
+        size,
+        bytesToBeReserved,
+        bytesToBeReleased,
+        reservedBytesInTotal,
+        this,
+        LOCAL_EXECUTION_PLANNER.getOperatorsMemoryBlock());
   }
 
   @Override
-  public void releaseMemoryCumulatively(final long size) {
+  public void reserveMemoryImmediately(String caller) {
+    if (bytesToBeReserved != 0) {
+      LOCAL_EXECUTION_PLANNER.reserveFromFreeMemoryForOperators(
+          bytesToBeReserved, reservedBytesInTotal, queryId.getId(), contextHolder, caller);
+      reservedBytesInTotal += bytesToBeReserved;
+      bytesToBeReserved = 0;
+      LOGGER.info(
+          "reserveMemoryImmediately by {}, bytesToBeReserved {}, bytesToBeReleased {}, reservedBytesInTotal {}, MemoryReservationManager {}, AtomicLongMemoryBlock {}",
+          caller,
+          bytesToBeReserved,
+          bytesToBeReleased,
+          reservedBytesInTotal,
+          this,
+          LOCAL_EXECUTION_PLANNER.getOperatorsMemoryBlock());
+    }
+  }
+
+  @Override
+  public void releaseMemoryCumulatively(final long size, String caller) {
     bytesToBeReleased += size;
     if (bytesToBeReleased >= MEMORY_BATCH_THRESHOLD) {
       long bytesToRelease;
@@ -75,20 +101,37 @@ public class NotThreadSafeMemoryReservationManager implements MemoryReservationM
       } else {
         bytesToRelease = bytesToBeReleased - bytesToBeReserved;
         bytesToBeReserved = 0;
-        LOCAL_EXECUTION_PLANNER.releaseToFreeMemoryForOperators(bytesToRelease);
+        LOCAL_EXECUTION_PLANNER.releaseToFreeMemoryForOperators(bytesToRelease, caller);
         reservedBytesInTotal -= bytesToRelease;
       }
       bytesToBeReleased = 0;
     }
+    LOGGER.info(
+        "releaseMemoryCumulatively by {}, size {}, bytesToBeReserved {}, bytesToBeReleased {}, reservedBytesInTotal {}, MemoryReservationManager {}, AtomicLongMemoryBlock {}",
+        caller,
+        size,
+        bytesToBeReserved,
+        bytesToBeReleased,
+        reservedBytesInTotal,
+        this,
+        LOCAL_EXECUTION_PLANNER.getOperatorsMemoryBlock());
   }
 
   @Override
-  public void releaseAllReservedMemory() {
+  public void releaseAllReservedMemory(String caller) {
     if (reservedBytesInTotal != 0) {
-      LOCAL_EXECUTION_PLANNER.releaseToFreeMemoryForOperators(reservedBytesInTotal);
+      LOCAL_EXECUTION_PLANNER.releaseToFreeMemoryForOperators(reservedBytesInTotal, caller);
       reservedBytesInTotal = 0;
       bytesToBeReserved = 0;
       bytesToBeReleased = 0;
     }
+    LOGGER.info(
+        "releaseAllReservedMemory by {}, bytesToBeReserved {}, bytesToBeReleased {}, reservedBytesInTotal {}, MemoryReservationManager {}, AtomicLongMemoryBlock {}",
+        caller,
+        bytesToBeReserved,
+        bytesToBeReleased,
+        reservedBytesInTotal,
+        this,
+        LOCAL_EXECUTION_PLANNER.getOperatorsMemoryBlock());
   }
 }

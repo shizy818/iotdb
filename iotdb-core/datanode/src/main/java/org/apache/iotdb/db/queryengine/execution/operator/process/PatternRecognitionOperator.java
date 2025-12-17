@@ -410,7 +410,8 @@ public class PatternRecognitionOperator implements ProcessOperator {
   public void close() throws Exception {
     child.close();
     if (totalMemorySize != 0) {
-      memoryReservationManager.releaseMemoryCumulatively(totalMemorySize);
+      memoryReservationManager.releaseMemoryCumulatively(
+          totalMemorySize, "PatternRecognitionOperator::releaseMemoryCumulatively");
     }
   }
 
@@ -421,7 +422,8 @@ public class PatternRecognitionOperator implements ProcessOperator {
 
   private void reserveOneTsBlockMemory(TsBlock tsBlock) {
     long reserved = tsBlock.getTotalInstanceSize();
-    memoryReservationManager.reserveMemoryCumulatively(reserved);
+    memoryReservationManager.reserveMemoryCumulatively(
+        reserved, "PatternRecognitionOperator::reserveMemoryCumulatively");
     totalMemorySize += reserved;
     maxUsedMemory = Math.max(maxUsedMemory, totalMemorySize);
     operatorContext.recordSpecifiedInfo(MAX_RESERVED_MEMORY, Long.toString(maxUsedMemory));
@@ -429,7 +431,8 @@ public class PatternRecognitionOperator implements ProcessOperator {
 
   private void releaseAllCachedTsBlockMemory() {
     long released = cachedTsBlocks.stream().mapToInt(TsBlock::getTotalInstanceSize).sum();
-    memoryReservationManager.releaseMemoryCumulatively(released);
+    memoryReservationManager.releaseMemoryCumulatively(
+        released, "PatternRecognitionOperator::releaseMemoryCumulatively");
     totalMemorySize -= released;
     // No need to update maxUsedMemory
     operatorContext.recordSpecifiedInfo(MAX_RESERVED_MEMORY, Long.toString(maxUsedMemory));

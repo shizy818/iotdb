@@ -53,10 +53,10 @@ public abstract class IMemoryBlock implements AutoCloseable {
    *
    * @param sizeInByte the size of memory to be allocated, should be positive
    */
-  public abstract boolean allocate(final long sizeInByte, Object obj, String caller);
+  public abstract boolean allocate(final long sizeInByte, String caller);
 
   public boolean allocate(final long sizeInByte) {
-    return allocate(sizeInByte, null, null);
+    return allocate(sizeInByte, null);
   }
 
   /**
@@ -83,10 +83,10 @@ public abstract class IMemoryBlock implements AutoCloseable {
    * @param sizeInByte the size of memory to be released, should be positive
    * @return the used size after release, zero if the release fails
    */
-  public abstract long release(final long sizeInByte, final Object obj, String caller);
+  public abstract long release(final long sizeInByte, String caller);
 
   public long release(final long sizeInByte) {
-    return release(sizeInByte, null, null);
+    return release(sizeInByte, null);
   }
 
   /**

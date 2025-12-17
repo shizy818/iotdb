@@ -272,7 +272,8 @@ public class LogicalPlanBuilder {
                   Collections.singletonList(selectedPath.getMeasurementSchema()),
                   outputViewPath,
                   outputViewPathType);
-          this.context.reserveMemoryForFrontEnd(memCost);
+          this.context.reserveMemoryForFrontEnd(
+              memCost, "LogicalPlanBuilder::reserveMemoryForFrontEnd");
         }
       } else {
         boolean aligned = false;
@@ -296,10 +297,13 @@ public class LogicalPlanBuilder {
                 measurementSchemas,
                 null,
                 null);
-        this.context.reserveMemoryForFrontEnd(memCost);
+        this.context.reserveMemoryForFrontEnd(
+            memCost, "LogicalPlanBuilder::reserveMemoryForFrontEnd");
       }
     }
-    this.context.reserveMemoryForFrontEnd(lastQueryNode.getMemorySizeOfSharedStructures());
+    this.context.reserveMemoryForFrontEnd(
+        lastQueryNode.getMemorySizeOfSharedStructures(),
+        "LogicalPlanBuilder::reserveMemoryForFrontEnd");
 
     processLastQueryTransformNode(analysis, lastQueryNode);
 
@@ -1390,7 +1394,8 @@ public class LogicalPlanBuilder {
    */
   private PlanNode reserveMemoryForSeriesSourceNode(final SeriesSourceNode sourceNode) {
     this.context.reserveMemoryForFrontEnd(
-        MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(sourceNode));
+        MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(sourceNode),
+        "LogicalPlanBuilder::reserveMemoryForFrontEnd");
     return sourceNode;
   }
 }

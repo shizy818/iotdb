@@ -2250,7 +2250,8 @@ public class AnalyzeVisitor extends StatementVisitor<Analysis, MPPQueryContext> 
     }
     long size = TimePartitionUtils.getEstimateTimePartitionSize(minTime, maxTime);
     context.reserveMemoryForFrontEnd(
-        RamUsageEstimator.shallowSizeOfInstance(TTimePartitionSlot.class) * size);
+        RamUsageEstimator.shallowSizeOfInstance(TTimePartitionSlot.class) * size,
+        "AnalyzerVisitor::reserveMemoryForFrontEnd");
   }
 
   private void analyzeInto(

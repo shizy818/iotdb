@@ -629,7 +629,8 @@ public class PrimitiveMemTableTest {
         Mockito.mock(MemoryReservationManager.class);
     Mockito.doThrow(new MemoryNotEnoughException(""))
         .when(memoryReservationManager)
-        .reserveMemoryCumulatively(list.calculateRamSize());
+        .reserveMemoryCumulatively(
+            list.calculateRamSize(), "PrimitiveMemTableTest::reserveMemoryCumulatively");
 
     // create FragmentInstanceId
     QueryId queryId = new QueryId("stub_query");

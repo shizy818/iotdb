@@ -366,7 +366,8 @@ public class FragmentInstanceContext extends QueryContext {
                 if (cachedModEntriesSize.compareAndSet(
                     alreadyUsedMemoryForCachedModEntries,
                     alreadyUsedMemoryForCachedModEntries + memCost)) {
-                  memoryReservationManager.reserveMemoryCumulatively(memCost);
+                  memoryReservationManager.reserveMemoryCumulatively(
+                      memCost, "FragmentInstanceContext::getAllModifications");
                   return allMods;
                 }
                 alreadyUsedMemoryForCachedModEntries = cachedModEntriesSize.get();
@@ -553,7 +554,8 @@ public class FragmentInstanceContext extends QueryContext {
     boolean added = super.collectTable(table);
     if (added && memoryReservationManager != null) {
       memoryReservationManager.reserveMemoryCumulatively(
-          RamUsageEstimator.sizeOf(table) + RamUsageEstimator.SHALLOW_SIZE_OF_HASHMAP_ENTRY);
+          RamUsageEstimator.sizeOf(table) + RamUsageEstimator.SHALLOW_SIZE_OF_HASHMAP_ENTRY,
+          "FragmentInstanceContext::collectTable");
     }
     return added;
   }
@@ -578,7 +580,8 @@ public class FragmentInstanceContext extends QueryContext {
   }
 
   public void releaseMemoryReservationManager() {
-    memoryReservationManager.releaseAllReservedMemory();
+    memoryReservationManager.releaseAllReservedMemory(
+        "FragmentInstanceContext::releaseMemoryReservationManager");
   }
 
   public boolean initQueryDataSource(List<IFullPath> sourcePaths) throws QueryProcessException {
@@ -907,7 +910,8 @@ public class FragmentInstanceContext extends QueryContext {
                 tvList,
                 tvList.calculateRamSize(),
                 this.getId());
-            memoryReservationManager.releaseMemoryCumulatively(tvList.calculateRamSize());
+            memoryReservationManager.releaseMemoryCumulatively(
+                tvList.calculateRamSize(), "FragmentInstanceContext::releaseTVListOwnedByQuery");
             tvList.clear();
           } else {
             FragmentInstanceContext queryContext =

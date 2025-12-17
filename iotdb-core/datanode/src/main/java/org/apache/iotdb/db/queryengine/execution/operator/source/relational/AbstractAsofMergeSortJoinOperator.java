@@ -118,7 +118,8 @@ public abstract class AbstractAsofMergeSortJoinOperator extends AbstractMergeSor
       for (int i = 0; i < rightBlockListIdx; i++) {
         long size = rightBlockList.get(i).getRetainedSizeInBytes();
         usedMemory -= size;
-        memoryReservationManager.releaseMemoryCumulatively(size);
+        memoryReservationManager.releaseMemoryCumulatively(
+            size, "AbstractAsofMergeSortJoinOperator::releaseMemoryCumulatively");
       }
       rightBlockList = rightBlockList.subList(rightBlockListIdx, rightBlockList.size());
       rightBlockListIdx = 0;

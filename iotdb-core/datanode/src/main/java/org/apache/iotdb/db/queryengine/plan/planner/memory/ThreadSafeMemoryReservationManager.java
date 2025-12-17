@@ -30,22 +30,22 @@ public class ThreadSafeMemoryReservationManager extends NotThreadSafeMemoryReser
   }
 
   @Override
-  public synchronized void reserveMemoryCumulatively(long size) {
-    super.reserveMemoryCumulatively(size);
+  public synchronized void reserveMemoryCumulatively(long size, String caller) {
+    super.reserveMemoryCumulatively(size, caller);
   }
 
   @Override
-  public synchronized void reserveMemoryImmediately() {
-    super.reserveMemoryImmediately();
+  public synchronized void reserveMemoryImmediately(String caller) {
+    super.reserveMemoryImmediately(caller);
   }
 
   @Override
-  public synchronized void releaseMemoryCumulatively(long size) {
-    super.releaseMemoryCumulatively(size);
+  public synchronized void releaseMemoryCumulatively(long size, String caller) {
+    super.releaseMemoryCumulatively(size, caller);
   }
 
   @Override
-  public synchronized void releaseAllReservedMemory() {
-    super.releaseAllReservedMemory();
+  public synchronized void releaseAllReservedMemory(String caller) {
+    super.releaseAllReservedMemory(caller);
   }
 }

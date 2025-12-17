@@ -366,7 +366,8 @@ public class TableWindowOperator implements ProcessOperator {
   public void close() throws Exception {
     inputOperator.close();
     if (totalMemorySize != 0) {
-      memoryReservationManager.releaseMemoryCumulatively(totalMemorySize);
+      memoryReservationManager.releaseMemoryCumulatively(
+          totalMemorySize, "TableWindowOperator::releaseMemoryCumulatively");
     }
   }
 
@@ -377,7 +378,8 @@ public class TableWindowOperator implements ProcessOperator {
 
   private void reserveOneTsBlockMemory(TsBlock tsBlock) {
     long reserved = tsBlock.getTotalInstanceSize();
-    memoryReservationManager.reserveMemoryCumulatively(reserved);
+    memoryReservationManager.reserveMemoryCumulatively(
+        reserved, "TableWindowOperator::reserveMemoryCumulatively");
     totalMemorySize += reserved;
     maxUsedMemory = Math.max(maxUsedMemory, totalMemorySize);
     operatorContext.recordSpecifiedInfo(MAX_RESERVED_MEMORY, Long.toString(maxUsedMemory));
@@ -385,7 +387,8 @@ public class TableWindowOperator implements ProcessOperator {
 
   private void releaseAllCachedTsBlockMemory() {
     long released = cachedTsBlocks.stream().mapToInt(TsBlock::getTotalInstanceSize).sum();
-    memoryReservationManager.releaseMemoryCumulatively(released);
+    memoryReservationManager.releaseMemoryCumulatively(
+        released, "TableWindowOperator::releaseMemoryCumulatively");
     totalMemorySize -= released;
     // No need to update maxUsedMemory
     operatorContext.recordSpecifiedInfo(MAX_RESERVED_MEMORY, Long.toString(maxUsedMemory));

@@ -322,7 +322,8 @@ public class Coordinator {
       return result;
     } finally {
       if (queryContext != null) {
-        queryContext.releaseAllMemoryReservedForFrontEnd();
+        queryContext.releaseAllMemoryReservedForFrontEnd(
+            "Coordinator::releaseAllMemoryReservedForFrontEnd");
       }
       DataNodeSchemaLockManager.getInstance().releaseReadLock(queryContext);
     }

@@ -26,21 +26,21 @@ public interface MemoryReservationManager {
    *
    * @param size the size of memory to reserve
    */
-  void reserveMemoryCumulatively(final long size);
+  void reserveMemoryCumulatively(final long size, String caller);
 
   /** Reserve memory for the accumulated memory size immediately. */
-  void reserveMemoryImmediately();
+  void reserveMemoryImmediately(String caller);
 
   /**
    * Release memory for the given size.
    *
    * @param size the size of memory to release
    */
-  void releaseMemoryCumulatively(final long size);
+  void releaseMemoryCumulatively(final long size, String caller);
 
   /**
    * Release all reserved memory immediately. Make sure this method is called when the lifecycle of
    * this manager ends, Or the memory to be released in the batch may not be released correctly.
    */
-  void releaseAllReservedMemory();
+  void releaseAllReservedMemory(String caller);
 }

@@ -57,9 +57,10 @@ public class AtomicLongMemoryBlock extends IMemoryBlock {
   }
 
   @Override
-  public boolean allocate(long sizeInByte, Object obj, String caller) {
-    if (obj != null) {
-      LOGGER.info("{} try to allocate {} by {}", caller, sizeInByte, obj);
+  public boolean allocate(long sizeInByte, String caller) {
+    if (caller != null) {
+      LOGGER.info(
+          "try to allocate {} by method {}, AtomicLongMemoryBlock {}", sizeInByte, caller, this);
     }
     AtomicBoolean result = new AtomicBoolean(false);
     usedMemoryInBytes.updateAndGet(
@@ -103,17 +104,17 @@ public class AtomicLongMemoryBlock extends IMemoryBlock {
   }
 
   @Override
-  public long release(long sizeInByte, Object obj, String caller) {
-    if (obj != null) {
-      LOGGER.info("{} try to release {} by {}", caller, sizeInByte, obj);
+  public long release(long sizeInByte, String caller) {
+    if (caller != null) {
+      LOGGER.info(
+          "try to release {} by method {}, AtomicLongMemoryBlock {}", sizeInByte, caller, this);
     }
     return usedMemoryInBytes.updateAndGet(
         memCost -> {
           if (sizeInByte > memCost) {
             LOGGER.warn(
-                "The memory cost to be released is larger than the memory cost of memory block {}, {}",
-                this,
-                obj);
+                "The memory cost to be released is larger than the memory cost of memory block {}",
+                this);
             return 0;
           }
           return memCost - sizeInByte;
@@ -134,21 +135,21 @@ public class AtomicLongMemoryBlock extends IMemoryBlock {
     return totalMemorySizeInBytes - usedMemoryInBytes.get();
   }
 
-  @Override
-  public String toString() {
-    return "IoTDBMemoryBlock{"
-        + "name="
-        + name
-        + ", isReleased="
-        + isReleased
-        + ", memoryBlockType="
-        + memoryBlockType
-        + ", totalMemorySizeInBytes="
-        + totalMemorySizeInBytes
-        + ", usedMemoryInBytes="
-        + usedMemoryInBytes
-        + '}';
-  }
+  //  @Override
+  //  public String toString() {
+  //    return "IoTDBMemoryBlock{"
+  //        + "name="
+  //        + name
+  //        + ", isReleased="
+  //        + isReleased
+  //        + ", memoryBlockType="
+  //        + memoryBlockType
+  //        + ", totalMemorySizeInBytes="
+  //        + totalMemorySizeInBytes
+  //        + ", usedMemoryInBytes="
+  //        + usedMemoryInBytes
+  //        + '}';
+  //  }
 
   @Override
   public void close() throws Exception {

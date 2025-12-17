@@ -939,7 +939,8 @@ public class SourceRewriter extends BaseSourceRewriter<DistributionPlanContext> 
       context
           .getQueryContext()
           .reserveMemoryForFrontEnd(
-              MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(split));
+              MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(split),
+              "SourceRewriter::reserveMemoryForFrontEnd");
       ret.add(split);
     }
     return ret;
@@ -1002,7 +1003,8 @@ public class SourceRewriter extends BaseSourceRewriter<DistributionPlanContext> 
       context
           .getQueryContext()
           .reserveMemoryForFrontEnd(
-              MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(split));
+              MemoryEstimationHelper.getEstimatedSizeOfAccountableObject(split),
+              "SourceRewriter::reserveMemoryForFrontEnd");
       aggregationNode.addChild(split);
     }
     return Collections.singletonList(aggregationNode);

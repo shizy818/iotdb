@@ -426,7 +426,8 @@ public class TableDeviceSchemaFetcher {
       if (isDirectDeviceQuery) {
         fetchPaths.add(deviceID);
       } else {
-        queryContext.reserveMemoryForFrontEnd(deviceEntry.ramBytesUsed());
+        queryContext.reserveMemoryForFrontEnd(
+            deviceEntry.ramBytesUsed(), "TableDeviceSchemaFetcher::reserveMemoryForFrontEnd");
       }
     }
     return true;
@@ -576,7 +577,8 @@ public class TableDeviceSchemaFetcher {
       final AlignedDeviceEntry deviceEntry =
           new AlignedDeviceEntry(
               deviceID, attributeColumns.stream().map(attributeMap::get).toArray(Binary[]::new));
-      mppQueryContext.reserveMemoryForFrontEnd(deviceEntry.ramBytesUsed());
+      mppQueryContext.reserveMemoryForFrontEnd(
+          deviceEntry.ramBytesUsed(), "TableDeviceSchemaFetcher::reserveMemoryForFrontEnd");
       deviceEntryList.add(deviceEntry);
       // Only cache those exact device query
       // Fetch paths is null iff there are fuzzy queries related to id columns
@@ -603,7 +605,8 @@ public class TableDeviceSchemaFetcher {
           columns[columns.length - 2].getBoolean(i)
               ? new AlignedDeviceEntry(deviceID, new Binary[0])
               : new NonAlignedDeviceEntry(deviceID, new Binary[0]);
-      mppQueryContext.reserveMemoryForFrontEnd(deviceEntry.ramBytesUsed());
+      mppQueryContext.reserveMemoryForFrontEnd(
+          deviceEntry.ramBytesUsed(), "TableDeviceSchemaFetcher::reserveMemoryForFrontEnd");
       deviceEntryMap
           .computeIfAbsent(
               columns[columns.length - 1].getBinary(0).getStringValue(TSFileConfig.STRING_CHARSET),

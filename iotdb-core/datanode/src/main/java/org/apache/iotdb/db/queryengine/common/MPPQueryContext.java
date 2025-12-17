@@ -165,13 +165,15 @@ public class MPPQueryContext implements IAuditEntity {
     if (reservedMemoryCostForSchemaTree <= 0) {
       return;
     }
-    this.memoryReservationManager.releaseMemoryCumulatively(reservedMemoryCostForSchemaTree);
+    this.memoryReservationManager.releaseMemoryCumulatively(
+        reservedMemoryCostForSchemaTree, "MppQueryContext::releaseMemoryCumulatively");
     reservedMemoryCostForSchemaTree = 0;
   }
 
   public void prepareForRetry() {
     this.initResultNodeContext();
-    this.releaseAllMemoryReservedForFrontEnd();
+    this.releaseAllMemoryReservedForFrontEnd(
+        "MppQueryContext::releaseAllMemoryReservedForFrontEnd");
   }
 
   private void initResultNodeContext() {
@@ -379,20 +381,20 @@ public class MPPQueryContext implements IAuditEntity {
    * This method does not require concurrency control because the query plan is generated in a
    * single-threaded manner.
    */
-  public void reserveMemoryForFrontEnd(final long bytes) {
-    this.memoryReservationManager.reserveMemoryCumulatively(bytes);
+  public void reserveMemoryForFrontEnd(final long bytes, String caller) {
+    this.memoryReservationManager.reserveMemoryCumulatively(bytes, caller);
   }
 
-  public void reserveMemoryForFrontEndImmediately() {
-    this.memoryReservationManager.reserveMemoryImmediately();
+  public void reserveMemoryForFrontEndImmediately(String caller) {
+    this.memoryReservationManager.reserveMemoryImmediately(caller);
   }
 
-  public void releaseAllMemoryReservedForFrontEnd() {
-    this.memoryReservationManager.releaseAllReservedMemory();
+  public void releaseAllMemoryReservedForFrontEnd(String caller) {
+    this.memoryReservationManager.releaseAllReservedMemory(caller);
   }
 
-  public void releaseMemoryReservedForFrontEnd(final long bytes) {
-    this.memoryReservationManager.releaseMemoryCumulatively(bytes);
+  public void releaseMemoryReservedForFrontEnd(final long bytes, String caller) {
+    this.memoryReservationManager.releaseMemoryCumulatively(bytes, caller);
   }
 
   public boolean useSampledAvgTimeseriesOperandMemCost() {

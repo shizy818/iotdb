@@ -179,7 +179,8 @@ public abstract class AbstractMergeSortJoinOperator extends AbstractOperator {
     for (TsBlock tsBlock : rightBlockList) {
       long size = tsBlock.getRetainedSizeInBytes();
       usedMemory -= size;
-      memoryReservationManager.releaseMemoryCumulatively(size);
+      memoryReservationManager.releaseMemoryCumulatively(
+          size, "AbstractMergeSortJoinOperator::releaseMemoryCumulatively");
     }
 
     rightBlockList.clear();
@@ -254,7 +255,8 @@ public abstract class AbstractMergeSortJoinOperator extends AbstractOperator {
       for (int i = 0; i < rightBlockListIdx; i++) {
         long size = rightBlockList.get(i).getRetainedSizeInBytes();
         usedMemory -= size;
-        memoryReservationManager.releaseMemoryCumulatively(size);
+        memoryReservationManager.releaseMemoryCumulatively(
+            size, "AbstractMergeSortJoinOperator::releaseMemoryCumulatively");
       }
       rightBlockList = rightBlockList.subList(rightBlockListIdx, rightBlockList.size());
       rightBlockListIdx = 0;
@@ -375,7 +377,8 @@ public abstract class AbstractMergeSortJoinOperator extends AbstractOperator {
 
   protected void reserveMemory(long size) {
     usedMemory += size;
-    memoryReservationManager.reserveMemoryCumulatively(size);
+    memoryReservationManager.reserveMemoryCumulatively(
+        size, "AbstractMergeSortJoinOperator::reserveMemoryCumulatively");
     if (usedMemory > maxUsedMemory) {
       maxUsedMemory = usedMemory;
       operatorContext.recordSpecifiedInfo(MAX_RESERVED_MEMORY, Long.toString(maxUsedMemory));
@@ -579,7 +582,9 @@ public abstract class AbstractMergeSortJoinOperator extends AbstractOperator {
 
     if (!rightBlockList.isEmpty()) {
       for (TsBlock block : rightBlockList) {
-        memoryReservationManager.releaseMemoryCumulatively(block.getRetainedSizeInBytes());
+        memoryReservationManager.releaseMemoryCumulatively(
+            block.getRetainedSizeInBytes(),
+            "AbstractMergeSortJoinOperator::releaseMemoryCumulatively");
       }
     }
   }

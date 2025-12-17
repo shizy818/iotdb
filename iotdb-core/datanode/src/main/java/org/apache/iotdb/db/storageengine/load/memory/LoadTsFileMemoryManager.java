@@ -90,7 +90,7 @@ public class LoadTsFileMemoryManager {
     }
     final long sizeToRelease = Math.min(sizeInBytes, usedMemorySizeInBytes.get());
     usedMemorySizeInBytes.addAndGet(-sizeToRelease);
-    QUERY_ENGINE_MEMORY_MANAGER.releaseToFreeMemoryForOperators(sizeToRelease);
+    QUERY_ENGINE_MEMORY_MANAGER.releaseToFreeMemoryForOperators(sizeToRelease, null);
     this.notifyAll();
   }
 

@@ -123,9 +123,11 @@ public class MarkDistinctOperator implements ProcessOperator {
     operatorContext.recordSpecifiedInfo(CURRENT_USED_MEMORY, Long.toString(memorySize));
     long delta = memorySize - previousRetainedSize;
     if (delta > 0) {
-      memoryReservationManager.reserveMemoryCumulatively(delta);
+      memoryReservationManager.reserveMemoryCumulatively(
+          delta, "MarkDistinctOperator::reserveMemoryCumulatively");
     } else if (delta < 0) {
-      memoryReservationManager.releaseMemoryCumulatively(-delta);
+      memoryReservationManager.releaseMemoryCumulatively(
+          -delta, "MarkDistinctOperator::releaseMemoryCumulatively");
     }
     previousRetainedSize = memorySize;
   }
