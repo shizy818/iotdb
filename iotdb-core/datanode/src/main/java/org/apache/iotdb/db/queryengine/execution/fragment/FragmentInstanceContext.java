@@ -904,18 +904,23 @@ public class FragmentInstanceContext extends QueryContext {
       try {
         queryContextSet.remove(this);
         if (tvList.getOwnerQuery() == this) {
+          memoryReservationManager.releaseMemoryCumulatively(
+              tvList.calculateRamSize(), "FragmentInstanceContext::releaseTVListOwnedByQuery");
           if (queryContextSet.isEmpty()) {
             LOGGER.info(
                 "TVList {} release memory {}, FragmentInstance Id is {}",
                 tvList,
                 tvList.calculateRamSize(),
                 this.getId());
-            memoryReservationManager.releaseMemoryCumulatively(
-                tvList.calculateRamSize(), "FragmentInstanceContext::releaseTVListOwnedByQuery");
             tvList.clear();
           } else {
             FragmentInstanceContext queryContext =
                 (FragmentInstanceContext) queryContextSet.iterator().next();
+            queryContext
+                .getMemoryReservationContext()
+                .reserveMemoryCumulatively(
+                    tvList.calculateRamSize(),
+                    "FragmentInstanceContext::reserveMemoryCumulatively");
             LOGGER.debug(
                 "TVList {} is now owned by another query, FragmentInstance Id is {}",
                 tvList,
