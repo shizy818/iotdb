@@ -881,14 +881,30 @@ public class FragmentInstanceContext extends QueryContext {
                   tvList,
                   this.getId());
             }
-            memoryReservationManager.releaseMemoryCumulatively(tvList.calculateRamSize());
+            long tvListRamSize = tvList.calculateRamSize();
+            if (tvList.getAllocateMemorySize() != tvListRamSize) {
+              LOGGER.error(
+                  "releaseMemoryCumulatively TVList allocate size: {}, release size {}",
+                  tvList.getAllocateMemorySize(),
+                  tvListRamSize,
+                  new Throwable());
+            }
+            memoryReservationManager.releaseMemoryCumulatively(tvListRamSize);
             tvList.clear();
           } else {
             // Transfer memory to next query. It must be exception-safe as this method is called
             // during FragmentInstanceExecution cleanup. Any exception during this process could
             // prevent proper resource cleanup and cause memory leaks.
+            long tvListRamSize = tvList.calculateRamSize();
+            if (tvList.getAllocateMemorySize() != tvListRamSize) {
+              LOGGER.error(
+                  "releaseMemoryVirtually TVList allocate size: {}, release size {}",
+                  tvList.getAllocateMemorySize(),
+                  tvListRamSize,
+                  new Throwable());
+            }
             Pair<Long, Long> releasedBytes =
-                memoryReservationManager.releaseMemoryVirtually(tvList.calculateRamSize());
+                memoryReservationManager.releaseMemoryVirtually(tvListRamSize);
             FragmentInstanceContext queryContext =
                 (FragmentInstanceContext) queryContextSet.iterator().next();
             queryContext

@@ -94,6 +94,8 @@ public abstract class TVList implements WALEntryValue {
 
   private final TVList outer = this;
 
+  private long allocateMemorySize = 0;
+
   protected TVList() {
     timestamps = new ArrayList<>();
     rowCount = 0;
@@ -759,6 +761,14 @@ public abstract class TVList implements WALEntryValue {
         floatPrecision,
         encoding,
         maxNumberOfPointsInPage);
+  }
+
+  public long getAllocateMemorySize() {
+    return allocateMemorySize;
+  }
+
+  public void setAllocateMemorySize(long allocateMemorySize) {
+    this.allocateMemorySize = allocateMemorySize;
   }
 
   /* TVList Iterator */

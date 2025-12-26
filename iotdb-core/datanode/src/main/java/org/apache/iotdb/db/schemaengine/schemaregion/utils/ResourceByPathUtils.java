@@ -188,7 +188,9 @@ public abstract class ResourceByPathUtils {
           if (firstQuery instanceof FragmentInstanceContext) {
             MemoryReservationManager memoryReservationManager =
                 ((FragmentInstanceContext) firstQuery).getMemoryReservationContext();
-            memoryReservationManager.reserveMemoryCumulatively(list.calculateRamSize());
+            long tvListRamSize = list.calculateRamSize();
+            list.setAllocateMemorySize(tvListRamSize);
+            memoryReservationManager.reserveMemoryCumulatively(tvListRamSize);
           }
           list.setOwnerQuery(firstQuery);
 
