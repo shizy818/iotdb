@@ -23,11 +23,16 @@ import org.apache.iotdb.db.queryengine.common.QueryId;
 import org.apache.iotdb.db.queryengine.plan.planner.LocalExecutionPlanner;
 
 import org.apache.tsfile.utils.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
 @NotThreadSafe
 public class NotThreadSafeMemoryReservationManager implements MemoryReservationManager {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(NotThreadSafeMemoryReservationManager.class);
+
   // To avoid reserving memory too frequently, we choose to do it in batches. This is the lower
   // bound for each batch.
   private static final long MEMORY_BATCH_THRESHOLD = 1024L * 1024L;
@@ -79,6 +84,9 @@ public class NotThreadSafeMemoryReservationManager implements MemoryReservationM
         bytesToBeReserved = 0;
         LOCAL_EXECUTION_PLANNER.releaseToFreeMemoryForOperators(bytesToRelease);
         reservedBytesInTotal -= bytesToRelease;
+        if (reservedBytesInTotal < 0) {
+          LOGGER.error("releaseMemoryCumulatively: reservedBytesInTotal < 0", new Throwable());
+        }
       }
       bytesToBeReleased = 0;
     }
@@ -104,6 +112,9 @@ public class NotThreadSafeMemoryReservationManager implements MemoryReservationM
       long releasedBytesInTotal = size - bytesToBeReserved;
       bytesToBeReserved = 0;
       reservedBytesInTotal -= releasedBytesInTotal;
+      if (reservedBytesInTotal < 0) {
+        LOGGER.error("releaseMemoryVirtually: reservedBytesInTotal < 0", new Throwable());
+      }
       return new Pair<>(releasedBytesInReserved, releasedBytesInTotal);
     }
   }
