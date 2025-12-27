@@ -884,9 +884,11 @@ public class FragmentInstanceContext extends QueryContext {
             long tvListRamSize = tvList.calculateRamSize();
             if (tvList.getAllocateMemorySize() != tvListRamSize) {
               LOGGER.error(
-                  "releaseMemoryCumulatively TVList allocate size: {}, release size {}",
+                  "releaseMemoryCumulatively TVList allocate size: {}, release size {}\nReserved: {}\nCurrent: {}",
                   tvList.getAllocateMemorySize(),
                   tvListRamSize,
+                  tvList.getReservedDiagnosticInfo(),
+                  tvList.getDiagnosticInfo("release"),
                   new Throwable());
             }
             memoryReservationManager.releaseMemoryCumulatively(tvListRamSize);
@@ -898,9 +900,11 @@ public class FragmentInstanceContext extends QueryContext {
             long tvListRamSize = tvList.calculateRamSize();
             if (tvList.getAllocateMemorySize() != tvListRamSize) {
               LOGGER.error(
-                  "releaseMemoryVirtually TVList allocate size: {}, release size {}",
+                  "releaseMemoryVirtually TVList allocate size: {}, release size {}\nReserved: {}\nCurrent: {}",
                   tvList.getAllocateMemorySize(),
                   tvListRamSize,
+                  tvList.getReservedDiagnosticInfo(),
+                  tvList.getDiagnosticInfo("release"),
                   new Throwable());
             }
             Pair<Long, Long> releasedBytes =

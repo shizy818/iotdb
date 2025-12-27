@@ -189,7 +189,7 @@ public abstract class ResourceByPathUtils {
             MemoryReservationManager memoryReservationManager =
                 ((FragmentInstanceContext) firstQuery).getMemoryReservationContext();
             long tvListRamSize = list.calculateRamSize();
-            list.setAllocateMemorySize(tvListRamSize);
+            list.setAllocateMemorySize(tvListRamSize, "clone");
             memoryReservationManager.reserveMemoryCumulatively(tvListRamSize);
           }
           list.setOwnerQuery(firstQuery);

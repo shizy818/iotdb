@@ -96,6 +96,9 @@ public abstract class TVList implements WALEntryValue {
 
   private long allocateMemorySize = 0;
 
+  // Record diagnostic info when reserving memory for comparison during release
+  private String reservedDiagnosticInfo = null;
+
   protected TVList() {
     timestamps = new ArrayList<>();
     rowCount = 0;
@@ -557,6 +560,8 @@ public abstract class TVList implements WALEntryValue {
     clearValue();
     clearIndices();
     clearBitMap();
+    allocateMemorySize = 0;
+    reservedDiagnosticInfo = null;
   }
 
   protected void clearTime() {
@@ -769,6 +774,52 @@ public abstract class TVList implements WALEntryValue {
 
   public void setAllocateMemorySize(long allocateMemorySize) {
     this.allocateMemorySize = allocateMemorySize;
+  }
+
+  public void setAllocateMemorySize(long allocateMemorySize, String operation) {
+    this.allocateMemorySize = allocateMemorySize;
+    this.reservedDiagnosticInfo = getDiagnosticInfo(operation);
+  }
+
+  public String getReservedDiagnosticInfo() {
+    return reservedDiagnosticInfo;
+  }
+
+  /**
+   * Get diagnostic information for this TVList, including timestamps, indices and bitmap info
+   *
+   * @param operation the operation being performed (e.g., "flush" or "clone")
+   * @return diagnostic string with TVList information
+   */
+  public String getDiagnosticInfo(String operation) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("TVList [operation=").append(operation);
+    sb.append(", aligned=").append(this instanceof AlignedTVList);
+    sb.append(", dataType=").append(getDataType());
+    sb.append(", rowCount=").append(rowCount);
+    sb.append(", seqRowCount=").append(seqRowCount);
+    sb.append(", sorted=").append(sorted);
+
+    // Timestamps info
+    sb.append(", timestamps=[size=").append(timestamps.size());
+    sb.append(", minTime=").append(minTime);
+    sb.append(", maxTime=").append(maxTime).append("]");
+
+    // Indices info
+    sb.append(", indices=[hasIndices=").append(indices != null);
+    if (indices != null) {
+      sb.append(", size=").append(indices.size());
+    }
+    sb.append("]");
+
+    // Bitmap info
+    sb.append(", bitMap=[hasBitmap=").append(bitMap != null);
+    if (bitMap != null) {
+      sb.append(", size=").append(bitMap.size());
+    }
+    sb.append("]");
+    sb.append("]");
+    return sb.toString();
   }
 
   /* TVList Iterator */
