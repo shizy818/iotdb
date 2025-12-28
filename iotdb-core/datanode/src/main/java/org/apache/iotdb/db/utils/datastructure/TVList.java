@@ -332,6 +332,7 @@ public abstract class TVList implements WALEntryValue {
         MemoryReservationManager memoryReservationManager =
             ((FragmentInstanceContext) ownerQuery).getMemoryReservationContext();
         memoryReservationManager.reserveMemoryCumulatively(indicesBytes);
+        addAllocateMemorySize(indicesBytes);
       }
     }
     indices.get(arrayIndex)[elementIndex] = valueIndex;
@@ -783,6 +784,10 @@ public abstract class TVList implements WALEntryValue {
 
   public void setAllocateMemorySize(long allocateMemorySize) {
     this.allocateMemorySize = allocateMemorySize;
+  }
+
+  public void addAllocateMemorySize(long bytes) {
+    this.allocateMemorySize += bytes;
   }
 
   public void setAllocateMemorySize(long allocateMemorySize, String operation) {
