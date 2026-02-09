@@ -284,6 +284,8 @@ public class LogicalOptimizeFactory {
                         new RemoveRedundantIdentityProjections()))
                 .build()),
         simplifyOptimizer,
+        new CollectJoinConstraint(),
+        new LeadingJoinOptimizer(),
         new UnaliasSymbolReferences(plannerContext.getMetadata()),
         new IterativeOptimizer(
             plannerContext,

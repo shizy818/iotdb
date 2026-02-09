@@ -141,6 +141,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Offset;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.OneOrMoreQuantifier;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.OrderBy;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Parameter;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ParameterizedHintItem;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.PatternAlternation;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.PatternConcatenation;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.PatternPermutation;
@@ -171,6 +172,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Row;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.RowPattern;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SearchedCaseExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Select;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SelectHint;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SelectItem;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SetColumnComment;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SetConfiguration;
@@ -209,6 +211,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ShowVariables;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ShowVersion;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SimpleCaseExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SimpleGroupBy;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SimpleHintItem;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SingleColumn;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SkipTo;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SortItem;
@@ -2234,7 +2237,8 @@ public class AstBuilder extends RelationalSqlBaseVisitor<Node> {
               query.getWindows(),
               orderBy,
               offset,
-              limit),
+              limit,
+              query.getSelectHint()),
           Optional.empty(),
           Optional.empty(),
           Optional.empty(),
@@ -2350,6 +2354,12 @@ public class AstBuilder extends RelationalSqlBaseVisitor<Node> {
       from = Optional.of(relation);
     }
 
+    // Hint Map
+    Optional<SelectHint> selectHint =
+        ctx.selectHint() != null
+            ? Optional.of((SelectHint) visitSelectHint(ctx.selectHint()))
+            : Optional.empty();
+
     return new QuerySpecification(
         getLocation(ctx),
         new Select(getLocation(ctx.SELECT()), isDistinct(ctx.setQuantifier()), selectItems),
@@ -2361,7 +2371,8 @@ public class AstBuilder extends RelationalSqlBaseVisitor<Node> {
         visit(ctx.windowDefinition(), WindowDefinition.class),
         Optional.empty(),
         Optional.empty(),
-        Optional.empty());
+        Optional.empty(),
+        selectHint);
   }
 
   @Override
@@ -2388,6 +2399,30 @@ public class AstBuilder extends RelationalSqlBaseVisitor<Node> {
     } else {
       return new AllColumns(getLocation(ctx), aliases);
     }
+  }
+
+  @Override
+  public Node visitSelectHint(RelationalSqlParser.SelectHintContext ctx) {
+    List<Node> hintItems = new ArrayList<>();
+    for (RelationalSqlParser.HintItemContext hintItemCtx : ctx.hintItem()) {
+      hintItems.add(visit(hintItemCtx));
+    }
+    return new SelectHint(hintItems);
+  }
+
+  @Override
+  public Node visitParameterizedHint(RelationalSqlParser.ParameterizedHintContext ctx) {
+    String hintName = ctx.identifier().getText();
+    List<RelationalSqlParser.HintParameterContext> identifiers = ctx.hintParameter();
+    List<String> params =
+        identifiers.stream().map(x -> x.getText().toLowerCase()).collect(Collectors.toList());
+    return new ParameterizedHintItem(hintName, params);
+  }
+
+  @Override
+  public Node visitSimpleHint(RelationalSqlParser.SimpleHintContext ctx) {
+    String hintName = ctx.identifier().getText();
+    return new SimpleHintItem(hintName);
   }
 
   @Override

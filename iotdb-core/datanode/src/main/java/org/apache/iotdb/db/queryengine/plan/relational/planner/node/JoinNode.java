@@ -27,16 +27,19 @@ import org.apache.iotdb.db.queryengine.plan.planner.plan.node.process.TwoChildPr
 import org.apache.iotdb.db.queryengine.plan.relational.planner.Symbol;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ComparisonExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Expression;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Identifier;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.NullLiteral;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -65,6 +68,9 @@ public class JoinNode extends TwoChildProcessNode {
   // private final Optional<DistributionType> distributionType;
   // private final Map<DynamicFilterId, Symbol> dynamicFilters;
 
+  private final Set<Identifier> leftTables;
+  private final Set<Identifier> rightTables;
+
   public JoinNode(
       PlanNodeId id,
       JoinType joinType,
@@ -75,7 +81,9 @@ public class JoinNode extends TwoChildProcessNode {
       List<Symbol> leftOutputSymbols,
       List<Symbol> rightOutputSymbols,
       Optional<Expression> filter,
-      Optional<Boolean> spillable) {
+      Optional<Boolean> spillable,
+      Set<Identifier> leftTables,
+      Set<Identifier> rightTables) {
     super(id);
     requireNonNull(joinType, "type is null");
     requireNonNull(leftChild, "left is null");
@@ -94,6 +102,8 @@ public class JoinNode extends TwoChildProcessNode {
     // requireNonNull(leftHashSymbol, "leftHashSymbol is null");
     // requireNonNull(rightHashSymbol, "rightHashSymbol is null");
     requireNonNull(spillable, "spillable is null");
+    requireNonNull(leftTables, "leftTables is null");
+    requireNonNull(rightTables, "rightTables is null");
 
     this.joinType = joinType;
     this.leftChild = leftChild;
@@ -107,6 +117,8 @@ public class JoinNode extends TwoChildProcessNode {
     // this.maySkipOutputDuplicates = maySkipOutputDuplicates;
     // this.leftHashSymbol = leftHashSymbol;
     // this.rightHashSymbol = rightHashSymbol;
+    this.leftTables = ImmutableSet.copyOf(leftTables);
+    this.rightTables = ImmutableSet.copyOf(rightTables);
 
     Set<Symbol> leftSymbols = ImmutableSet.copyOf(leftChild.getOutputSymbols());
     Set<Symbol> rightSymbols = ImmutableSet.copyOf(rightChild.getOutputSymbols());
@@ -134,6 +146,32 @@ public class JoinNode extends TwoChildProcessNode {
                 equiJoinClause));
   }
 
+  public JoinNode(
+      PlanNodeId id,
+      JoinType joinType,
+      PlanNode leftChild,
+      PlanNode rightChild,
+      List<EquiJoinClause> criteria,
+      Optional<AsofJoinClause> asofCriteria,
+      List<Symbol> leftOutputSymbols,
+      List<Symbol> rightOutputSymbols,
+      Optional<Expression> filter,
+      Optional<Boolean> spillable) {
+    this(
+        id,
+        joinType,
+        leftChild,
+        rightChild,
+        criteria,
+        asofCriteria,
+        leftOutputSymbols,
+        rightOutputSymbols,
+        filter,
+        spillable,
+        leftChild.getInputTables(),
+        rightChild.getInputTables());
+  }
+
   // only used for deserialize
   public JoinNode(
       PlanNodeId id,
@@ -141,15 +179,21 @@ public class JoinNode extends TwoChildProcessNode {
       List<EquiJoinClause> criteria,
       Optional<AsofJoinClause> asofCriteria,
       List<Symbol> leftOutputSymbols,
-      List<Symbol> rightOutputSymbols) {
+      List<Symbol> rightOutputSymbols,
+      Set<Identifier> leftTables,
+      Set<Identifier> rightTables) {
     super(id);
     requireNonNull(joinType, "type is null");
     requireNonNull(criteria, "criteria is null");
+    requireNonNull(leftTables, "leftTables is null");
+    requireNonNull(rightTables, "rightTables is null");
 
     this.leftOutputSymbols = leftOutputSymbols;
     this.rightOutputSymbols = rightOutputSymbols;
     this.filter = Optional.empty();
     this.spillable = Optional.empty();
+    this.leftTables = ImmutableSet.copyOf(leftTables);
+    this.rightTables = ImmutableSet.copyOf(rightTables);
 
     this.joinType = joinType;
     this.criteria = criteria;
@@ -170,7 +214,9 @@ public class JoinNode extends TwoChildProcessNode {
         rightOutputSymbols,
         leftOutputSymbols,
         filter,
-        spillable);
+        spillable,
+        rightTables,
+        leftTables);
   }
 
   @Override
@@ -191,7 +237,9 @@ public class JoinNode extends TwoChildProcessNode {
         leftOutputSymbols,
         rightOutputSymbols,
         filter,
-        spillable);
+        spillable,
+        leftTables,
+        rightTables);
   }
 
   @Override
@@ -215,7 +263,9 @@ public class JoinNode extends TwoChildProcessNode {
             leftOutputSymbols,
             rightOutputSymbols,
             filter,
-            spillable);
+            spillable,
+            leftTables,
+            rightTables);
     joinNode.setLeftChild(null);
     joinNode.setRightChild(null);
     return joinNode;
@@ -236,6 +286,16 @@ public class JoinNode extends TwoChildProcessNode {
     for (EquiJoinClause equiJoinClause : criteria) {
       Symbol.serialize(equiJoinClause.getLeft(), byteBuffer);
       Symbol.serialize(equiJoinClause.getRight(), byteBuffer);
+      Set<Identifier> leftTables = equiJoinClause.getLeftTables();
+      ReadWriteIOUtils.write(leftTables.size(), byteBuffer);
+      for (Identifier identifier : leftTables) {
+        identifier.serialize(byteBuffer);
+      }
+      Set<Identifier> rightTables = equiJoinClause.getRightTables();
+      ReadWriteIOUtils.write(rightTables.size(), byteBuffer);
+      for (Identifier identifier : rightTables) {
+        identifier.serialize(byteBuffer);
+      }
     }
 
     if (asofCriteria.isPresent()) {
@@ -256,6 +316,16 @@ public class JoinNode extends TwoChildProcessNode {
     for (Symbol rightOutputSymbol : rightOutputSymbols) {
       Symbol.serialize(rightOutputSymbol, byteBuffer);
     }
+
+    // Serialize JoinNode-level leftTables and rightTables
+    ReadWriteIOUtils.write(this.leftTables.size(), byteBuffer);
+    for (Identifier identifier : this.leftTables) {
+      identifier.serialize(byteBuffer);
+    }
+    ReadWriteIOUtils.write(this.rightTables.size(), byteBuffer);
+    for (Identifier identifier : this.rightTables) {
+      identifier.serialize(byteBuffer);
+    }
   }
 
   @Override
@@ -268,6 +338,16 @@ public class JoinNode extends TwoChildProcessNode {
     for (EquiJoinClause equiJoinClause : criteria) {
       Symbol.serialize(equiJoinClause.getLeft(), stream);
       Symbol.serialize(equiJoinClause.getRight(), stream);
+      Set<Identifier> leftTables = equiJoinClause.getLeftTables();
+      ReadWriteIOUtils.write(leftTables.size(), stream);
+      for (Identifier identifier : leftTables) {
+        identifier.serialize(stream);
+      }
+      Set<Identifier> rightTables = equiJoinClause.getRightTables();
+      ReadWriteIOUtils.write(rightTables.size(), stream);
+      for (Identifier identifier : rightTables) {
+        identifier.serialize(stream);
+      }
     }
 
     if (asofCriteria.isPresent()) {
@@ -288,6 +368,16 @@ public class JoinNode extends TwoChildProcessNode {
     for (Symbol rightOutputSymbol : rightOutputSymbols) {
       Symbol.serialize(rightOutputSymbol, stream);
     }
+
+    // Serialize JoinNode-level leftTables and rightTables
+    ReadWriteIOUtils.write(this.leftTables.size(), stream);
+    for (Identifier identifier : this.leftTables) {
+      identifier.serialize(stream);
+    }
+    ReadWriteIOUtils.write(this.rightTables.size(), stream);
+    for (Identifier identifier : this.rightTables) {
+      identifier.serialize(stream);
+    }
   }
 
   public static JoinNode deserialize(ByteBuffer byteBuffer) {
@@ -295,8 +385,19 @@ public class JoinNode extends TwoChildProcessNode {
     int size = ReadWriteIOUtils.readInt(byteBuffer);
     List<EquiJoinClause> criteria = new ArrayList<>(size);
     while (size-- > 0) {
-      criteria.add(
-          new EquiJoinClause(Symbol.deserialize(byteBuffer), Symbol.deserialize(byteBuffer)));
+      Symbol left = Symbol.deserialize(byteBuffer);
+      Symbol right = Symbol.deserialize(byteBuffer);
+      int leftTablesSize = ReadWriteIOUtils.readInt(byteBuffer);
+      Set<Identifier> leftTables = new HashSet<>(leftTablesSize);
+      while (leftTablesSize-- > 0) {
+        leftTables.add(new Identifier(byteBuffer));
+      }
+      int rightTablesSize = ReadWriteIOUtils.readInt(byteBuffer);
+      Set<Identifier> rightTables = new HashSet<>(rightTablesSize);
+      while (rightTablesSize-- > 0) {
+        rightTables.add(new Identifier(byteBuffer));
+      }
+      criteria.add(new EquiJoinClause(left, right, leftTables, rightTables));
     }
 
     Optional<AsofJoinClause> asofJoinClause = Optional.empty();
@@ -321,9 +422,28 @@ public class JoinNode extends TwoChildProcessNode {
       rightOutputSymbols.add(Symbol.deserialize(byteBuffer));
     }
 
+    // Deserialize JoinNode-level leftTables and rightTables
+    int joinLeftTablesSize = ReadWriteIOUtils.readInt(byteBuffer);
+    Set<Identifier> joinLeftTables = new HashSet<>(joinLeftTablesSize);
+    while (joinLeftTablesSize-- > 0) {
+      joinLeftTables.add(new Identifier(byteBuffer));
+    }
+    int joinRightTablesSize = ReadWriteIOUtils.readInt(byteBuffer);
+    Set<Identifier> joinRightTables = new HashSet<>(joinRightTablesSize);
+    while (joinRightTablesSize-- > 0) {
+      joinRightTables.add(new Identifier(byteBuffer));
+    }
+
     PlanNodeId planNodeId = PlanNodeId.deserialize(byteBuffer);
     return new JoinNode(
-        planNodeId, joinType, criteria, asofJoinClause, leftOutputSymbols, rightOutputSymbols);
+        planNodeId,
+        joinType,
+        criteria,
+        asofJoinClause,
+        leftOutputSymbols,
+        rightOutputSymbols,
+        joinLeftTables,
+        joinRightTables);
   }
 
   public JoinType getJoinType() {
@@ -354,6 +474,14 @@ public class JoinNode extends TwoChildProcessNode {
     return spillable;
   }
 
+  public Set<Identifier> getLeftTables() {
+    return leftTables;
+  }
+
+  public Set<Identifier> getRightTables() {
+    return rightTables;
+  }
+
   public boolean isCrossJoin() {
     return !asofCriteria.isPresent()
         && criteria.isEmpty()
@@ -369,10 +497,25 @@ public class JoinNode extends TwoChildProcessNode {
   public static class EquiJoinClause {
     private final Symbol left;
     private final Symbol right;
+    private final Set<Identifier> leftTables;
+    private final Set<Identifier> rightTables;
+    private final Set<Identifier> tables;
 
     public EquiJoinClause(Symbol left, Symbol right) {
       this.left = requireNonNull(left, "left is null");
       this.right = requireNonNull(right, "right is null");
+      this.leftTables = ImmutableSet.of();
+      this.rightTables = ImmutableSet.of();
+      this.tables = ImmutableSet.of();
+    }
+
+    public EquiJoinClause(
+        Symbol left, Symbol right, Set<Identifier> leftTables, Set<Identifier> rightTables) {
+      this.left = requireNonNull(left, "left is null");
+      this.right = requireNonNull(right, "right is null");
+      this.leftTables = requireNonNull(leftTables, "leftTables is null");
+      this.rightTables = requireNonNull(rightTables, "rightTables is null");
+      this.tables = Sets.union(leftTables, rightTables);
     }
 
     public Symbol getLeft() {
@@ -383,13 +526,25 @@ public class JoinNode extends TwoChildProcessNode {
       return right;
     }
 
+    public Set<Identifier> getLeftTables() {
+      return leftTables;
+    }
+
+    public Set<Identifier> getRightTables() {
+      return rightTables;
+    }
+
+    public Set<Identifier> getTables() {
+      return tables;
+    }
+
     public ComparisonExpression toExpression() {
       return new ComparisonExpression(
           ComparisonExpression.Operator.EQUAL, left.toSymbolReference(), right.toSymbolReference());
     }
 
     public EquiJoinClause flip() {
-      return new EquiJoinClause(right, left);
+      return new EquiJoinClause(right, left, rightTables, leftTables);
     }
 
     public static List<EquiJoinClause> flipBatch(List<EquiJoinClause> input) {
@@ -410,12 +565,15 @@ public class JoinNode extends TwoChildProcessNode {
 
       EquiJoinClause other = (EquiJoinClause) obj;
 
-      return Objects.equals(this.left, other.left) && Objects.equals(this.right, other.right);
+      return Objects.equals(this.left, other.left)
+          && Objects.equals(this.right, other.right)
+          && Objects.equals(this.leftTables, other.leftTables)
+          && Objects.equals(this.rightTables, other.rightTables);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(left, right);
+      return Objects.hash(left, right, leftTables, rightTables);
     }
 
     @Override

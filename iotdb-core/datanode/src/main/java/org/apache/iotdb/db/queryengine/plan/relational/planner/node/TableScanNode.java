@@ -31,6 +31,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.metadata.Metadata;
 import org.apache.iotdb.db.queryengine.plan.relational.metadata.QualifiedObjectName;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.Symbol;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Expression;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Identifier;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.tsfile.utils.ReadWriteIOUtils;
@@ -42,10 +43,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -74,6 +77,9 @@ public abstract class TableScanNode extends SourceNode {
   // The id of DataRegion where the node will run
   // For query of schemaInfo, we only need the list of DataNodeLocation
   protected TRegionReplicaSet regionReplicaSet;
+
+  // alias name
+  protected Identifier alias;
 
   public TableScanNode(
       PlanNodeId id,
@@ -108,6 +114,13 @@ public abstract class TableScanNode extends SourceNode {
   @Override
   public <R, C> R accept(PlanVisitor<R, C> visitor, C context) {
     return visitor.visitTableScan(this, context);
+  }
+
+  @Override
+  public Set<Identifier> getInputTables() {
+    Set<Identifier> tables = new HashSet<>();
+    tables.add(alias != null ? alias : new Identifier(qualifiedObjectName.getObjectName()));
+    return tables;
   }
 
   @Override
@@ -176,6 +189,10 @@ public abstract class TableScanNode extends SourceNode {
 
   @Override
   public void close() throws Exception {}
+
+  public Identifier getAlias() {
+    return alias;
+  }
 
   public QualifiedObjectName getQualifiedObjectName() {
     return this.qualifiedObjectName;
@@ -255,6 +272,13 @@ public abstract class TableScanNode extends SourceNode {
 
     ReadWriteIOUtils.write(node.pushDownLimit, byteBuffer);
     ReadWriteIOUtils.write(node.pushDownOffset, byteBuffer);
+
+    if (node.alias != null) {
+      ReadWriteIOUtils.write(true, byteBuffer);
+      node.alias.serialize(byteBuffer);
+    } else {
+      ReadWriteIOUtils.write(false, byteBuffer);
+    }
   }
 
   protected static void serializeMemberVariables(
@@ -290,6 +314,13 @@ public abstract class TableScanNode extends SourceNode {
 
     ReadWriteIOUtils.write(node.pushDownLimit, stream);
     ReadWriteIOUtils.write(node.pushDownOffset, stream);
+
+    if (node.alias != null) {
+      ReadWriteIOUtils.write(true, stream);
+      node.alias.serialize(stream);
+    } else {
+      ReadWriteIOUtils.write(false, stream);
+    }
   }
 
   protected static void deserializeMemberVariables(
@@ -327,6 +358,11 @@ public abstract class TableScanNode extends SourceNode {
 
     node.pushDownLimit = ReadWriteIOUtils.readLong(byteBuffer);
     node.pushDownOffset = ReadWriteIOUtils.readLong(byteBuffer);
+
+    boolean hasAlias = ReadWriteIOUtils.readBool(byteBuffer);
+    if (hasAlias) {
+      node.alias = new Identifier(byteBuffer);
+    }
   }
 
   @Override
