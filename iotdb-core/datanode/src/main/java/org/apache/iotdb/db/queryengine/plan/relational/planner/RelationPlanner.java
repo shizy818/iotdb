@@ -394,7 +394,8 @@ public class RelationPlanner extends AstVisitor<RelationPlan, Void> {
                 qualifiedObjectName,
                 outputSymbols,
                 tableColumnSchema,
-                tagAndAttributeIndexMap);
+                tagAndAttributeIndexMap,
+                analysis.getAliased(table));
     return new RelationPlan(tableScanNode, scope, outputSymbols, outerContext);
   }
 
@@ -512,7 +513,28 @@ public class RelationPlanner extends AstVisitor<RelationPlan, Void> {
       rightCoercions.put(rightOutput, right.getSymbol(rightField).toSymbolReference());
       rightJoinColumns.put(identifier, rightOutput);
 
-      clauses.add(new JoinNode.EquiJoinClause(leftOutput, rightOutput));
+      // Extract tables from the actual fields used in the join condition
+      Field leftFieldObj = left.getScope().getRelationType().getFieldByIndex(leftField);
+      Identifier leftTable =
+          extractTableName(leftFieldObj)
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          String.format(
+                              "Cannot find source table for field %s in JOIN USING clause",
+                              leftFieldObj.getName())));
+
+      Field rightFieldObj = right.getScope().getRelationType().getFieldByIndex(rightField);
+      Identifier rightTable =
+          extractTableName(rightFieldObj)
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          String.format(
+                              "Cannot find source table for field %s in JOIN USING clause",
+                              rightFieldObj.getName())));
+
+      clauses.add(new JoinNode.EquiJoinClause(leftOutput, rightOutput, leftTable, rightTable));
     }
 
     ProjectNode leftCoercion =
@@ -713,6 +735,41 @@ public class RelationPlanner extends AstVisitor<RelationPlan, Void> {
       rightPlanBuilder = rightCoercions.getSubPlan();
 
       for (int i = 0; i < leftComparisonExpressions.size(); i++) {
+        // Extract tables from expressions
+        Set<QualifiedName> leftDependencies =
+            SymbolsExtractor.extractNames(
+                leftComparisonExpressions.get(i), analysis.getColumnReferences());
+        Set<QualifiedName> rightDependencies =
+            SymbolsExtractor.extractNames(
+                rightComparisonExpressions.get(i), analysis.getColumnReferences());
+
+        if (leftDependencies.size() != 1 || rightDependencies.size() != 1) {
+          throw new IllegalStateException("Cannot find source table for symbol");
+        }
+
+        QualifiedName leftQualifiedName = leftDependencies.iterator().next();
+        QualifiedName rightQualifiedName = rightDependencies.iterator().next();
+
+        Identifier leftTable =
+            leftQualifiedName
+                .getPrefix()
+                .map(prefix -> new Identifier(prefix.getSuffix()))
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            String.format(
+                                "Cannot find source table for symbol %s in JOIN ON clause")));
+
+        Identifier rightTable =
+            rightQualifiedName
+                .getPrefix()
+                .map(prefix -> new Identifier(prefix.getSuffix()))
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            String.format(
+                                "Cannot find source table for symbol %s in JOIN ON clause")));
+
         if (asofCriteria != null && i == 0) {
           Symbol leftSymbol = leftCoercions.get(leftComparisonExpressions.get(i));
           Symbol rightSymbol = rightCoercions.get(rightComparisonExpressions.get(i));
@@ -720,7 +777,11 @@ public class RelationPlanner extends AstVisitor<RelationPlan, Void> {
           asofJoinClause =
               Optional.of(
                   new JoinNode.AsofJoinClause(
-                      joinConditionComparisonOperators.get(i), leftSymbol, rightSymbol));
+                      joinConditionComparisonOperators.get(i),
+                      leftSymbol,
+                      rightSymbol,
+                      leftTable,
+                      rightTable));
           continue;
         }
 
@@ -728,7 +789,8 @@ public class RelationPlanner extends AstVisitor<RelationPlan, Void> {
           Symbol leftSymbol = leftCoercions.get(leftComparisonExpressions.get(i));
           Symbol rightSymbol = rightCoercions.get(rightComparisonExpressions.get(i));
 
-          equiClauses.add(new JoinNode.EquiJoinClause(leftSymbol, rightSymbol));
+          equiClauses.add(
+              new JoinNode.EquiJoinClause(leftSymbol, rightSymbol, leftTable, rightTable));
         } else {
           postInnerJoinConditions.add(
               new ComparisonExpression(
@@ -1640,5 +1702,21 @@ public class RelationPlanner extends AstVisitor<RelationPlan, Void> {
     public Map<IrLabel, ExpressionAndValuePointers> getVariableDefinitions() {
       return variableDefinitions;
     }
+  }
+
+  /**
+   * Extracts the table name from a field. Priority: 1) relation alias (if exists), 2) origin table
+   * name.
+   *
+   * @param field the field to extract the table name from
+   * @return the table identifier, or empty if not found
+   */
+  private static Optional<Identifier> extractTableName(Field field) {
+    Optional<Identifier> fromAlias =
+        field.getRelationAlias().map(alias -> new Identifier(alias.getSuffix()));
+    if (fromAlias.isPresent()) {
+      return fromAlias;
+    }
+    return field.getOriginTable().map(originTable -> new Identifier(originTable.getObjectName()));
   }
 }

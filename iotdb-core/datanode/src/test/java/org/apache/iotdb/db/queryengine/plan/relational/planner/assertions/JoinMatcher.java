@@ -166,15 +166,22 @@ public final class JoinMatcher implements Matcher {
     }
 
     @CanIgnoreReturnValue
-    public Builder equiCriteria(String left, String right) {
-      this.equiCriteria = Optional.of(ImmutableList.of(equiJoinClause(left, right)));
+    public Builder equiCriteria(String left, String right, String leftTable, String rightTable) {
+      this.equiCriteria =
+          Optional.of(ImmutableList.of(equiJoinClause(left, right, leftTable, rightTable)));
 
       return this;
     }
 
     @CanIgnoreReturnValue
-    public Builder asofCriteria(ComparisonExpression.Operator operator, String left, String right) {
-      this.asofJoinCriteria = Optional.of(asofJoinClause(operator, left, right));
+    public Builder asofCriteria(
+        ComparisonExpression.Operator operator,
+        String left,
+        String right,
+        String leftTable,
+        String rightTable) {
+      this.asofJoinCriteria =
+          Optional.of(asofJoinClause(operator, left, right, leftTable, rightTable));
 
       return this;
     }

@@ -101,6 +101,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Expression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.FunctionCall;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Insert;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SymbolReference;
+import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.Hint;
 import org.apache.iotdb.db.queryengine.plan.statement.component.Ordering;
 import org.apache.iotdb.db.schemaengine.table.DataNodeTableCache;
 import org.apache.iotdb.db.schemaengine.table.DataNodeTreeViewSchemaUtils;
@@ -742,7 +743,8 @@ public class TableDistributedPlanGenerator
                         node.getPushDownLimit(),
                         node.getPushDownOffset(),
                         node.isPushLimitToEachDevice(),
-                        node.containsNonAlignedDevice());
+                        node.containsNonAlignedDevice(),
+                        node.getAlias());
                 scanNode.setRegionReplicaSet(regionReplicaSets.get(0));
                 return scanNode;
               });
@@ -828,7 +830,8 @@ public class TableDistributedPlanGenerator
                           node.getPushDownLimit(),
                           node.getPushDownOffset(),
                           node.isPushLimitToEachDevice(),
-                          node.containsNonAlignedDevice());
+                          node.containsNonAlignedDevice(),
+                          node.getAlias());
                   scanNode.setRegionReplicaSet(regionReplicaSet);
                   return scanNode;
                 });
@@ -1441,7 +1444,8 @@ public class TableDistributedPlanGenerator
                               partialAggTableScanNode.getGroupingSets(),
                               partialAggTableScanNode.getPreGroupedSymbols(),
                               partialAggTableScanNode.getStep(),
-                              partialAggTableScanNode.getGroupIdSymbol())
+                              partialAggTableScanNode.getGroupIdSymbol(),
+                              partialAggTableScanNode.getAlias())
                           : new AggregationTreeDeviceViewScanNode(
                               queryId.genPlanNodeId(),
                               partialAggTableScanNode.getQualifiedObjectName(),
@@ -1952,6 +1956,7 @@ public class TableDistributedPlanGenerator
 
   public static class PlanContext {
     final Map<PlanNodeId, NodeDistribution> nodeDistributionMap;
+    final Map<String, Hint> hintMap;
     boolean hasExchangeNode = false;
     boolean hasSortProperty = false;
     boolean pushDownGrouping = false;
@@ -1959,8 +1964,9 @@ public class TableDistributedPlanGenerator
     TRegionReplicaSet mostUsedRegion;
     boolean deviceCrossRegion;
 
-    public PlanContext() {
+    public PlanContext(Map<String, Hint> hintMap) {
       this.nodeDistributionMap = new HashMap<>();
+      this.hintMap = hintMap;
     }
 
     public NodeDistribution getNodeDistribution(PlanNodeId nodeId) {

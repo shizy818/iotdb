@@ -237,7 +237,8 @@ public class UnaliasSymbolReferences implements PlanOptimizer {
               node.getPushDownLimit(),
               node.getPushDownOffset(),
               node.isPushLimitToEachDevice(),
-              node.containsNonAlignedDevice()),
+              node.containsNonAlignedDevice(),
+              node.getAlias()),
           mapping);
     }
 
@@ -812,7 +813,10 @@ public class UnaliasSymbolReferences implements PlanOptimizer {
       for (JoinNode.EquiJoinClause clause : node.getCriteria()) {
         builder.add(
             new JoinNode.EquiJoinClause(
-                mapper.map(clause.getLeft()), mapper.map(clause.getRight())));
+                mapper.map(clause.getLeft()),
+                mapper.map(clause.getRight()),
+                clause.getLeftTable(),
+                clause.getRightTable()));
       }
       List<JoinNode.EquiJoinClause> newCriteria = builder.build();
 
