@@ -141,11 +141,11 @@ public abstract class AstVisitor<R, C> {
     return visitNode(node, context);
   }
 
-  protected R visitLeaderHintItem(LeaderHintItem node, C context) {
+  protected R visitReplicaHintItem(ReplicaHintItem node, C context) {
     return visitNode(node, context);
   }
 
-  protected R visitFollowerHintItem(FollowerHintItem node, C context) {
+  protected R visitRegionRouteHintItem(RegionRouteHintItem node, C context) {
     return visitNode(node, context);
   }
 

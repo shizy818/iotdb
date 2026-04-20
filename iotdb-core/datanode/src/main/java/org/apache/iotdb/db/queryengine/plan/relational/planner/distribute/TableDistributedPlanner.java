@@ -133,7 +133,7 @@ public class TableDistributedPlanner {
       TableDistributedPlanGenerator.PlanContext planContext) {
     // set parallel hint
     ParallelHint parallelHint =
-        (ParallelHint) planContext.hintMap.getOrDefault(ParallelHint.category, null);
+        (ParallelHint) planContext.hintMap.getOrDefault(ParallelHint.HINT_NAME, null);
     if (parallelHint != null) {
       mppQueryContext.setParallelism(parallelHint.getParallelism());
     }

@@ -100,7 +100,6 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Extract;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.FetchDevice;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.FieldReference;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Fill;
-import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.FollowerHintItem;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.FrameBound;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.FunctionCall;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.GroupBy;
@@ -121,7 +120,6 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Join;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.JoinCriteria;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.JoinOn;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.JoinUsing;
-import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.LeaderHintItem;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.LikePredicate;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Limit;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Literal;
@@ -144,9 +142,11 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QualifiedName;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QuantifiedComparisonExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Query;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QuerySpecification;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.RegionRouteHintItem;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Relation;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.RenameColumn;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.RenameTable;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.ReplicaHintItem;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Row;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.SearchedCaseExpression;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.Select;
@@ -199,10 +199,10 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.WithQuery;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.WrappedInsertStatement;
 import org.apache.iotdb.db.queryengine.plan.relational.type.CompatibleResolver;
 import org.apache.iotdb.db.queryengine.plan.relational.type.TypeManager;
-import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.FollowerHint;
 import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.Hint;
-import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.LeaderHint;
 import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.ParallelHint;
+import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.RegionRouteHint;
+import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.ReplicaHint;
 import org.apache.iotdb.db.queryengine.plan.statement.component.FillPolicy;
 import org.apache.iotdb.db.queryengine.plan.statement.crud.InsertBaseStatement;
 import org.apache.iotdb.db.schemaengine.table.DataNodeTableCache;
@@ -1520,74 +1520,50 @@ public class StatementAnalyzer {
     public Scope visitSelectHint(SelectHint node, final Optional<Scope> context) {
       Map<String, Hint> hintMap = new HashMap<>();
       for (Node hintItem : node.getHintItems()) {
-        if (hintItem instanceof LeaderHintItem) {
-          LeaderHintItem leaderHintItem = (LeaderHintItem) hintItem;
-          List<String> tables = leaderHintItem.getTables();
-          addLeaderHints(tables, hintMap);
-        } else if (hintItem instanceof FollowerHintItem) {
-          FollowerHintItem followerHintItem = (FollowerHintItem) hintItem;
-          List<String> tables = followerHintItem.getTables();
-          List<List<Integer>> nodeIds = followerHintItem.getNodeIds();
-          addFollowerHints(tables, nodeIds, hintMap);
+        Hint hint = null;
+        if (hintItem instanceof ReplicaHintItem) {
+          ReplicaHintItem replicaHintItem = (ReplicaHintItem) hintItem;
+          QualifiedName table = getValidTable(replicaHintItem.getTable());
+          hint = new ReplicaHint(table, replicaHintItem.getReplicaIndex());
+        } else if (hintItem instanceof RegionRouteHintItem) {
+          RegionRouteHintItem regionRouteHintItem = (RegionRouteHintItem) hintItem;
+          QualifiedName table = getValidTable(regionRouteHintItem.getTable());
+          hint = new RegionRouteHint(table, regionRouteHintItem.getRegionDatanodeMap());
         } else if (hintItem instanceof ParallelHintItem) {
           ParallelHintItem parallelHintItem = (ParallelHintItem) hintItem;
           int parallelism = parallelHintItem.getParallelism();
-          if (parallelism > 0) {
-            Hint hint = new ParallelHint(parallelism);
-            hintMap.putIfAbsent(hint.getKey(), hint);
-          }
+          hint = new ParallelHint(parallelism);
+        }
+        if (hint != null) {
+          hintMap.putIfAbsent(hint.getKey(), hint);
         }
       }
       analysis.setHintMap(hintMap);
       return createAndAssignScope(node, context);
     }
 
-    private void addLeaderHints(List<String> tables, Map<String, Hint> hintMap) {
-      List<String> existingTables =
-          analysis.getRelationNames().values().stream()
-              .map(QualifiedName::getSuffix)
-              .collect(toImmutableList());
-
-      if (tables == null || tables.isEmpty()) {
-        existingTables.forEach(
-            table -> {
-              Hint hint = new LeaderHint(table);
-              hintMap.putIfAbsent(hint.getKey(), hint);
-            });
-      } else {
-        for (String table : tables) {
-          if (!existingTables.contains(table)) {
-            continue;
-          }
-          Hint hint = new LeaderHint(table);
-          hintMap.putIfAbsent(hint.getKey(), hint);
-        }
+    private QualifiedName getValidTable(QualifiedName table) {
+      if (table == null) {
+        return null;
       }
-    }
 
-    private void addFollowerHints(
-        List<String> tables, List<List<Integer>> nodeIds, Map<String, Hint> hintMap) {
-      List<String> existingTables =
-          analysis.getRelationNames().values().stream()
-              .map(QualifiedName::getSuffix)
-              .collect(toImmutableList());
+      List<QualifiedName> existingTables =
+          analysis.getRelationNames().values().stream().collect(toImmutableList());
 
-      if (tables == null || tables.isEmpty()) {
-        existingTables.forEach(
-            table -> {
-              Hint hint = new FollowerHint(table, ImmutableList.of());
-              hintMap.putIfAbsent(hint.getKey(), hint);
-            });
-      } else {
-        for (int i = 0; i < tables.size(); i++) {
-          String table = tables.get(i);
-          if (!existingTables.contains(table)) {
-            continue;
-          }
-          Hint hint = new FollowerHint(table, nodeIds.get(i));
-          hintMap.putIfAbsent(hint.getKey(), hint);
-        }
+      // Alias
+      if (existingTables.contains(table)) {
+        return table;
       }
+
+      // Table
+      QualifiedObjectName tableObjectName = createQualifiedObjectName(sessionContext, table);
+      QualifiedName tableName =
+          QualifiedName.of(tableObjectName.getDatabaseName(), tableObjectName.getObjectName());
+
+      if (!existingTables.contains(tableName)) {
+        throw new SemanticException(String.format("Invalid table : %s", tableName));
+      }
+      return tableName;
     }
 
     private List<Expression> analyzeSelect(QuerySpecification node, Scope scope) {

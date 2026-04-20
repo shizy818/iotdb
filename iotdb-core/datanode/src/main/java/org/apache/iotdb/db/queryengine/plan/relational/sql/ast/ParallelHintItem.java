@@ -31,7 +31,7 @@ public class ParallelHintItem extends Node {
   private static final long INSTANCE_SIZE =
       RamUsageEstimator.shallowSizeOfInstance(ParallelHintItem.class);
 
-  private static final String hintItemName = "parallel";
+  private static final String HINT_NAME_ITEM = "parallel";
   private final int parallelism;
 
   public ParallelHintItem(int parallelism) {
@@ -72,13 +72,11 @@ public class ParallelHintItem extends Node {
 
   @Override
   public String toString() {
-    return hintItemName + "(" + parallelism + ")";
+    return HINT_NAME_ITEM + "(" + parallelism + ")";
   }
 
   @Override
   public long ramBytesUsed() {
-    long size = INSTANCE_SIZE;
-    size += AstMemoryEstimationHelper.getEstimatedSizeOfNodeLocation(getLocationInternal());
-    return size;
+    return INSTANCE_SIZE;
   }
 }

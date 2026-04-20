@@ -28,6 +28,7 @@ import org.apache.iotdb.db.queryengine.plan.planner.plan.node.PlanNode;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.node.PlanVisitor;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.node.WritePlanNode;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.node.metadata.read.TableDeviceSourceNode;
+import org.apache.iotdb.db.queryengine.plan.relational.metadata.QualifiedObjectName;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.CollectNode;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.CopyToNode;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.CteScanNode;
@@ -39,6 +40,7 @@ import org.apache.iotdb.db.queryengine.plan.relational.planner.node.schema.Table
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.schema.TableDeviceQueryCountNode;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.schema.TableDeviceQueryScanNode;
 import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.Hint;
+import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.RegionRouteHint;
 import org.apache.iotdb.db.queryengine.plan.relational.utils.hint.ReplicaHint;
 
 import java.util.List;
@@ -105,27 +107,40 @@ public class AddExchangeNodes
       TableScanNode node, TableDistributedPlanGenerator.PlanContext context) {
     // Original region replica set
     TRegionReplicaSet regionReplicaSet = node.getRegionReplicaSet();
-    // Find applicable hint
-    ReplicaHint hint = findReplicaHint(node, context.hintMap);
-
-    // Early return for simple cases
-    if (regionReplicaSet == null || hint == null) {
-      context.nodeDistributionMap.put(
-          node.getPlanNodeId(), new NodeDistribution(SAME_WITH_ALL_CHILDREN, regionReplicaSet));
-      return node;
-    }
 
     // Determine optimized locations based on hint
-    List<TDataNodeLocation> optimizedLocations =
-        selectLocations(regionReplicaSet.getDataNodeLocations(), hint);
+    List<TDataNodeLocation> optimizedLocations = null;
 
-    // Create optimized region replica set
-    TRegionReplicaSet optimizedRegionReplicaSet =
-        new TRegionReplicaSet(regionReplicaSet.getRegionId(), optimizedLocations);
+    // Find region_route hint
+    RegionRouteHint regionRouteHint =
+        (RegionRouteHint) findHint(RegionRouteHint.HINT_NAME, node, context.hintMap);
+    if (regionRouteHint != null) {
+      optimizedLocations =
+          regionRouteHint.selectLocations(
+              regionReplicaSet.getDataNodeLocations(), regionReplicaSet.getRegionId().getId());
+    }
 
-    context.nodeDistributionMap.put(
-        node.getPlanNodeId(),
-        new NodeDistribution(SAME_WITH_ALL_CHILDREN, optimizedRegionReplicaSet));
+    // Find replica hint
+    if (optimizedLocations == null) {
+      ReplicaHint replicaHint =
+          (ReplicaHint) findHint(ReplicaHint.HINT_NAME, node, context.hintMap);
+      if (replicaHint != null) {
+        optimizedLocations = replicaHint.selectLocations(regionReplicaSet.getDataNodeLocations());
+      }
+    }
+
+    if (optimizedLocations == null) {
+      context.nodeDistributionMap.put(
+          node.getPlanNodeId(), new NodeDistribution(SAME_WITH_ALL_CHILDREN, regionReplicaSet));
+    } else {
+      // Create optimized region replica set
+      TRegionReplicaSet optimizedRegionReplicaSet =
+          new TRegionReplicaSet(regionReplicaSet.getRegionId(), optimizedLocations);
+
+      context.nodeDistributionMap.put(
+          node.getPlanNodeId(),
+          new NodeDistribution(SAME_WITH_ALL_CHILDREN, optimizedRegionReplicaSet));
+    }
 
     return node;
   }
@@ -262,18 +277,24 @@ public class AddExchangeNodes
    * Finds the applicable replica hint for the given table scan node. First checks for
    * table-specific hint, then falls back to global hint.
    */
-  private ReplicaHint findReplicaHint(TableScanNode node, Map<String, Hint> hintMap) {
+  private Hint findHint(String hintName, TableScanNode node, Map<String, Hint> hintMap) {
     if (hintMap == null || hintMap.isEmpty()) {
       return null;
     }
 
-    String tableName =
-        node.getAlias() != null
-            ? node.getAlias().getValue()
-            : node.getQualifiedObjectName().getObjectName();
-    String tableSpecificKey = "replica-" + tableName;
+    String tableName = getTableName(node);
+    String tableSpecificKey = hintName + "-" + tableName;
 
-    return (ReplicaHint) hintMap.getOrDefault(tableSpecificKey, null);
+    Hint hint = hintMap.get(tableSpecificKey);
+    return hint != null ? hint : hintMap.get(hintName);
+  }
+
+  private String getTableName(TableScanNode node) {
+    if (node.getAlias() != null) {
+      return node.getAlias().getValue();
+    }
+    QualifiedObjectName fullName = node.getQualifiedObjectName();
+    return fullName.getDatabaseName() + "." + fullName.getObjectName();
   }
 
   /**

@@ -25,11 +25,9 @@ import java.util.Objects;
 
 public abstract class Hint {
   protected String hintName;
-  protected String category;
 
-  protected Hint(String hintName, String category) {
+  protected Hint(String hintName) {
     this.hintName = Objects.requireNonNull(hintName, "hintName can not be null");
-    this.category = Objects.requireNonNull(category, "category can not be null");
   }
 
   public abstract String getKey();

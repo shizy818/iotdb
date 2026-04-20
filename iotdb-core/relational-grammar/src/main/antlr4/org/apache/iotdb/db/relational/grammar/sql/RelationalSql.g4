@@ -1121,28 +1121,25 @@ selectHint
     ;
 
 hintItem
-    : leaderHint
-    | followerHint
+    : replicaHint
+    | regionRouteHint
     | parallelHint
     ;
 
-leaderHint
-    : LEADER
-    | LEADER '(' identifier (',' identifier)* ')'
+replicaHint
+    : REPLICA '(' (tableName=qualifiedName ',')? INTEGER_VALUE ')'
     ;
 
-followerHint
-    : FOLLOWER
-    | FOLLOWER '(' followerParameter (',' followerParameter)* ')'
+regionRouteHint
+    : REGION_ROUTE '(' (tableName=qualifiedName ',')? regionRoutes+=regionRouteItem (',' regionRoutes+=regionRouteItem)* ')'
     ;
 
-followerParameter
-    : identifier
-    | identifier '(' number (',' number)* ')'
+regionRouteItem
+    : '(' regionId=number ',' datanodeId=number ')'
     ;
 
 parallelHint
-    : PARALLEL '(' number ')'
+    : PARALLEL '(' INTEGER_VALUE ')'
     ;
 
 patternRecognition
@@ -1950,8 +1947,8 @@ WRITE: 'WRITE';
 YEAR: 'YEAR' | 'Y';
 ZONE: 'ZONE';
 AUDIT: 'AUDIT';
-LEADER: 'LEADER';
-FOLLOWER: 'FOLLOWER';
+REPLICA: 'REPLICA';
+REGION_ROUTE: 'REGION_ROUTE';
 PARALLEL: 'PARALLEL';
 
 AT_SIGN: '@';

@@ -22,27 +22,44 @@
 package org.apache.iotdb.db.queryengine.plan.relational.utils.hint;
 
 import org.apache.iotdb.common.rpc.thrift.TDataNodeLocation;
+import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QualifiedName;
+
+import com.google.common.collect.ImmutableList;
 
 import java.util.List;
 
-/**
- * Abstract base class for replica-related hints. Provides common functionality for hints that deal
- * with data node replica selection.
- */
-public abstract class ReplicaHint extends Hint {
-  public static String category = "replica";
+public class ReplicaHint extends Hint {
+  public static String HINT_NAME = "replica";
 
-  protected ReplicaHint(String hintName) {
-    super(hintName, category);
+  private final QualifiedName table;
+  private final int replicaIndex;
+
+  public ReplicaHint(QualifiedName table, int replicaIndex) {
+    super(HINT_NAME);
+    this.table = table;
+    this.replicaIndex = replicaIndex;
+  }
+
+  @Override
+  public String getKey() {
+    return HINT_NAME + (table == null ? "" : "-" + table);
+  }
+
+  @Override
+  public String toString() {
+    return HINT_NAME + (table == null ? "" : "-" + table) + "(" + replicaIndex + ")";
   }
 
   /**
-   * Selects data node locations based on the replica strategy. Each replica hint implementation
-   * defines its own location selection logic.
+   * Selects data node locations based on the replica strategy.
    *
    * @param dataNodeLocations the available data node locations
    * @return the selected locations based on replica hint strategy
    */
-  public abstract List<TDataNodeLocation> selectLocations(
-      List<TDataNodeLocation> dataNodeLocations);
+  public List<TDataNodeLocation> selectLocations(List<TDataNodeLocation> dataNodeLocations) {
+    if (dataNodeLocations == null || dataNodeLocations.isEmpty()) {
+      return null;
+    }
+    return ImmutableList.of(dataNodeLocations.get(replicaIndex % dataNodeLocations.size()));
+  }
 }

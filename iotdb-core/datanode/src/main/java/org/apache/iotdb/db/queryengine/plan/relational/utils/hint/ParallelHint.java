@@ -22,13 +22,12 @@
 package org.apache.iotdb.db.queryengine.plan.relational.utils.hint;
 
 public class ParallelHint extends Hint {
-  public static String category = "parallel";
-  public static String hintName = "parallel";
+  public static String HINT_NAME = "parallel";
 
   private final int parallelism;
 
   public ParallelHint(int parallelism) {
-    super(hintName, category);
+    super(HINT_NAME);
     this.parallelism = parallelism;
   }
 
@@ -38,11 +37,11 @@ public class ParallelHint extends Hint {
 
   @Override
   public String getKey() {
-    return category;
+    return HINT_NAME;
   }
 
   @Override
   public String toString() {
-    return hintName + "(" + parallelism + ")";
+    return HINT_NAME + "(" + parallelism + ")";
   }
 }
