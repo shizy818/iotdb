@@ -3,6 +3,8 @@ package org.apache.iotdb.db.queryengine.plan.relational.sql.ast;
 import com.google.common.collect.ImmutableList;
 import org.apache.tsfile.utils.RamUsageEstimator;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -11,16 +13,16 @@ public class ReplicaHintItem extends Node {
       RamUsageEstimator.shallowSizeOfInstance(ReplicaHintItem.class);
   private static final String HINT_NAME_ITEM = "replica";
 
-  private final QualifiedName table;
+  private @Nullable final QualifiedName table;
   private final int replicaIndex;
 
-  public ReplicaHintItem(QualifiedName table, int replicaIndex) {
+  public ReplicaHintItem(@Nullable QualifiedName table, int replicaIndex) {
     super(null);
     this.table = table;
     this.replicaIndex = replicaIndex;
   }
 
-  public QualifiedName getTable() {
+  public @Nullable QualifiedName getTable() {
     return table;
   }
 

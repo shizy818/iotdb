@@ -5,6 +5,8 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QualifiedName;
 
 import com.google.common.collect.ImmutableList;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
 import java.util.Map;
 
@@ -12,10 +14,10 @@ public class RegionRouteHint extends Hint {
   public static String HINT_NAME = "region_route";
   public static int ANY_TABLE = -1;
 
-  private final QualifiedName table;
+  private @Nullable final QualifiedName table;
   private final Map<Integer, Integer> regionDatanodeMap;
 
-  public RegionRouteHint(QualifiedName table, Map<Integer, Integer> regionDatanodeMa) {
+  public RegionRouteHint(@Nullable QualifiedName table, Map<Integer, Integer> regionDatanodeMa) {
     super(HINT_NAME);
     this.table = table;
     this.regionDatanodeMap = regionDatanodeMa;

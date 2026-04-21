@@ -26,15 +26,17 @@ import org.apache.iotdb.db.queryengine.plan.relational.sql.ast.QualifiedName;
 
 import com.google.common.collect.ImmutableList;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
 
 public class ReplicaHint extends Hint {
   public static String HINT_NAME = "replica";
 
-  private final QualifiedName table;
+  private @Nullable final QualifiedName table;
   private final int replicaIndex;
 
-  public ReplicaHint(QualifiedName table, int replicaIndex) {
+  public ReplicaHint(@Nullable QualifiedName table, int replicaIndex) {
     super(HINT_NAME);
     this.table = table;
     this.replicaIndex = replicaIndex;

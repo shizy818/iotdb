@@ -3,6 +3,8 @@ package org.apache.iotdb.db.queryengine.plan.relational.sql.ast;
 import com.google.common.collect.ImmutableList;
 import org.apache.tsfile.utils.RamUsageEstimator;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -12,16 +14,17 @@ public class RegionRouteHintItem extends Node {
       RamUsageEstimator.shallowSizeOfInstance(RegionRouteHintItem.class);
   private static final String HINT_NAME_ITEM = "region_route";
 
-  private final QualifiedName table;
+  private @Nullable final QualifiedName table;
   private final Map<Integer, Integer> regionDatanodeMap;
 
-  public RegionRouteHintItem(QualifiedName table, Map<Integer, Integer> regionDatanodeMap) {
+  public RegionRouteHintItem(
+      @Nullable QualifiedName table, Map<Integer, Integer> regionDatanodeMap) {
     super(null);
     this.table = table;
     this.regionDatanodeMap = regionDatanodeMap;
   }
 
-  public QualifiedName getTable() {
+  public @Nullable QualifiedName getTable() {
     return table;
   }
 
