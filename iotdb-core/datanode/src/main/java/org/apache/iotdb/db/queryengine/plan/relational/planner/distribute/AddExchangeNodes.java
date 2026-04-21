@@ -296,13 +296,4 @@ public class AddExchangeNodes
     QualifiedObjectName fullName = node.getQualifiedObjectName();
     return fullName.getDatabaseName() + "." + fullName.getObjectName();
   }
-
-  /**
-   * Selects data node locations based on the provided hint using polymorphism. - ReplicaHint: Uses
-   * the hint's own selectLocations strategy - Other hints or null: Returns all original locations
-   */
-  private List<TDataNodeLocation> selectLocations(
-      List<TDataNodeLocation> dataNodeLocations, ReplicaHint hint) {
-    return hint.selectLocations(dataNodeLocations);
-  }
 }

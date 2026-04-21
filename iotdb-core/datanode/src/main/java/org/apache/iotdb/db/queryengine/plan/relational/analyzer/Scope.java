@@ -31,12 +31,11 @@ import org.apache.iotdb.rpc.TSStatusCode;
 
 import com.google.common.collect.ImmutableMap;
 
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Predicate;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -58,7 +57,7 @@ public class Scope {
   // Tables to access for the current relation. For CTE materialization and constant folding
   // subqueries, non-materialized CTEs in tables must be identified, and their definitions
   // attached to the subquery context.
-  private Set<Identifier> tables;
+  private List<Identifier> tables;
 
   public static Scope create() {
     return builder().build();
@@ -74,24 +73,24 @@ public class Scope {
       RelationId relationId,
       RelationType relation,
       Map<String, WithQuery> namedQueries,
-      Set<Identifier> tables) {
+      List<Identifier> tables) {
     this.parent = requireNonNull(parent, "parent is null");
     this.relationId = requireNonNull(relationId, "relationId is null");
     this.queryBoundary = queryBoundary;
     this.relation = requireNonNull(relation, "relation is null");
     this.namedQueries = ImmutableMap.copyOf(requireNonNull(namedQueries, "namedQueries is null"));
-    this.tables = new HashSet<>(requireNonNull(tables, "tables is null"));
+    this.tables = new ArrayList<>(requireNonNull(tables, "tables is null"));
   }
 
   public void addTable(Table table) {
     tables.add(new Identifier(table.getName().getSuffix()));
   }
 
-  public void setTables(Set<Identifier> tables) {
+  public void setTables(List<Identifier> tables) {
     this.tables = tables;
   }
 
-  public Set<Identifier> getTables() {
+  public List<Identifier> getTables() {
     return tables;
   }
 
@@ -350,7 +349,7 @@ public class Scope {
     private RelationId relationId = RelationId.anonymous();
     private RelationType relationType = new RelationType();
     private final Map<String, WithQuery> namedQueries = new HashMap<>();
-    private final Set<Identifier> tables = new HashSet<>();
+    private final List<Identifier> tables = new ArrayList<>();
     private Optional<Scope> parent = Optional.empty();
     private boolean queryBoundary;
 
@@ -389,7 +388,7 @@ public class Scope {
       return this;
     }
 
-    public Builder withTables(Set<Identifier> tables) {
+    public Builder withTables(List<Identifier> tables) {
       this.tables.addAll(tables);
       return this;
     }

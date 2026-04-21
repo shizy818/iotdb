@@ -3729,7 +3729,7 @@ public class StatementAnalyzer {
       joinConditionCheck(criteria);
 
       // Remember original tables before processing left
-      Set<Identifier> originalTables = new HashSet<>();
+      List<Identifier> originalTables = new ArrayList<>();
       scope.ifPresent(s -> originalTables.addAll(s.getTables()));
 
       Scope left = process(node.getLeft(), scope);

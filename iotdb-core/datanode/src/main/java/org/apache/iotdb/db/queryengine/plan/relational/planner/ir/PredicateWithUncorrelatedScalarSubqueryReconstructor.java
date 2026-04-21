@@ -55,7 +55,6 @@ import org.apache.tsfile.read.common.block.TsBlock;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -119,7 +118,7 @@ public class PredicateWithUncorrelatedScalarSubqueryReconstructor {
       Query query = subqueryExpression.getQuery();
       Query q = query;
       if (with != null) {
-        Set<Identifier> tables = context.getTables(query);
+        List<Identifier> tables = context.getTables(query);
         List<WithQuery> withQueries =
             with.getQueries().stream()
                 .filter(
