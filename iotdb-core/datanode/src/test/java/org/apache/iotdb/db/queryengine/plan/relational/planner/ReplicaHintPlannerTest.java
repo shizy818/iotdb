@@ -21,6 +21,8 @@ package org.apache.iotdb.db.queryengine.plan.relational.planner;
 
 import org.apache.iotdb.common.rpc.thrift.TDataNodeLocation;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.FragmentInstance;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.PlanNode;
+import org.apache.iotdb.db.queryengine.plan.relational.planner.node.AggregationNode;
 import org.apache.iotdb.db.queryengine.plan.relational.planner.node.TableScanNode;
 import org.apache.iotdb.db.queryengine.plan.relational.sql.parser.ParsingException;
 
@@ -32,6 +34,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class ReplicaHintPlannerTest extends PlanTester {
 
@@ -88,6 +91,15 @@ public class ReplicaHintPlannerTest extends PlanTester {
     createPlan(sql);
     for (int fragment = 1; fragment <= 3; fragment++) {
       verifyReplica(fragment, ImmutableMap.of("table1", 1));
+    }
+  }
+
+  @Test
+  public void testReplicaHintWithAgg() {
+    String sql = "SELECT /*+ REPLICA(0) */ tag1, avg(s1) FROM table1 GROUP BY tag1";
+    createPlan(sql);
+    for (int fragment = 1; fragment <= 3; fragment++) {
+      verifyReplica(fragment, ImmutableMap.of("table1", 0));
     }
   }
 
@@ -178,18 +190,29 @@ public class ReplicaHintPlannerTest extends PlanTester {
 
   private void verifyReplica(int fragment, Map<String, Integer> tableToReplica) {
     FragmentInstance fragmentInstance = getFragmentInstance(fragment);
-    TableScanNode fragmentPlan = (TableScanNode) getFragmentPlan(fragment);
+    PlanNode fragmentPlan = getFragmentPlan(fragment);
+
+    TableScanNode tableScanNode = null;
+    if (fragmentPlan instanceof AggregationNode) {
+      tableScanNode = (TableScanNode) fragmentPlan.getChildren().get(0);
+    } else if (fragmentPlan instanceof TableScanNode) {
+      tableScanNode = (TableScanNode) fragmentPlan;
+    }
+    if (tableScanNode == null) {
+      fail("tableScanNode must not be null");
+    }
+
     assertEquals(
-        fragmentPlan.getRegionReplicaSet().getRegionId().getId(),
+        tableScanNode.getRegionReplicaSet().getRegionId().getId(),
         fragmentInstance.getRegionReplicaSet().getRegionId().getId());
 
     String tableName =
-        fragmentPlan.getAlias() != null
-            ? fragmentPlan.getAlias().getValue()
-            : fragmentPlan.getQualifiedObjectName().getObjectName();
+        tableScanNode.getAlias() != null
+            ? tableScanNode.getAlias().getValue()
+            : tableScanNode.getQualifiedObjectName().getObjectName();
 
     List<TDataNodeLocation> replicaNodes =
-        fragmentPlan.getRegionReplicaSet().getDataNodeLocations();
+        tableScanNode.getRegionReplicaSet().getDataNodeLocations();
     TDataNodeLocation queryNode = fragmentInstance.getHostDataNode();
 
     assertEquals(2, replicaNodes.size());
