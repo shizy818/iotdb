@@ -29,6 +29,7 @@ import org.apache.iotdb.db.queryengine.common.QueryId;
 import org.apache.iotdb.db.queryengine.common.SessionInfo;
 import org.apache.iotdb.db.queryengine.execution.warnings.WarningCollector;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.DistributedQueryPlan;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.FragmentInstance;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.LogicalQueryPlan;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.node.PlanNode;
 import org.apache.iotdb.db.queryengine.plan.relational.analyzer.Analysis;
@@ -161,6 +162,10 @@ public class PlanTester {
     return plan;
   }
 
+  public Analysis getAnalysis() {
+    return analysis;
+  }
+
   public LogicalQueryPlan createPlan(
       SessionInfo sessionInfo,
       String sql,
@@ -233,5 +238,15 @@ public class PlanTester {
               .plan();
     }
     return distributedQueryPlan.getFragments().get(index).getPlanNodeTree().getChildren().get(0);
+  }
+
+  public FragmentInstance getFragmentInstance(int index) {
+    if (distributedQueryPlan == null) {
+      distributedQueryPlan =
+          new TableDistributedPlanner(
+                  analysis, symbolAllocator, plan, metadata, dataNodeLocationSupplier)
+              .plan();
+    }
+    return distributedQueryPlan.getInstances().get(index);
   }
 }

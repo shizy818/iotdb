@@ -151,6 +151,9 @@ public class MPPQueryContext implements IAuditEntity {
   // Tables in the subquery
   private final Map<NodeRef<Query>, List<Identifier>> subQueryTables = new HashMap<>();
 
+  // parallel hint
+  private int parallelism = 0;
+
   @TestOnly
   public MPPQueryContext(QueryId queryId) {
     this.queryId = queryId;
@@ -672,6 +675,14 @@ public class MPPQueryContext implements IAuditEntity {
   public IAuditEntity setSqlString(String sqlString) {
     // Do nothing
     return this;
+  }
+
+  public int getParallelism() {
+    return parallelism;
+  }
+
+  public void setParallelism(int parallelism) {
+    this.parallelism = parallelism;
   }
 
   // ================= Authentication Interfaces =========================
