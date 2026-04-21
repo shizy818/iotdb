@@ -38,7 +38,6 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Locale;
 
-import static org.apache.iotdb.db.it.utils.TestUtils.tableAssertTestFail;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -93,9 +92,14 @@ public class IoTDBHintIT {
 
   @Test
   public void testReplicaHintWithInvalidTable() {
-    String sql = "SELECT /*+ REPLICA(t1, 2) */ * FROM testtb";
-    String expectedErrMsg = "Invalid table : testdb.t1";
-    tableAssertTestFail(sql, expectedErrMsg, DATABASE_NAME);
+    try (Connection connection = EnvFactory.getEnv().getConnection(BaseEnv.TABLE_SQL_DIALECT);
+        Statement statement = connection.createStatement()) {
+      statement.execute("use " + DATABASE_NAME);
+      String sql = "SELECT /*+ REPLICA(t1, 2) */ * FROM testtb";
+      statement.executeQuery(sql);
+    } catch (Exception e) {
+      fail(e.getMessage());
+    }
   }
 
   @Test

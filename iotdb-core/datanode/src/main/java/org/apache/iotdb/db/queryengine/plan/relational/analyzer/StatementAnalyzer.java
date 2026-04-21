@@ -1520,20 +1520,7 @@ public class StatementAnalyzer {
     public Scope visitSelectHint(SelectHint node, final Optional<Scope> context) {
       Map<String, Hint> hintMap = new HashMap<>();
       for (Node hintItem : node.getHintItems()) {
-        Hint hint = null;
-        if (hintItem instanceof ReplicaHintItem) {
-          ReplicaHintItem replicaHintItem = (ReplicaHintItem) hintItem;
-          QualifiedName table = getValidTable(replicaHintItem.getTable());
-          hint = new ReplicaHint(table, replicaHintItem.getReplicaIndex());
-        } else if (hintItem instanceof RegionRouteHintItem) {
-          RegionRouteHintItem regionRouteHintItem = (RegionRouteHintItem) hintItem;
-          QualifiedName table = getValidTable(regionRouteHintItem.getTable());
-          hint = new RegionRouteHint(table, regionRouteHintItem.getRegionDatanodeMap());
-        } else if (hintItem instanceof ParallelHintItem) {
-          ParallelHintItem parallelHintItem = (ParallelHintItem) hintItem;
-          int parallelism = parallelHintItem.getParallelism();
-          hint = new ParallelHint(parallelism);
-        }
+        Hint hint = processHintItem(hintItem);
         if (hint != null) {
           hintMap.putIfAbsent(hint.getKey(), hint);
         }
@@ -1542,11 +1529,35 @@ public class StatementAnalyzer {
       return createAndAssignScope(node, context);
     }
 
-    private QualifiedName getValidTable(QualifiedName table) {
-      if (table == null) {
-        return null;
+    private Hint processHintItem(Node hintItem) {
+      if (hintItem instanceof ReplicaHintItem) {
+        ReplicaHintItem item = (ReplicaHintItem) hintItem;
+        QualifiedName table = item.getTable();
+        if (table == null) {
+          return new ReplicaHint(null, item.getReplicaIndex());
+        }
+        QualifiedName resolvedTable = resolveTable(table);
+        if (resolvedTable != null) {
+          return new ReplicaHint(resolvedTable, item.getReplicaIndex());
+        }
+      } else if (hintItem instanceof RegionRouteHintItem) {
+        RegionRouteHintItem item = (RegionRouteHintItem) hintItem;
+        QualifiedName table = item.getTable();
+        if (table == null) {
+          return new RegionRouteHint(null, item.getRegionDatanodeMap());
+        }
+        QualifiedName resolvedTable = resolveTable(table);
+        if (resolvedTable != null) {
+          return new RegionRouteHint(resolvedTable, item.getRegionDatanodeMap());
+        }
+      } else if (hintItem instanceof ParallelHintItem) {
+        ParallelHintItem item = (ParallelHintItem) hintItem;
+        return new ParallelHint(item.getParallelism());
       }
+      return null;
+    }
 
+    private QualifiedName resolveTable(QualifiedName table) {
       List<QualifiedName> existingTables =
           analysis.getRelationNames().values().stream().collect(toImmutableList());
 
@@ -1561,7 +1572,7 @@ public class StatementAnalyzer {
           QualifiedName.of(tableObjectName.getDatabaseName(), tableObjectName.getObjectName());
 
       if (!existingTables.contains(tableName)) {
-        throw new SemanticException(String.format("Invalid table : %s", tableName));
+        return null;
       }
       return tableName;
     }
