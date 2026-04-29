@@ -23,6 +23,7 @@ import org.apache.iotdb.commons.path.MeasurementPath;
 import org.apache.iotdb.commons.path.PartialPath;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
+import org.apache.iotdb.db.queryengine.exception.MemoryNotEnoughException;
 import org.apache.iotdb.db.queryengine.execution.fragment.FragmentInstanceContext;
 import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.queryengine.plan.planner.memory.MemoryReservationManager;
@@ -148,7 +149,7 @@ public abstract class ResourceByPathUtils {
     // mutable tvlist
     TVList list = memChunk.getWorkingTVList();
     TVList cloneList = null;
-    long tvListRamSize = list.calculateRamSize();
+    TVList.RamInfo listRamInfo = list.calculateRamSize();
     list.lockQueryList();
     try {
       if (copyTimeFilter != null
@@ -189,8 +190,8 @@ public abstract class ResourceByPathUtils {
           if (firstQuery instanceof FragmentInstanceContext) {
             MemoryReservationManager memoryReservationManager =
                 ((FragmentInstanceContext) firstQuery).getMemoryReservationContext();
-            memoryReservationManager.reserveMemoryCumulatively(tvListRamSize);
-            list.setReservedMemoryBytes(tvListRamSize);
+            memoryReservationManager.reserveMemoryCumulatively(listRamInfo.getRamSize());
+            list.setReservedMemoryBytes(listRamInfo.getRamSize());
           }
           list.setOwnerQuery(firstQuery);
 
@@ -200,6 +201,14 @@ public abstract class ResourceByPathUtils {
           tvListQueryMap.put(cloneList, cloneList.rowCount());
         }
       }
+    } catch (MemoryNotEnoughException ex) {
+      LOGGER.warn(
+          "Failed to reserve memory for TVList: ramSize {}, timestampsSize {}, arrayMemCost {}, rowCount {}, dataTypes {}",
+          listRamInfo.getRamSize(),
+          listRamInfo.getTimestampsSize(),
+          listRamInfo.getArrayMemCost(),
+          listRamInfo.getRowCount(),
+          listRamInfo.getDataTypes());
     } finally {
       list.unlockQueryList();
     }
