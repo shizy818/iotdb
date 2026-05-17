@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.db.utils.datastructure;
 
+import org.apache.iotdb.db.queryengine.execution.fragment.QueryContext;
 import org.apache.iotdb.db.queryengine.plan.statement.component.Ordering;
 import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.IWALByteBufferView;
 import org.apache.iotdb.db.storageengine.dataregion.wal.utils.WALWriteUtils;
@@ -45,6 +46,8 @@ import org.apache.tsfile.write.UnSupportedDataTypeException;
 import org.apache.tsfile.write.chunk.AlignedChunkWriterImpl;
 import org.apache.tsfile.write.chunk.IChunkWriter;
 import org.apache.tsfile.write.chunk.ValueChunkWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -63,6 +66,7 @@ import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_ARRAY_HEADER;
 import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_OBJECT_REF;
 
 public abstract class AlignedTVList extends TVList {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AlignedTVList.class);
 
   // Data types of this aligned tvList
   protected List<TSDataType> dataTypes;
@@ -93,6 +97,7 @@ public abstract class AlignedTVList extends TVList {
     for (int i = 0; i < types.size(); i++) {
       values.add(new ArrayList<>());
     }
+    cloned = 0;
   }
 
   public static AlignedTVList newAlignedList(List<TSDataType> dataTypes) {
@@ -144,6 +149,7 @@ public abstract class AlignedTVList extends TVList {
     cloneList.memoryBinaryChunkSize = this.memoryBinaryChunkSize;
     cloneList.values = this.values;
     cloneList.bitMaps = this.bitMaps;
+    cloneList.cloned = 1;
     return cloneList;
   }
 
@@ -177,6 +183,7 @@ public abstract class AlignedTVList extends TVList {
         }
       }
     }
+    cloneList.cloned = 2;
     return cloneList;
   }
 
@@ -1265,6 +1272,7 @@ public abstract class AlignedTVList extends TVList {
     }
 
     AlignedTVList tvList = AlignedTVList.newAlignedList(new ArrayList<>(dataTypes));
+    tvList.cloned = 3;
     tvList.putAlignedValues(times, values, bitMaps, 0, rowCount);
     return tvList;
   }
@@ -1449,92 +1457,107 @@ public abstract class AlignedTVList extends TVList {
     @Override
     @SuppressWarnings("java:S6541")
     protected void prepareNext() {
-      // find the first row that is neither deleted nor empty (all NULL values)
-      findValidRow = false;
-      while (index < rows && !findValidRow) {
-        // all columns values are deleted
-        int convertedScanOrderValueIndex = getValueIndex(getScanOrderIndex(index));
-        if ((allValueColDeletedMap != null
-            && allValueColDeletedMap.isMarked(convertedScanOrderValueIndex))) {
-          index++;
-          continue;
-        }
-        long time = getTime(getScanOrderIndex(index));
-        if (!isTimeSatisfied(time)) {
-          index++;
-          continue;
-        }
+      try {
+        // find the first row that is neither deleted nor empty (all NULL values)
+        findValidRow = false;
+        while (index < rows && !findValidRow) {
+          // all columns values are deleted
+          int convertedScanOrderValueIndex = getValueIndex(getScanOrderIndex(index));
+          if ((allValueColDeletedMap != null
+              && allValueColDeletedMap.isMarked(convertedScanOrderValueIndex))) {
+            index++;
+            continue;
+          }
+          long time = getTime(getScanOrderIndex(index));
+          if (!isTimeSatisfied(time)) {
+            index++;
+            continue;
+          }
 
-        // does not find any valid row
-        if (index >= rows) {
-          probeNext = true;
-          return;
-        }
+          // does not find any valid row
+          if (index >= rows) {
+            probeNext = true;
+            return;
+          }
 
-        // When traversing in ASC order, we only need to overwrite the previous non-null value
-        // with the non-null value encountered later.
-        // When traversing in DESC order, we need to keep the non-null value encountered first,
-        // and only overwrite it if the previous value is null and current value is non-null.
-        for (int i = 0; i < selectedIndices.length; i++) {
-          // In order to identify the previous null, we use index -1 here to represent.
-          // The -1 here is also used for checking all null rows
-          selectedIndices[i] = isNullValue(index, i) ? -1 : index;
-        }
-        findValidRow = true;
+          // When traversing in ASC order, we only need to overwrite the previous non-null value
+          // with the non-null value encountered later.
+          // When traversing in DESC order, we need to keep the non-null value encountered first,
+          // and only overwrite it if the previous value is null and current value is non-null.
+          for (int i = 0; i < selectedIndices.length; i++) {
+            // In order to identify the previous null, we use index -1 here to represent.
+            // The -1 here is also used for checking all null rows
+            selectedIndices[i] = isNullValue(index, i) ? -1 : index;
+          }
+          findValidRow = true;
 
-        // handle duplicated timestamp
-        // We can use the selectedIndices structure to handle the value coverage of ASC or DESC
-        // traversal
-        while (index + 1 < rows
-            && getTime(getScanOrderIndex(index + 1)) == getTime(getScanOrderIndex(index))) {
-          index++;
-          // skip all-Null rows if allValueColDeletedMap exists
-          if (allValueColDeletedMap == null
-              || !allValueColDeletedMap.isMarked(getValueIndex(getScanOrderIndex(index)))) {
-            for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
-              if (!scanOrder.isAscending() && selectedIndices[columnIndex] != -1) {
-                // non -1 value means it already set the latest point index
-                continue;
-              }
-              // update selected index if the column is not null
-              if (!isNullValue(index, columnIndex)) {
-                selectedIndices[columnIndex] = index;
+          // handle duplicated timestamp
+          // We can use the selectedIndices structure to handle the value coverage of ASC or DESC
+          // traversal
+          while (index + 1 < rows
+              && getTime(getScanOrderIndex(index + 1)) == getTime(getScanOrderIndex(index))) {
+            index++;
+            // skip all-Null rows if allValueColDeletedMap exists
+            if (allValueColDeletedMap == null
+                || !allValueColDeletedMap.isMarked(getValueIndex(getScanOrderIndex(index)))) {
+              for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
+                if (!scanOrder.isAscending() && selectedIndices[columnIndex] != -1) {
+                  // non -1 value means it already set the latest point index
+                  continue;
+                }
+                // update selected index if the column is not null
+                if (!isNullValue(index, columnIndex)) {
+                  selectedIndices[columnIndex] = index;
+                }
               }
             }
           }
-        }
 
-        // valueColumnsDeletionList is set when AlignedTVList iterator is created by
-        // MemPointIterator.single method. Otherwise, it is checked by
-        // MergeSortMultiAlignedTVListIterator or OrderedMultiAlignedTVListIterator.
-        BitMap bitMap = null;
-        time = getTime(getScanOrderIndex(index));
-        for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
-          if (selectedIndices[columnIndex] == -1
-              || (valueColumnsDeletionList != null
-                  && isPointDeleted(
-                      time,
-                      valueColumnsDeletionList.get(columnIndex),
-                      valueColumnDeleteCursor.get(columnIndex),
-                      scanOrder))) {
-            bitMap = bitMap == null ? new BitMap(dataTypeList.size()) : bitMap;
-            bitMap.mark(columnIndex);
+          // valueColumnsDeletionList is set when AlignedTVList iterator is created by
+          // MemPointIterator.single method. Otherwise, it is checked by
+          // MergeSortMultiAlignedTVListIterator or OrderedMultiAlignedTVListIterator.
+          BitMap bitMap = null;
+          time = getTime(getScanOrderIndex(index));
+          for (int columnIndex = 0; columnIndex < dataTypeList.size(); columnIndex++) {
+            if (selectedIndices[columnIndex] == -1
+                || (valueColumnsDeletionList != null
+                    && isPointDeleted(
+                        time,
+                        valueColumnsDeletionList.get(columnIndex),
+                        valueColumnDeleteCursor.get(columnIndex),
+                        scanOrder))) {
+              bitMap = bitMap == null ? new BitMap(dataTypeList.size()) : bitMap;
+              bitMap.mark(columnIndex);
+            }
+          }
+          if (bitMap != null && bitMap.isAllMarked()) {
+            findValidRow = false;
+            index++;
+            continue;
+          }
+          // We previously set some -1. If these values are still -1 in the end,
+          // it means that each index is invalid. At this time, we can use any one at random.
+          for (int i = 0; i < selectedIndices.length; i++) {
+            if (selectedIndices[i] == -1) {
+              selectedIndices[i] = index;
+            }
           }
         }
-        if (bitMap != null && bitMap.isAllMarked()) {
-          findValidRow = false;
-          index++;
-          continue;
+        probeNext = true;
+      } catch (Exception ex) {
+        for (QueryContext ctx : queryContextSet) {
+          LOGGER.error("Query {} id {}", ctx, ctx.getQueryId());
         }
-        // We previously set some -1. If these values are still -1 in the end,
-        // it means that each index is invalid. At this time, we can use any one at random.
-        for (int i = 0; i < selectedIndices.length; i++) {
-          if (selectedIndices[i] == -1) {
-            selectedIndices[i] = index;
-          }
-        }
+        LOGGER.error(
+            "AlignedTVList {} - cloned {}, rowCount {}, seqRowCount {}, iterator rows {}",
+            this,
+            cloned,
+            rowCount,
+            seqRowCount,
+            rows);
+        LOGGER.error("AlignedTVList {} - {} ", this, String.join("\n", operations));
+        throw ex;
       }
-      probeNext = true;
     }
 
     // When used as a point reader, we should not apply a pagination controller or push down filter
@@ -1649,49 +1672,65 @@ public abstract class AlignedTVList extends TVList {
       LazyBitMap timeDuplicatedInfo = null;
 
       int startIndex = index;
-      // time column
-      for (; index < rows; index++) {
-        long time = getTime(getScanOrderIndex(index));
-        if (validRowCount >= maxNumberOfPointsInPage || isCurrentTimeExceedTimeRange(time)) {
-          break;
-        }
-        // skip invalid row
-        if ((allValueColDeletedMap != null
-                && allValueColDeletedMap.isMarked(getValueIndex(getScanOrderIndex(index))))
-            || !isTimeSatisfied(time)) {
-          timeInvalidInfo =
-              timeInvalidInfo == null
-                  ? new LazyBitMap(index, maxRowCountOfCurrentBatch, rows - 1)
-                  : timeInvalidInfo;
-          timeInvalidInfo.mark(index);
-          continue;
-        }
-        int nextRowIndex = index + 1;
-        while (nextRowIndex < rows
-            && ((allValueColDeletedMap != null
-                    && allValueColDeletedMap.isMarked(
-                        getValueIndex(getScanOrderIndex(nextRowIndex))))
-                || !isTimeSatisfied(getTime(getScanOrderIndex(nextRowIndex))))) {
-          timeInvalidInfo =
-              timeInvalidInfo == null
-                  ? new LazyBitMap(nextRowIndex, maxRowCountOfCurrentBatch, rows - 1)
-                  : timeInvalidInfo;
-          timeInvalidInfo.mark(nextRowIndex);
-          nextRowIndex++;
-        }
-        if ((nextRowIndex == rows || time != getTime(getScanOrderIndex(nextRowIndex)))) {
-          timeBuilder.writeLong(time);
-          validRowCount++;
-        } else {
-          if (Objects.isNull(timeDuplicatedInfo)) {
-            timeDuplicatedInfo = new LazyBitMap(index, maxRowCountOfCurrentBatch, rows - 1);
+      try {
+        // time column
+        for (; index < rows; index++) {
+          long time = getTime(getScanOrderIndex(index));
+          if (validRowCount >= maxNumberOfPointsInPage || isCurrentTimeExceedTimeRange(time)) {
+            break;
           }
-          // For this timeDuplicatedInfo, we mark all positions that are not the last one in the
-          // ASC traversal. It has the same behaviour for the DESC traversal, because our ultimate
-          // goal is to process all the data with the same timestamp before writing it into TsBlock.
-          timeDuplicatedInfo.mark(index);
+          // skip invalid row
+          if ((allValueColDeletedMap != null
+                  && allValueColDeletedMap.isMarked(getValueIndex(getScanOrderIndex(index))))
+              || !isTimeSatisfied(time)) {
+            timeInvalidInfo =
+                timeInvalidInfo == null
+                    ? new LazyBitMap(index, maxRowCountOfCurrentBatch, rows - 1)
+                    : timeInvalidInfo;
+            timeInvalidInfo.mark(index);
+            continue;
+          }
+          int nextRowIndex = index + 1;
+          while (nextRowIndex < rows
+              && ((allValueColDeletedMap != null
+                      && allValueColDeletedMap.isMarked(
+                          getValueIndex(getScanOrderIndex(nextRowIndex))))
+                  || !isTimeSatisfied(getTime(getScanOrderIndex(nextRowIndex))))) {
+            timeInvalidInfo =
+                timeInvalidInfo == null
+                    ? new LazyBitMap(nextRowIndex, maxRowCountOfCurrentBatch, rows - 1)
+                    : timeInvalidInfo;
+            timeInvalidInfo.mark(nextRowIndex);
+            nextRowIndex++;
+          }
+          if ((nextRowIndex == rows || time != getTime(getScanOrderIndex(nextRowIndex)))) {
+            timeBuilder.writeLong(time);
+            validRowCount++;
+          } else {
+            if (Objects.isNull(timeDuplicatedInfo)) {
+              timeDuplicatedInfo = new LazyBitMap(index, maxRowCountOfCurrentBatch, rows - 1);
+            }
+            // For this timeDuplicatedInfo, we mark all positions that are not the last one in the
+            // ASC traversal. It has the same behaviour for the DESC traversal, because our ultimate
+            // goal is to process all the data with the same timestamp before writing it into
+            // TsBlock.
+            timeDuplicatedInfo.mark(index);
+          }
+          index = nextRowIndex - 1;
         }
-        index = nextRowIndex - 1;
+      } catch (Exception ex) {
+        for (QueryContext ctx : queryContextSet) {
+          LOGGER.error("Query {} id {}", ctx, ctx.getQueryId());
+        }
+        LOGGER.error(
+            "AlignedTVList {} - cloned {}, rowCount {}, seqRowCount {}, iterator rows {}",
+            this,
+            cloned,
+            rowCount,
+            seqRowCount,
+            rows);
+        LOGGER.error("AlignedTVList {} - {} ", this, String.join("\n", operations));
+        throw ex;
       }
 
       boolean[] hasAnyNonNullValue = new boolean[validRowCount];

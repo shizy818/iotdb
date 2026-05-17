@@ -208,15 +208,27 @@ public class PrimitiveMemTableTest {
         resourcesByPathUtils.getReadOnlyMemChunkFromMemTable(
             new QueryContext(), memTable, null, Long.MAX_VALUE, null);
 
-    for (int i = 1; i <= 50; i++) {
-      memTable.writeAlignedRow(
-          new PlainDeviceID("root.test.d1"), measurementSchemas, i, new Object[] {i, i, i});
-    }
-    memTable.getWritableMemChunk(new PlainDeviceID("root.test.d1"), "").sortTvListForFlush();
+    TVList tvList =
+        memTable
+            .getMemTableMap()
+            .get(new PlainDeviceID("root.test.d1"))
+            .getMemChunkMap()
+            .get("")
+            .getWorkingTVList();
+    //    tvList.getQueryContextSet().add(Mockito.mock(FragmentInstanceContext.class));
 
     readOnlyMemChunk.sortTvLists();
 
+    for (int i = 0; i < 500; i++) {
+      memTable.writeAlignedRow(
+          new PlainDeviceID("root.test.d1"), measurementSchemas, i, new Object[] {i, i, i});
+    }
+
     MemPointIterator memPointIterator = readOnlyMemChunk.createMemPointIterator(Ordering.ASC, null);
+
+    tvList.getQueryContextSet().clear();
+    memTable.getWritableMemChunk(new PlainDeviceID("root.test.d1"), "").sortTvListForFlush();
+
     while (memPointIterator.hasNextBatch()) {
       memPointIterator.nextBatch();
     }

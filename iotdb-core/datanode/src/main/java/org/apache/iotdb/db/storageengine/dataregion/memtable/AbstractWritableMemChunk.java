@@ -229,6 +229,12 @@ public abstract class AbstractWritableMemChunk implements IWritableMemChunk {
     }
     workingListForFlush =
         needCloneTimesAndIndicesInWorkingTVList ? workingList.cloneForFlushSort() : workingList;
+    workingListForFlush.operations.add(
+        String.format(
+            "sort workingList for flush - rowCount %d, seqRowCount %d, workingListForFlush == workingList %b",
+            workingListForFlush.rowCount(),
+            workingListForFlush.seqRowCount(),
+            workingListForFlush == workingList));
     workingListForFlush.sort();
   }
 

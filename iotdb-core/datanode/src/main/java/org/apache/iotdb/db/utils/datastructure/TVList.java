@@ -61,6 +61,9 @@ import static org.apache.tsfile.utils.RamUsageEstimator.NUM_BYTES_OBJECT_REF;
 public abstract class TVList implements WALEntryValue {
   protected static final String ERR_DATATYPE_NOT_CONSISTENT = "DataType not consistent";
 
+  public int cloned;
+  public List<String> operations = new ArrayList<>();
+
   public static class RamInfo {
     private final int timestampsSize;
     private final long arrayMemCost;

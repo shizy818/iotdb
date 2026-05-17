@@ -45,6 +45,8 @@ import org.apache.tsfile.read.reader.IPointReader;
 import org.apache.tsfile.utils.TsPrimitiveType;
 import org.apache.tsfile.write.UnSupportedDataTypeException;
 import org.apache.tsfile.write.schema.IMeasurementSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -53,6 +55,8 @@ import java.util.List;
 import java.util.Map;
 
 public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AlignedReadOnlyMemChunk.class);
+
   private final String timeChunkName;
 
   private final List<String> valueChunkNames;
@@ -121,6 +125,13 @@ public class AlignedReadOnlyMemChunk extends ReadOnlyMemChunk {
         // involved in current sort operation.
         // We must update queryRowCount here, otherwise, it may be used later to build
         // BitMaps, causing bitmap array size mismatch and possible out of bound.
+        alignedTvList.operations.add(
+            String.format(
+                "ReadOnlyMemChunk sort by query %s id %d - rowCount %d, seqRowCount %d",
+                context,
+                context.getQueryId(),
+                alignedTvList.rowCount(),
+                alignedTvList.seqRowCount()));
         entry.setValue(alignedTvList.sort());
         long alignedTvListRamSize = alignedTvList.calculateRamSize().getRamSize();
         alignedTvList.lockQueryList();
